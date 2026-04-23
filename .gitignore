@@ -1,0 +1,62 @@
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Environment
+.env
+.env.*
+!.env.example
+!**/.env.example
+
+# Logs
+*.log
+logs/
+
+# Node / frontend
+node_modules/
+dist/
+build/
+.next/
+.nuxt/
+coverage/
+
+# Python / backend / analysis
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+htmlcov/
+.ipynb_checkpoints/
+
+# Data and generated artifacts
+data/**
+!data/
+!data/**/
+!data/**/.gitkeep
+models/**
+!models/
+!models/**/
+!models/**/.gitkeep
+artifacts/
+outputs/
+reports/generated/
+
+# Database / infra local state
+*.sqlite
+*.sqlite3
+*.db
+.terraform/
+*.tfstate
+*.tfstate.*
+
+# Secrets / certificates
+*.pem
+*.key
+*.crt
+secrets/

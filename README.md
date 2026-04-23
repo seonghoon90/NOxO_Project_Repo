@@ -1,1 +1,3 @@
-# NOxO_Project_Repo
+# NOxO Project
+
+AI 기반 대기오염물질 배출 예측 및 발전소 최적 운전조건 추천 프로젝트입니다.
