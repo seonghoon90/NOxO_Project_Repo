@@ -17,6 +17,7 @@
 | `IGCC.CC.G1.VNPR_P` | **`npr_primary`** | FLOAT | 1차 노즐 압력비 | Feature (안정성) |
 | `IGCC.CC.G1.ATID` | **`ambient_temp`** | FLOAT | 대기 온도 | Feature (외기) |
 | `IGCC.CC.G1.NQJ` | **`dgan_flow`** | FLOAT | 희석질소 유량 | Feature |
+| `IGCC.CC.G1.CSGV` | **`igv`** | FLOAT | IGV 개도 | Feature |
 
 ---
 

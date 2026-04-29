@@ -2,10 +2,15 @@ import pandas as pd
 import glob
 import os
 from sqlalchemy import create_engine
+from dotenv import load_dotenv
 
-TARGET_FOLDER = "250811-250825"
+current_dir = os.path.dirname(os.path.abspath(__file__))
+
+TARGET_FOLDER = os.path.join(current_dir, "..", "data", "raw", "250811-250825")
 file_pattern = os.path.join(TARGET_FOLDER, "*.csv")
-DB_URL = 'postgresql://postgres:1234@localhost:5432/igcc_db'
+
+load_dotenv()
+DB_URL = os.getenv('DATABASE_URL')
 
 # ==========================================
 # 1. 데이터 추출 (Extract)
@@ -35,7 +40,8 @@ rename_dict = {
     'IGCC.CC.G1.DWATT': 'generator_output',
     'IGCC.CC.G1.VNPR_P': 'npr_primary',
     'IGCC.CC.G1.ATID': 'ambient_temp',
-    'IGCC.CC.G1.NQJ': 'dgan_flow'
+    'IGCC.CC.G1.NQJ': 'dgan_flow',
+    'IGCC.CC.G1.CSGV': 'igv'
 }
 df = df.rename(columns=rename_dict)
 # 날짜가 아닌 이상한 글자(예: 또 다른 파일의 헤더가 섞여있을 경우)가 나오면 에러 내지 말고 NaT로 처리
