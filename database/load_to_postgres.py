@@ -1,22 +1,27 @@
 import pandas as pd
-import glob
 import os
+from pathlib import Path
 from sqlalchemy import create_engine
 from dotenv import load_dotenv
 
-current_dir = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = Path(__file__).resolve().parents[1]
 
-TARGET_FOLDER = os.path.join(current_dir, "..", "data", "raw", "250811-250825")
-file_pattern = os.path.join(TARGET_FOLDER, "*.csv")
+TARGET_FOLDER = BASE_DIR / "data" / "raw" / "250811-250825"
 
 load_dotenv()
 DB_URL = os.getenv('DATABASE_URL')
+
+if not DB_URL:
+    raise ValueError("🚨 [에러] DATABASE_URL 환경변수가 없습니다!")
 
 # ==========================================
 # 1. 데이터 추출 (Extract)
 # ==========================================
 print("⏳ 데이터를 불러오는 중...")
-file_list = glob.glob(file_pattern)
+file_list = sorted(TARGET_FOLDER.glob("*.csv"))
+
+if not file_list:
+    raise FileNotFoundError(f"🚨 [에러] CSV 파일을 찾을 수 없습니다: {TARGET_FOLDER}")
 
 df_list = []
 for file in file_list:
@@ -41,18 +46,26 @@ rename_dict = {
     'IGCC.CC.G1.VNPR_P': 'npr_primary',
     'IGCC.CC.G1.ATID': 'ambient_temp',
     'IGCC.CC.G1.NQJ': 'dgan_flow',
-    'IGCC.CC.G1.CSGV': 'igv'
+    'IGCC.CC.G1.csgv': 'igv'
 }
+
+missing_columns = [column for column in rename_dict if column not in df.columns]
+if missing_columns:
+    raise KeyError(f"🚨 [에러] 원천 CSV에 필수 컬럼이 없습니다: {missing_columns}")
+
 df = df.rename(columns=rename_dict)
 # 날짜가 아닌 이상한 글자(예: 또 다른 파일의 헤더가 섞여있을 경우)가 나오면 에러 내지 말고 NaT로 처리
 df['measured_at'] = pd.to_datetime(df['measured_at'], errors='coerce')
 
-# NaT로 변환된 쓰레기 데이터 행은 깔끔하게 삭제
-df = df.dropna(subset=['measured_at'])
-
-# 우리가 지정한 핵심 컬럼 8개만 쏙 뽑아내기
+# 우리가 지정한 핵심 컬럼 9개만 쏙 뽑아내기
 core_columns = list(rename_dict.values())
-df_core = df[core_columns]
+df_core = df[core_columns].copy()
+
+numeric_columns = [column for column in core_columns if column != 'measured_at']
+df_core[numeric_columns] = df_core[numeric_columns].apply(pd.to_numeric, errors='coerce')
+
+# 날짜/센서값 변환 중 생긴 결측 행은 깔끔하게 삭제
+df_core = df_core.dropna(subset=core_columns)
 
 print(f"✅ 전처리 완료! 총 {len(df_core)}행의 데이터를 DB에 적재합니다...")
 
@@ -65,7 +78,9 @@ df_core.to_sql(
     name='sensor_data',
     con=engine,
     if_exists='replace',        
-    index=False                 
+    index=False,
+    chunksize=10000,
+    method='multi'
 )
 
 print("🎉 PostgreSQL DB 적재가 완벽하게 끝났습니다!")

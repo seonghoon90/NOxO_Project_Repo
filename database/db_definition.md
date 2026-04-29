@@ -11,13 +11,13 @@
 | :--- | :--- | :--- | :--- | :--- |
 | **`TagName`** | **`measured_at`** | TIMESTAMP | 측정 시간 | **Primary Key** |
 | `IGCC.DeNOX.AT_H1_901_PV` | **`nox_ppm`** | FLOAT | 가스터빈 후단 NOx 농도 | **Target** |
-| `IGCC.CC.G1.NQKR3_MONITOR` | **`dgan_offset`** | INTEGER | 희석질소 오프셋 | **Control** |
+| `IGCC.CC.G1.NQKR3_MONITOR` | **`dgan_offset`** | FLOAT | 희석질소 오프셋 | **Control** |
 | `IGCC.CC.G1.ca_fqsg_cl` | **`syngas_flow`** | FLOAT | 합성가스 유량 | Feature |
 | `IGCC.CC.G1.DWATT` | **`generator_output`** | FLOAT | 발전기 출력 | Feature |
 | `IGCC.CC.G1.VNPR_P` | **`npr_primary`** | FLOAT | 1차 노즐 압력비 | Feature (안정성) |
 | `IGCC.CC.G1.ATID` | **`ambient_temp`** | FLOAT | 대기 온도 | Feature (외기) |
 | `IGCC.CC.G1.NQJ` | **`dgan_flow`** | FLOAT | 희석질소 유량 | Feature |
-| `IGCC.CC.G1.CSGV` | **`igv`** | FLOAT | IGV 개도 | Feature |
+| `IGCC.CC.G1.csgv` | **`igv`** | FLOAT | IGV 개도 | Feature |
 
 ---
 
