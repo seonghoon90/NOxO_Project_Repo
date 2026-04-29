@@ -1,0 +1,65 @@
+import pandas as pd
+import glob
+import os
+from sqlalchemy import create_engine
+
+TARGET_FOLDER = "250811-250825"
+file_pattern = os.path.join(TARGET_FOLDER, "*.csv")
+DB_URL = 'postgresql://postgres:1234@localhost:5432/igcc_db'
+
+# ==========================================
+# 1. 데이터 추출 (Extract)
+# ==========================================
+print("⏳ 데이터를 불러오는 중...")
+file_list = glob.glob(file_pattern)
+
+df_list = []
+for file in file_list:
+    temp_df = pd.read_csv(file, skiprows=[1, 2, 3, 4]) 
+    df_list.append(temp_df)
+
+df = pd.concat(df_list, ignore_index=True)
+
+# ==========================================
+# 2. 데이터 변환 (Transform) - info.md 기준 컬럼 매핑
+# ==========================================
+# 결측/불필요 컬럼 제거
+df = df.drop(columns=['IGCC.CC.G1.ttfr1', 'Column1'], errors='ignore')
+
+# 💡 info.md 명세서를 바탕으로 프론트/백엔드가 쓰기 편하게 이름 변경
+rename_dict = {
+    'TagName': 'measured_at',
+    'IGCC.DeNOX.AT_H1_901_PV': 'nox_ppm',
+    'IGCC.CC.G1.NQKR3_MONITOR': 'dgan_offset',
+    'IGCC.CC.G1.ca_fqsg_cl': 'syngas_flow',
+    'IGCC.CC.G1.DWATT': 'generator_output',
+    'IGCC.CC.G1.VNPR_P': 'npr_primary',
+    'IGCC.CC.G1.ATID': 'ambient_temp',
+    'IGCC.CC.G1.NQJ': 'dgan_flow'
+}
+df = df.rename(columns=rename_dict)
+# 날짜가 아닌 이상한 글자(예: 또 다른 파일의 헤더가 섞여있을 경우)가 나오면 에러 내지 말고 NaT로 처리
+df['measured_at'] = pd.to_datetime(df['measured_at'], errors='coerce')
+
+# NaT로 변환된 쓰레기 데이터 행은 깔끔하게 삭제
+df = df.dropna(subset=['measured_at'])
+
+# 우리가 지정한 핵심 컬럼 8개만 쏙 뽑아내기
+core_columns = list(rename_dict.values())
+df_core = df[core_columns]
+
+print(f"✅ 전처리 완료! 총 {len(df_core)}행의 데이터를 DB에 적재합니다...")
+
+# ==========================================
+# 3. 데이터 적재 (Load)
+# ==========================================
+engine = create_engine(DB_URL)
+
+df_core.to_sql(
+    name='sensor_data',
+    con=engine,
+    if_exists='replace',        
+    index=False                 
+)
+
+print("🎉 PostgreSQL DB 적재가 완벽하게 끝났습니다!")
