@@ -1,0 +1,15 @@
+{
+  "experiment_id": "exp_015_ridge_realdata",
+  "model": "Ridge_RealData",
+  "timestamp": "2026-04-30T11:12:24.787649",
+  "training_time_seconds": 0.10572576522827148,
+  "performance": {
+    "train_mae": 0.00713902403504093,
+    "train_rmse": 0.012668470770633794,
+    "val_mae": 0.007392876639603512,
+    "val_rmse": 0.01171701490933676,
+    "test_mae": 0.0071544073031441285,
+    "test_rmse": 0.011733544165302928
+  },
+  "data_type": "real_data"
+}

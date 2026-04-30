@@ -1,0 +1,14 @@
+{
+  "experiment_id": "exp_014_svr",
+  "model": "SVR",
+  "timestamp": "2026-04-30T10:24:00.663985",
+  "training_time_seconds": 1.5593161582946777,
+  "performance": {
+    "train_mae": 0.009989264150975488,
+    "train_rmse": 0.010054525336926861,
+    "val_mae": 0.16460785977461365,
+    "val_rmse": 0.20498517900002508,
+    "test_mae": 0.1610991925874026,
+    "test_rmse": 0.20383349463535907
+  }
+}

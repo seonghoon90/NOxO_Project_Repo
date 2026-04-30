@@ -1,0 +1,32 @@
+# Baseline Model 1: Ridge Regression
+# 성능 기준선 (interpretability 최고)
+
+model:
+  type: ridge
+  name: Ridge Regression Baseline
+  description: Simple linear model for performance baseline
+
+parameters:
+  alpha: 1.0
+  fit_intercept: true
+  normalize: false
+  solver: auto
+
+data:
+  features: all_88_features
+  target: IGCC.DeNOX.AT_H1_901_PV
+  exclude_features: []  # 비우면 O2 포함
+
+train:
+  test_size: 0.2
+  validation_split: false
+  random_state: 42
+  shuffle: false  # 시계열이므로 시간순 분할
+
+evaluation:
+  metrics: [mae, rmse, mape, r2]
+  cv_folds: 5
+
+artifacts:
+  model_save_path: experiments/models/exp_001_ridge_baseline.pkl
+  log_save_path: experiments/logs/exp_001_ridge_baseline.log

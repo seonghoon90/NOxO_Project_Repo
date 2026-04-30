@@ -1,0 +1,14 @@
+{
+  "experiment_id": "exp_004_gradientboosting",
+  "model": "GradientBoosting",
+  "timestamp": "2026-04-30T10:05:18.692625",
+  "training_time_seconds": 48.164143085479736,
+  "performance": {
+    "train_mae": 0.10192403505946078,
+    "train_rmse": 0.12595128760592983,
+    "val_mae": 0.15328142817417836,
+    "val_rmse": 0.19164236775403198,
+    "test_mae": 0.1510913553208115,
+    "test_rmse": 0.19026541891934817
+  }
+}
