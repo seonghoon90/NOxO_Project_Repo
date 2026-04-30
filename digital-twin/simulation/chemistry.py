@@ -98,7 +98,7 @@ def arrhenius_rate_constant(
 #   - 결과를 ppm/초 스케일로 정규화
 # ============================================================
 def zeldovich_nox_rate(
-    flame_temp_k: float,
+    exhaust_temp_c: float,
     o2_fraction: float,
     n2_fraction: float,
     consts: ZeldovichConstants = DEFAULT_ZELDOVICH,
@@ -106,15 +106,17 @@ def zeldovich_nox_rate(
     """NOx 생성률 [ppm/s] 근사.
 
     Args:
-        flame_temp_k: 화염 온도 [K].
-        o2_fraction:  배기 O2 몰분율 (0~1).
-        n2_fraction:  배기 N2 몰분율 (0~1).
-        consts:       Arrhenius 상수.
+        exhaust_temp_c: 배기 온도 [°C]. IGCC.CC.G1.TTXM 실측 기반.
+        o2_fraction:    배기 O2 몰분율 (0~1).
+        n2_fraction:    배기 N2 몰분율 (0~1).
+        consts:         Arrhenius 상수.
 
     Returns:
         생성률 [ppm/s]. consts.max_nox_rate_ppm_per_s 상한 클램프.
     """
-    k1 = arrhenius_rate_constant(flame_temp_k, consts)
+    # Arrhenius는 절대온도(K) 기반 — °C → K 변환
+    temp_k = exhaust_temp_c + 273.15
+    k1 = arrhenius_rate_constant(temp_k, consts)
 
     # [O]를 O2 몰분율의 sqrt에 비례한다고 단순 가정
     # (정확한 dissociation 평형은 Cantera 필요)
@@ -138,7 +140,7 @@ def zeldovich_nox_rate(
 # ============================================================
 def integrate_zeldovich_step(
     nox_current: float,
-    flame_temp_k: float,
+    exhaust_temp_c: float,
     o2_fraction: float,
     n2_fraction: float,
     dt: float,
@@ -150,9 +152,9 @@ def integrate_zeldovich_step(
     """현재 NOx에서 dt만큼 Zeldovich ODE를 적분.
 
     Args:
-        nox_current:  현재 NOx 농도 [ppm].
-        flame_temp_k: 화염 온도 [K].
-        o2_fraction:  배기 O2 몰분율.
+        nox_current:    현재 NOx 농도 [ppm].
+        exhaust_temp_c: 배기 온도 [°C]. IGCC.CC.G1.TTXM 실측 기반.
+        o2_fraction:    배기 O2 몰분율.
         n2_fraction:  배기 N2 몰분율.
         dt:           적분 시간 [초].
         consts:       반응 상수.
@@ -166,7 +168,7 @@ def integrate_zeldovich_step(
         - 계산 실패(NaN/Inf) 시 입력값 그대로 반환 (가이드 단계 3 fallback 기준).
     """
     try:
-        rate = zeldovich_nox_rate(flame_temp_k, o2_fraction, n2_fraction, consts)
+        rate = zeldovich_nox_rate(exhaust_temp_c, o2_fraction, n2_fraction, consts)
         next_nox = nox_current + rate * dt
 
         # NaN/Inf 가드
@@ -187,7 +189,7 @@ def integrate_zeldovich_step(
 # ML 회귀 결과 검증 시 동일 입력을 넣었을 때 정성적 일치 여부 확인용.
 # ============================================================
 def estimate_steady_nox(
-    flame_temp_k: float,
+    exhaust_temp_c: float,
     o2_fraction: float,
     n2_fraction: float,
     residence_time_s: float = 30.0,
@@ -198,5 +200,5 @@ def estimate_steady_nox(
     실제 정상상태는 평형 상수까지 풀어야 하지만, 프로토타입에서는
     "rate × residence_time"으로 충분히 동작 방향성을 확인 가능.
     """
-    rate = zeldovich_nox_rate(flame_temp_k, o2_fraction, n2_fraction, consts)
+    rate = zeldovich_nox_rate(exhaust_temp_c, o2_fraction, n2_fraction, consts)
     return max(0.0, rate * residence_time_s)

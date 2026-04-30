@@ -146,7 +146,7 @@ def sim_step(
     state.output_target = OutputVars(
         nox=ml_output.nox,
         co=ml_output.co,
-        flame_temp=ml_output.flame_temp,
+        exhaust_temp=ml_output.exhaust_temp,
         lambda_=lambda_now,           # features 결과로 덮어쓰기
         efficiency=ml_output.efficiency,
         power=ml_output.power,
@@ -156,9 +156,9 @@ def sim_step(
     # [Step 5] 화염 온도 lag — 출력 lag 영역 시작
     # 가이드 §6 내부 처리 순서 5번
     # ----------------------------------------------------------
-    flame_temp_next = apply_first_order_lag_exact(
-        state.output.flame_temp,
-        state.output_target.flame_temp,
+    exhaust_temp_next = apply_first_order_lag_exact(
+        state.output.exhaust_temp,
+        state.output_target.exhaust_temp,
         dt,
         tau.temp,
     )
@@ -175,7 +175,7 @@ def sim_step(
 
     state.nox_integrated = chemistry.integrate_zeldovich_step(
         nox_current=state.nox_integrated,
-        flame_temp_k=flame_temp_next,
+        exhaust_temp_c=exhaust_temp_next,
         o2_fraction=o2_frac,
         n2_fraction=n2_frac,
         dt=dt,
@@ -207,7 +207,7 @@ def sim_step(
 
     efficiency_now = features.compute_efficiency(
         syngas_flow=state.current.syngas_flow,
-        flame_temp=flame_temp_next,
+        exhaust_temp=exhaust_temp_next,
     )
 
     power_lag = apply_first_order_lag_exact(
@@ -220,7 +220,7 @@ def sim_step(
     state.output = OutputVars(
         nox=nox_blended,
         co=co_lag,
-        flame_temp=flame_temp_next,
+        exhaust_temp=exhaust_temp_next,
         lambda_=lambda_now,
         efficiency=efficiency_now,
         power=power_lag,
@@ -263,10 +263,10 @@ def create_initial_state(
     output_with_lambda = OutputVars(
         nox=initial_output.nox,
         co=initial_output.co,
-        flame_temp=initial_output.flame_temp,
+        exhaust_temp=initial_output.exhaust_temp,
         lambda_=lambda_init,
         efficiency=features.compute_efficiency(
-            initial_controls.syngas_flow, initial_output.flame_temp
+            initial_controls.syngas_flow, initial_output.exhaust_temp
         ),
         power=initial_output.power,
     )

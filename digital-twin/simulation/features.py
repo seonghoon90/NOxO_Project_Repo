@@ -115,7 +115,7 @@ def compute_co(
 # ============================================================
 def compute_efficiency(
     syngas_flow: float,
-    flame_temp: float,
+    exhaust_temp: float,
     *,
     base_efficiency: float = 0.89,
     temp_sensitivity: float = 0.0001,
@@ -124,16 +124,15 @@ def compute_efficiency(
 
     Args:
         syngas_flow:      합성가스 유량.
-        flame_temp:       현재 화염 온도(K).
+        exhaust_temp:     현재 배기 온도(°C). IGCC.CC.G1.TTXM 실측 기반.
         base_efficiency:  기준 효율. [추후 결정]
-        temp_sensitivity: 온도 1K 변동당 효율 변동. [조사 필요]
+        temp_sensitivity: 온도 1°C 변동당 효율 변동. [조사 필요]
 
     Returns:
         무차원 효율. [0.0, 1.0] 클램프.
     """
-    # 화염 온도가 기준점(1450K)보다 높으면 효율 약간 증가 — 카르노 사이클 직관
-    # 너무 높아지면 NOx 패널티가 따로 잡으므로 본 함수에서는 단순 선형 가정
-    eta = base_efficiency + (flame_temp - 1450.0) * temp_sensitivity
+    # 배기온도 기준점 580°C (TTXM 운전 평균 가안)
+    eta = base_efficiency + (exhaust_temp - 580.0) * temp_sensitivity
 
     # 합성가스 유량이 기준점에서 멀어지면 효율 약간 감소 (off-design 패널티)
     fuel_deviation = abs(syngas_flow - REF_SYNGAS_FLOW) / REF_SYNGAS_FLOW

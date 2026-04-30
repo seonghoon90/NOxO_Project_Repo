@@ -12,17 +12,15 @@
 
 [가이드 §5 단계 4 — 정상상태 ML 회귀 모델 산출물]
 
-| 파일명 | 역할 | 학습 타깃 | 단위(가안) |
-|--------|------|---------|----------|
-| `flame_temp_model.pkl` | 정상상태 화염 온도 회귀 | flame_temp | K |
-| `nox_steady_model.pkl` | 정상상태 NOx 회귀     | nox        | ppm |
-| `co_model.pkl`         | 정상상태 CO 회귀      | co         | ppm |
-| `efficiency_model.pkl` | 발전 효율 회귀        | efficiency | 0~1 |
-| `power_model.pkl`      | 발전량 회귀           | power      | MW  |
-| `metadata.json`        | 모델 버전/입력 피처 명세 | -        | -   |
+| 파일명 | 역할 | 학습 타깃 | 단위 |
+|--------|------|---------|------|
+| `steady_state_model.pkl` | 정상상태 멀티 타겟 회귀 | nox_ppm, exhaust_temp, power | ppm / °C / MW |
+| `metadata.json`          | 모델 버전/입력 피처 명세 | - | - |
 
-> 초기 버전에서 모든 모델이 갖춰질 필요는 없음. 우선순위는 **NOx > 화염온도 > 그 외**.
-> 누락된 모델은 `StubPredictor` 또는 `features.py`의 근사식이 임시 대체한다.
+> 타겟 3개(nox_ppm, exhaust_temp, power)를 단일 멀티 타겟 모델로 학습한다.
+> - `exhaust_temp`: 화염온도 직접 측정 불가 → IGCC.CC.G1.TTXM(배기온도)으로 대체
+> - `co`, `efficiency`: features.py 수식으로 계산하므로 ML 타겟 제외
+> 누락 시 `StubPredictor` 또는 `features.py` 근사식이 임시 대체한다.
 
 ---
 
@@ -73,8 +71,8 @@ model = joblib.load("digital-twin/models/nox_steady_model.pkl")
   "framework": "xgboost",
   "framework_version": "2.0.3",
   "feature_order": ["syngas_flow", "n2_offset", "igv_opening"],
-  "target": "nox",
-  "target_unit": "ppm",
+  "targets": ["nox_ppm", "exhaust_temp", "power"],
+  "target_units": ["ppm", "°C", "MW"],
   "metrics": {
     "test_mae": 0.0102,
     "test_rmse": 0.0186
