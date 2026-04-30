@@ -12,16 +12,16 @@ load_dotenv()
 DB_URL = os.getenv('DATABASE_URL')
 
 if not DB_URL:
-    raise ValueError("🚨 [에러] DATABASE_URL 환경변수가 없습니다!")
+    raise ValueError("[에러] DATABASE_URL 환경변수가 없습니다!")
 
 # ==========================================
 # 1. 데이터 추출 (Extract)
 # ==========================================
-print("⏳ 데이터를 불러오는 중...")
+print("[Extract] 데이터를 불러오는 중...")
 file_list = sorted(TARGET_FOLDER.glob("*.csv"))
 
 if not file_list:
-    raise FileNotFoundError(f"🚨 [에러] CSV 파일을 찾을 수 없습니다: {TARGET_FOLDER}")
+    raise FileNotFoundError(f"[에러] CSV 파일을 찾을 수 없습니다: {TARGET_FOLDER}")
 
 df_list = []
 for file in file_list:
@@ -51,7 +51,7 @@ rename_dict = {
 
 missing_columns = [column for column in rename_dict if column not in df.columns]
 if missing_columns:
-    raise KeyError(f"🚨 [에러] 원천 CSV에 필수 컬럼이 없습니다: {missing_columns}")
+    raise KeyError(f"[에러] 원천 CSV에 필수 컬럼이 없습니다: {missing_columns}")
 
 df = df.rename(columns=rename_dict)
 # 날짜가 아닌 이상한 글자(예: 또 다른 파일의 헤더가 섞여있을 경우)가 나오면 에러 내지 말고 NaT로 처리
@@ -67,7 +67,7 @@ df_core[numeric_columns] = df_core[numeric_columns].apply(pd.to_numeric, errors=
 # 날짜/센서값 변환 중 생긴 결측 행은 깔끔하게 삭제
 df_core = df_core.dropna(subset=core_columns)
 
-print(f"✅ 전처리 완료! 총 {len(df_core)}행의 데이터를 DB에 적재합니다...")
+print(f"[Transform] 전처리 완료. 총 {len(df_core)}행의 데이터를 DB에 적재합니다...")
 
 # ==========================================
 # 3. 데이터 적재 (Load)
@@ -83,4 +83,4 @@ df_core.to_sql(
     method='multi'
 )
 
-print("🎉 PostgreSQL DB 적재가 완벽하게 끝났습니다!")
+print("[Load] PostgreSQL DB 적재가 끝났습니다.")
