@@ -1,0 +1,87 @@
+{
+  "model_type": "MultiOutputRegressor(LGBMRegressor)",
+  "features": [
+    "IGCC.CC.G1.FPSG",
+    "IGCC.CC.G1.FTSG",
+    "IGCC.CC.G1.ca_fqsg_cl",
+    "IGCC.CC.G1.LHVSYNDW_SCF",
+    "IGCC.CC.G1.FSAGR",
+    "IGCC.CC.G1.FPSG2",
+    "IGCC.CC.G1.FSAG11A",
+    "IGCC.CC.G1.FSAG11",
+    "IGCC.CC.G1.FSAG12",
+    "IGCC.CC.G1.FPSG3",
+    "IGCC.CC.G1.AFDPM",
+    "IGCC.CC.G1.CTIM",
+    "IGCC.CC.G1.afpap",
+    "IGCC.CC.G1.csgv",
+    "IGCC.CC.G1.CPD",
+    "IGCC.CC.G1.CTD",
+    "IGCC.CC.G1.CSBHX",
+    "IGCC.CC.G1.tnh_v",
+    "IGCC.CC.G1.ATID",
+    "IGCC.CC.G1.EXHMASS",
+    "IGCC.CC.G1.FPGN1_SEL",
+    "IGCC.CC.G1.FPGN2_SEL",
+    "IGCC.CC.G1.ROUTPUT_32",
+    "IGCC.CC.G1.VNPR_S",
+    "IGCC.CC.G1.VNPR_P",
+    "IGCC.CC.G1.NPNJ",
+    "IGCC.CC.G1.NTNJ",
+    "IGCC.CC.G1.NQJ",
+    "IGCC.CC.G1.NQJO2",
+    "IGCC.CC.G1.nicvs1",
+    "IGCC.CC.G1.ndt1",
+    "IGCC.CC.G1.NPNJ2",
+    "IGCC.CC.G1.NQKR3_MONITOR",
+    "IGCC.CC.G1.ROUTPUT_6",
+    "IGCC.IG.PIC7069A.PV",
+    "IGCC.IG.ZT7069B.PV",
+    "IGCC.DeNOX.AIT_H1_902",
+    "IGCC.DeNOX.TT_H1_90123",
+    "IGCC.CC.G1.itdp",
+    "IGCC.CC.G1.tcsph1"
+  ],
+  "targets": [
+    "IGCC.DeNOX.AT_H1_901_PV",
+    "IGCC.CC.G1.DWATT",
+    "IGCC.CC.G1.TTXM"
+  ],
+  "n_features": 40,
+  "train_samples": 1209599,
+  "test_samples": 86400,
+  "train_performance": {
+    "IGCC.DeNOX.AT_H1_901_PV": {
+      "mae": 0.007208023329009707,
+      "rmse": 0.012923853226239995,
+      "r2": 0.9950610759218509
+    },
+    "IGCC.CC.G1.DWATT": {
+      "mae": 0.23184978078812787,
+      "rmse": 0.3204058241048291,
+      "r2": 0.9983792729973464
+    },
+    "IGCC.CC.G1.TTXM": {
+      "mae": 0.3688059156633227,
+      "rmse": 0.5005227360750827,
+      "r2": 0.9946245126340217
+    }
+  },
+  "test_performance": {
+    "IGCC.DeNOX.AT_H1_901_PV": {
+      "mae": 0.00979374924869454,
+      "rmse": 0.0183296507809124,
+      "r2": 0.9833693067794455
+    },
+    "IGCC.CC.G1.DWATT": {
+      "mae": 0.23036054821640176,
+      "rmse": 0.3051306830903866,
+      "r2": 0.9970195060289021
+    },
+    "IGCC.CC.G1.TTXM": {
+      "mae": 0.4075285250037066,
+      "rmse": 0.5387405020375365,
+      "r2": 0.9879423299653716
+    }
+  }
+}

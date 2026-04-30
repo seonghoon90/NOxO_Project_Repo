@@ -65,3 +65,4 @@ reports/generated/
 *.key
 *.crt
 secrets/
+digital-twin/models/*.pkl
