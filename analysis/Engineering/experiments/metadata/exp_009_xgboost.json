@@ -1,0 +1,15 @@
+{
+  "experiment_id": "exp_009_xgboost",
+  "model": "XGBoost",
+  "timestamp": "2026-04-30T10:22:56.491152",
+  "training_time_seconds": 0.2066502571105957,
+  "performance": {
+    "train_mae": 0.1413919109383017,
+    "train_rmse": 0.17660648232250734,
+    "val_mae": 0.15133293596953903,
+    "val_rmse": 0.18846814720495644,
+    "test_mae": 0.14998052255911268,
+    "test_rmse": 0.1890943968813238
+  },
+  "n_features": 88
+}
