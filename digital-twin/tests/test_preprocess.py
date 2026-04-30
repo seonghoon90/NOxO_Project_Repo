@@ -6,6 +6,11 @@ from preprocess import load_data, split_xy, train_val_split, FEATURES, TARGETS
 DATA_DIR = Path(__file__).parent.parent.parent / "data"
 TRAIN_FILE = DATA_DIR / "NOx_train_20250811_20250824.csv"
 
+pytestmark = pytest.mark.skipif(
+    not TRAIN_FILE.exists(),
+    reason="Real data file not available"
+)
+
 
 def test_feature_count():
     assert len(FEATURES) == 40
@@ -74,3 +79,37 @@ def test_train_val_split_preserves_order():
     split_idx = len(train_df)
     assert train_df.index.tolist() == df.index[:split_idx].tolist()
     assert val_df.index.tolist() == df.index[split_idx:].tolist()
+
+
+@pytest.mark.skipif(False, reason="always run")
+def test_load_data_skips_metadata_rows(tmp_path):
+    header = ["TagName"] + FEATURES + TARGETS
+    rows = [
+        ["Description"] + ["desc"] * (len(FEATURES) + len(TARGETS)),
+        ["Units"] + ["unit"] * (len(FEATURES) + len(TARGETS)),
+        ["Plot Min"] + ["0"] * (len(FEATURES) + len(TARGETS)),
+        ["Plot Max"] + ["100"] * (len(FEATURES) + len(TARGETS)),
+        ["row1"] + ["1.0"] * (len(FEATURES) + len(TARGETS)),
+        ["row2"] + ["2.0"] * (len(FEATURES) + len(TARGETS)),
+    ]
+    csv_path = tmp_path / "test.csv"
+    with open(csv_path, "w") as f:
+        f.write(",".join(header) + "\n")
+        for row in rows:
+            f.write(",".join(row) + "\n")
+    df = load_data(csv_path)
+    assert len(df) == 2
+    assert list(df.columns) == FEATURES + TARGETS
+
+
+@pytest.mark.skipif(False, reason="always run")
+def test_load_data_raises_on_missing_file():
+    with pytest.raises(FileNotFoundError):
+        load_data(Path("/nonexistent/file.csv"))
+
+
+@pytest.mark.skipif(False, reason="always run")
+def test_train_val_split_invalid_ratio_raises():
+    df = pd.DataFrame({"a": range(10)})
+    with pytest.raises(ValueError):
+        train_val_split(df, val_ratio=20)

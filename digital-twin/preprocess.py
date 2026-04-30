@@ -59,9 +59,16 @@ def load_data(path: str | Path) -> pd.DataFrame:
         index_col=0,
         encoding="utf-8-sig",
     )
+    missing = set(FEATURES + TARGETS) - set(df.columns)
+    if missing:
+        raise ValueError(f"Missing columns in {Path(path).name}: {sorted(missing)}")
     df = df[FEATURES + TARGETS]
     df = df.apply(pd.to_numeric, errors="coerce")
+    before = len(df)
     df = df.dropna()
+    dropped = before - len(df)
+    if dropped > 0:
+        print(f"[load_data] Dropped {dropped} rows ({dropped/before:.1%}) with non-numeric values from {Path(path).name}")
     return df
 
 
@@ -72,5 +79,7 @@ def split_xy(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
 def train_val_split(
     df: pd.DataFrame, val_ratio: float = 0.2
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
+    if not 0 < val_ratio < 1:
+        raise ValueError(f"val_ratio must be between 0 and 1, got {val_ratio}")
     split_idx = int(len(df) * (1 - val_ratio))
     return df.iloc[:split_idx].copy(), df.iloc[split_idx:].copy()
