@@ -50,10 +50,10 @@ features = [
 import joblib
 
 # 저장
-joblib.dump(model, "digital-twin/models/nox_steady_model.pkl")
+joblib.dump(model, "digital_twin/models/nox_steady_model.pkl")
 
 # 로드 (백엔드 MLPredictor에서 자동 수행)
-model = joblib.load("digital-twin/models/nox_steady_model.pkl")
+model = joblib.load("digital_twin/models/nox_steady_model.pkl")
 ```
 
 - 직렬화 도구: **joblib** (가이드 §단계 4 도구 명세)
@@ -99,7 +99,7 @@ model = joblib.load("digital-twin/models/nox_steady_model.pkl")
 
 ```
 ┌────────────────────┐    joblib.load    ┌──────────────────────┐
-│ digital-twin/      │ ─────────────────▶│ MLPredictor          │
+│ digital_twin/      │ ─────────────────▶│ MLPredictor          │
 │   models/*.pkl     │                   │ (adapters/predictor) │
 └────────────────────┘                   └──────────┬───────────┘
                                                     │ predict(ControlVars)

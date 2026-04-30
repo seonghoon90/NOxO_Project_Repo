@@ -8,12 +8,8 @@ from app.core.input_injector import InputInjector
 from app.core.sim_loop import SimLoopManager
 from app.core.state_store import StateStore
 from app.core.ws_manager import WebSocketManager
-from app.domain.simulation import SimulationState
-from app.domain.tags import (
-    DEFAULT_CONTROL_BOUNDS,
-    ControlVars,
-    validate_control,
-)
+from app.domain.tags import DEFAULT_CONTROL_BOUNDS, validate_control
+from digital_twin.simulation import ControlVars, SimulationState
 from app.exceptions import (
     InvalidControlInputError,
     SessionLimitExceededError,

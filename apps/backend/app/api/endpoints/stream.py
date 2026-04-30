@@ -42,7 +42,7 @@ async def session_stream(
             igv_opening=state.current.igv_opening,
             nox=state.output.nox,
             co=state.output.co,
-            flame_temp=state.output.flame_temp,
+            exhaust_temp=state.output.exhaust_temp,
             lambda_=state.output.lambda_,
             power=state.output.power,
             warning=state.warning,

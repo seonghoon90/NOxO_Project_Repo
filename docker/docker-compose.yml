@@ -30,7 +30,7 @@ services:
       TZ: Asia/Seoul
     volumes:
       - ../data:/app/data:ro
-      - dt_models:/app/digital-twin/models
+      - dt_models:/app/digital_twin/models
     networks: [noxo-net]
 
   frontend:

@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 
 from app.api.deps import get_session_service
-from app.domain.simulation import SimulationState
+from digital_twin.simulation import SimulationState
 from app.schemas.common import AckResponse
 from app.schemas.session import (
     ControlPayload,
@@ -40,7 +40,7 @@ def _to_snapshot(state: SimulationState) -> SnapshotResponse:
         output=OutputPayload(
             nox=state.output.nox,
             co=state.output.co,
-            flame_temp=state.output.flame_temp,
+            exhaust_temp=state.output.exhaust_temp,
             power=state.output.power,
             **{"lambda": state.output.lambda_},
         ),

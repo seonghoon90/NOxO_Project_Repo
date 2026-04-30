@@ -20,7 +20,7 @@ class StreamMessage(BaseModel):
     # 출력 변수
     nox: float
     co: float
-    flame_temp: float
+    exhaust_temp: float
     lambda_: float = Field(alias="lambda")
     power: float  # MW — IGCC.CC.G1.DWATT
 

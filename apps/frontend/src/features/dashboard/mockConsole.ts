@@ -56,7 +56,7 @@ export type BackendConsoleSnapshot = {
   igv_opening?: number
   lambda?: number
   lambda_?: number
-  flame_temp?: number
+  exhaust_temp?: number
   nox?: number
   co?: number
   power?: number
@@ -176,7 +176,7 @@ export function createStateFromSnapshot(
   const metrics = {
     nox: pickSnapshotValue(outputSource, ['nox'], previous?.metrics.nox ?? 25, 1),
     co: pickSnapshotValue(outputSource, ['co'], previous?.metrics.co ?? 12, 1),
-    flame: pickSnapshotValue(outputSource, ['flame_temp'], previous?.metrics.flame ?? 1450, 1),
+    flame: pickSnapshotValue(outputSource, ['exhaust_temp'], previous?.metrics.flame ?? 580, 1),
     lambda: pickSnapshotValue(outputSource, ['lambda', 'lambda_'], previous?.metrics.lambda ?? 1.1, 2),
     // 백엔드 stream/snapshot은 'power' 키 사용 (단위: MW, 태그: IGCC.CC.G1.DWATT).
     // 향후 raw 태그 키로 직송될 가능성 대비해 POWER_RAW_NAME도 fallback에 포함.

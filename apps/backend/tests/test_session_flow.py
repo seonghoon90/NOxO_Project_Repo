@@ -80,7 +80,7 @@ def test_websocket_stream(client):
     with client.websocket_connect(f"/api/session/{sid}/stream") as ws:
         # 첫 메시지: 초기 snapshot 또는 첫 step push
         msg = ws.receive_json()
-        for key in ("sid", "t", "syngas_flow", "nox", "co", "flame_temp", "lambda", "power"):
+        for key in ("sid", "t", "syngas_flow", "nox", "co", "exhaust_temp", "lambda", "power"):
             assert key in msg, f"missing key: {key}"
         assert msg["sid"] == sid
 

@@ -15,7 +15,7 @@ WORKDIR /app
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     TZ=Asia/Seoul \
-    PYTHONPATH=/app/apps/backend:/app/digital-twin
+    PYTHONPATH=/app/apps/backend:/app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     tzdata curl \
  && rm -rf /var/lib/apt/lists/*
@@ -25,7 +25,7 @@ EXPOSE 8000
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", \
      "--reload", \
      "--reload-dir", "/app/apps/backend/app", \
-     "--reload-dir", "/app/digital-twin"]
+     "--reload-dir", "/app/digital_twin"]
 
 # ===== Stage 3: prod =====
 FROM python:3.11-slim AS prod
@@ -33,7 +33,7 @@ WORKDIR /app
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     TZ=Asia/Seoul \
-    PYTHONPATH=/app/apps/backend:/app/digital-twin
+    PYTHONPATH=/app/apps/backend:/app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     tzdata curl \
  && rm -rf /var/lib/apt/lists/* \
@@ -41,7 +41,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 COPY --chown=app:app apps/backend ./apps/backend
-COPY --chown=app:app digital-twin ./digital-twin
+COPY --chown=app:app digital_twin ./digital_twin
 USER app
 EXPOSE 8000
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

@@ -1,6 +1,6 @@
 from typing import Protocol
 
-from app.domain.tags import ControlVars, OutputVars
+from digital_twin.simulation import ControlVars, OutputVars
 
 
 class Predictor(Protocol):

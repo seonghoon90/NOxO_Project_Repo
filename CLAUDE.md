@@ -64,7 +64,7 @@ NOxO_Project_Repo/
 ├── analysis/        # 데이터 분석 (notebooks, reports)
 ├── data/            # 데이터셋
 ├── database/        # DB 관련
-├── digital-twin/    # 디지털 트윈
+├── digital_twin/    # 디지털 트윈
 └── docs/            # 문서
 ```
 

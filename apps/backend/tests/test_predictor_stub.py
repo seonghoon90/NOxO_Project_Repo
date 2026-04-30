@@ -4,21 +4,21 @@
 """
 
 from app.adapters.predictor import StubPredictor
-from app.domain.tags import ControlVars
+from digital_twin.simulation import ControlVars
 
 
-def test_higher_syngas_increases_flame_temp():
+def test_higher_syngas_increases_exhaust_temp():
     p = StubPredictor()
     base = p.predict(ControlVars(syngas_flow=1500, n2_offset=200, igv_opening=75))
     high = p.predict(ControlVars(syngas_flow=1800, n2_offset=200, igv_opening=75))
-    assert high.flame_temp > base.flame_temp
+    assert high.exhaust_temp > base.exhaust_temp
 
 
-def test_more_n2_lowers_flame_temp():
+def test_more_n2_lowers_exhaust_temp():
     p = StubPredictor()
     base = p.predict(ControlVars(syngas_flow=1500, n2_offset=200, igv_opening=75))
     diluted = p.predict(ControlVars(syngas_flow=1500, n2_offset=400, igv_opening=75))
-    assert diluted.flame_temp < base.flame_temp
+    assert diluted.exhaust_temp < base.exhaust_temp
 
 
 def test_higher_igv_raises_lambda():

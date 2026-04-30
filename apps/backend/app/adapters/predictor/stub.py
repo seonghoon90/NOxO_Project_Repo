@@ -4,9 +4,9 @@
 물리적 직관에 부합하는 단조 함수로 출력을 산출한다. 실제 수치는 의미 없음.
 
 거동 요약:
-- 화염온도 ↑ : 합성가스 유량, IGV 개도 ↑ / 질소 오프셋 ↑ 시 ↓ (희석 냉각)
+- 배기온도(exhaust_temp) ↑ : 합성가스 유량, IGV 개도 ↑ / 질소 오프셋 ↑ 시 ↓ (희석 냉각)
 - λ (공기비) ↑ : IGV 개도 ↑ (공기 더 들어옴) / 합성가스 유량 ↑ 시 ↓
-- NOx : 화염온도와 λ에 강하게 의존 (Zeldovich 흉내, 단조 증가)
+- NOx : 배기온도와 λ에 강하게 의존 (Zeldovich 흉내, 단조 증가)
 - CO : λ가 1 근처에서 최저, 멀어질수록 증가
 - 발전량(MW) : 합성가스 유량과 IGV 개도에 비례, 질소 오프셋 ↑ 시 약간 ↓
 """
@@ -14,7 +14,8 @@
 import math
 
 from app.adapters.predictor.base import Predictor
-from app.domain.tags import ControlVars, OutputVars
+from digital_twin.simulation import ControlVars, OutputVars
+from digital_twin.simulation.features import compute_efficiency
 
 
 class StubPredictor:
@@ -26,35 +27,38 @@ class StubPredictor:
     REF_IGV = 75.0
 
     # 베이스 출력값 — 기준점에서의 정상상태 가안
-    BASE_FLAME_TEMP = 1450.0  # K
+    BASE_EXHAUST_TEMP = 580.0  # °C — IGCC.CC.G1.TTXM
     BASE_LAMBDA = 1.10
-    BASE_NOX = 25.0           # ppm
-    BASE_CO = 12.0            # ppm
-    BASE_POWER = 248.6        # MW (기준 운전점)
+    BASE_NOX = 25.0            # ppm
+    BASE_CO = 12.0             # ppm
+    BASE_POWER = 248.6         # MW (기준 운전점)
 
     def predict(self, controls: ControlVars) -> OutputVars:
-        flame_temp = self._flame_temp(controls)
+        exhaust_temp = self._exhaust_temp(controls)
         lambda_ = self._lambda(controls)
-        nox = self._nox(flame_temp, lambda_)
+        nox = self._nox(exhaust_temp, lambda_)
         co = self._co(lambda_)
         power = self._power(controls)
+        # efficiency는 features 근사식 재사용 (Stub은 자체 계산 없음)
+        efficiency = compute_efficiency(controls.syngas_flow, exhaust_temp)
         return OutputVars(
             nox=nox,
             co=co,
-            flame_temp=flame_temp,
+            exhaust_temp=exhaust_temp,
             lambda_=lambda_,
+            efficiency=efficiency,
             power=power,
         )
 
     # ----- 내부 함수 -----
-    def _flame_temp(self, c: ControlVars) -> float:
-        # 합성가스 유량 +500 → +120K, IGV +25 → +60K, N2 +300 → -90K
+    def _exhaust_temp(self, c: ControlVars) -> float:
+        # 합성가스 유량 +500 → +12°C, IGV +25 → +6°C, N2 +300 → -9°C
         delta = (
-            (c.syngas_flow - self.REF_SYNGAS) * 0.24
-            + (c.igv_opening - self.REF_IGV) * 2.4
-            - (c.n2_offset - self.REF_N2) * 0.30
+            (c.syngas_flow - self.REF_SYNGAS) * 0.024
+            + (c.igv_opening - self.REF_IGV) * 0.24
+            - (c.n2_offset - self.REF_N2) * 0.030
         )
-        return max(900.0, self.BASE_FLAME_TEMP + delta)
+        return max(400.0, self.BASE_EXHAUST_TEMP + delta)
 
     def _lambda(self, c: ControlVars) -> float:
         # IGV 개도가 공기 유량 비례 → λ 직접 영향, 합성가스 ↑ 시 λ ↓
@@ -64,9 +68,9 @@ class StubPredictor:
         n2_bonus = (c.n2_offset - self.REF_N2) * 0.0005
         return max(0.5, self.BASE_LAMBDA * (igv_ratio / fuel_ratio) + n2_bonus)
 
-    def _nox(self, flame_temp: float, lambda_: float) -> float:
+    def _nox(self, exhaust_temp: float, lambda_: float) -> float:
         # Zeldovich: T가 지배적, λ는 산소 가용성 (최대치는 약 lean 영역)
-        temp_factor = math.exp((flame_temp - self.BASE_FLAME_TEMP) / 120.0)
+        temp_factor = math.exp((exhaust_temp - self.BASE_EXHAUST_TEMP) / 12.0)
         lambda_factor = 1.0 + 0.6 * max(0.0, lambda_ - 1.0)
         return max(0.0, self.BASE_NOX * temp_factor * lambda_factor)
 

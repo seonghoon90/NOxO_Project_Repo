@@ -1,11 +1,17 @@
-"""제어 변수 / 출력 변수 태그 정의.
+"""IGCC 태그 매핑 / 운영 한계 / 입력 검증.
 
-프론트엔드와 백엔드가 공유하는 식별자. 추후 `[DB 협의 필요]`로 컬럼명이
-확정되면 본 모듈을 단일 진입점으로 사용하여 매핑한다.
+도메인 객체(ControlVars, OutputVars, SimulationState)는 `digital_twin.simulation`이
+SoT(Single Source of Truth). 본 모듈은 백엔드 전용 책임만 담당한다:
+
+1. IGCC.CC.G1.* 태그 상수 정의 (프론트 ↔ 백엔드 식별자)
+2. ControlVars ↔ 태그 dict 양방향 매핑
+3. ControlBounds (운영 한계) + validate_control (입력 검증)
 """
 
 from dataclasses import dataclass
 from typing import Final
+
+from digital_twin.simulation import ControlVars
 
 
 # ============================================================
@@ -22,45 +28,32 @@ CONTROL_TAGS: Final[tuple[str, ...]] = (
 )
 
 
-@dataclass(frozen=True)
-class ControlVars:
-    """제어 입력 도메인 모델 — 단일 step에 적용될 목표값."""
-
-    syngas_flow: float        # IGCC.CC.G1.ca_fqsg_cl
-    n2_offset: float          # IGCC.CC.G1.NQKR3_MONITOR
-    igv_opening: float        # IGCC.CC.G1.csgv
-
-    @classmethod
-    def from_tag_dict(cls, tags: dict[str, float]) -> "ControlVars":
-        return cls(
-            syngas_flow=tags[TAG_SYNGAS_FLOW],
-            n2_offset=tags[TAG_N2_OFFSET],
-            igv_opening=tags[TAG_IGV_OPENING],
-        )
-
-    def to_tag_dict(self) -> dict[str, float]:
-        return {
-            TAG_SYNGAS_FLOW: self.syngas_flow,
-            TAG_N2_OFFSET: self.n2_offset,
-            TAG_IGV_OPENING: self.igv_opening,
-        }
-
-
 # ============================================================
-# 출력 변수 (백엔드 → 프론트, WebSocket)
+# 출력 변수 태그
 # ============================================================
 TAG_POWER: Final[str] = "IGCC.CC.G1.DWATT"  # 발전량 (MW)
 
 
-@dataclass(frozen=True)
-class OutputVars:
-    """모델 추론 결과 — 단위는 [추후 결정]."""
+# ============================================================
+# ControlVars ↔ 태그 dict 매핑
+# DT의 ControlVars는 IGCC 태그 체계를 모르므로 매핑은 본 모듈이 책임진다.
+# ============================================================
+def control_vars_from_tag_dict(tags: dict[str, float]) -> ControlVars:
+    """IGCC 태그 dict → DT ControlVars."""
+    return ControlVars(
+        syngas_flow=tags[TAG_SYNGAS_FLOW],
+        n2_offset=tags[TAG_N2_OFFSET],
+        igv_opening=tags[TAG_IGV_OPENING],
+    )
 
-    nox: float            # ppm (가안)
-    co: float             # ppm (가안)
-    flame_temp: float     # K (가안)
-    lambda_: float        # 공기비 (dimensionless)
-    power: float          # MW — IGCC.CC.G1.DWATT
+
+def control_vars_to_tag_dict(vars: ControlVars) -> dict[str, float]:
+    """DT ControlVars → IGCC 태그 dict."""
+    return {
+        TAG_SYNGAS_FLOW: vars.syngas_flow,
+        TAG_N2_OFFSET: vars.n2_offset,
+        TAG_IGV_OPENING: vars.igv_opening,
+    }
 
 
 # ============================================================
@@ -80,7 +73,9 @@ class ControlBounds:
 DEFAULT_CONTROL_BOUNDS: Final[ControlBounds] = ControlBounds()
 
 
-def validate_control(vars: ControlVars, bounds: ControlBounds = DEFAULT_CONTROL_BOUNDS) -> list[str]:
+def validate_control(
+    vars: ControlVars, bounds: ControlBounds = DEFAULT_CONTROL_BOUNDS
+) -> list[str]:
     """범위를 벗어난 값에 대한 에러 메시지 목록을 반환. 빈 리스트면 정상."""
     errors: list[str] = []
     if not (bounds.syngas_flow_min <= vars.syngas_flow <= bounds.syngas_flow_max):

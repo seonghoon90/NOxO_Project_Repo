@@ -5,7 +5,7 @@ Protocol 기반 추상화 — 추후 Redis 등 외부 저장소로 교체 가능
 
 from typing import Iterator, Protocol
 
-from app.domain.simulation import SimulationState
+from digital_twin.simulation import SimulationState
 
 
 class StateStore(Protocol):

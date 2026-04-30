@@ -3,7 +3,7 @@ import asyncio
 from app.config import Settings
 from app.core.input_injector import InputInjector
 from app.core.state_store import InMemoryStateStore
-from app.domain.tags import ControlVars
+from digital_twin.simulation import ControlVars
 from app.services.session_service import SessionService
 
 

@@ -13,7 +13,7 @@
  *   raw 태그를 보존하거나 백엔드 API 필드명(`syngas_flow`, `n2_offset`,
  *   `igv_opening`)에 맞춘다. 프론트 내부 키(`syngas`/`n2`/`load`)는 사용하지 않는다.
  * - mode 값은 현재 프론트가 보내는 `'sim' | 'pred'` 문자열을 그대로 따른다.
- * - 출력 변수는 백엔드 stream 필드명(`nox`, `co`, `flame_temp`, `lambda`, `power`)을 따른다.
+ * - 출력 변수는 백엔드 stream 필드명(`nox`, `co`, `exhaust_temp`, `lambda`, `power`)을 따른다.
  */
 const erdTables = [
   {
@@ -50,7 +50,7 @@ const erdTables = [
       ['igv_opening', 'numeric', '', 'IGCC.CC.G1.csgv'],
       ['nox', 'numeric', '', 'NOx (ppm)'],
       ['co', 'numeric', '', 'CO (ppm)'],
-      ['flame_temp', 'numeric', '', '화염온도 (K)'],
+      ['exhaust_temp', 'numeric', '', '배기온도 (°C) — IGCC.CC.G1.TTXM'],
       ['lambda', 'numeric', '', '공기비 (-)'],
       ['power', 'numeric', '', 'IGCC.CC.G1.DWATT (MW)'],
       ['warning', 'boolean', '', 'NOx 임계 초과 여부'],
@@ -124,7 +124,7 @@ export function DatabasePage() {
                 'session_id',
                 't',
                 'syngas_flow, n2_offset, igv_opening',
-                'nox, co, flame_temp, lambda',
+                'nox, co, exhaust_temp, lambda',
                 'power',
                 'warning',
                 'ts',
