@@ -21,21 +21,9 @@ class Settings(BaseSettings):
     # DB (Phase 1: 연결만 준비, 실제 쿼리는 inmemory repository)
     database_url: str | None = Field(default=None, alias="DATABASE_URL")
 
-    # 시뮬 루프
-    sim_dt_seconds: float = 0.2  # WebSocket push 주기 (200ms)
+    # 시뮬 루프 — 백엔드 전용 설정 (세션 수 제한)
+    # τ / dt / 임계치는 digital_twin.simulation.DEFAULT_CONFIG가 단일 진실원.
     sim_max_sessions: int = 10
-
-    # 시간 상수 τ (단위: 초) — [조사 필요] 실측 도출
-    tau_fuel: float = 1.0
-    tau_n2: float = 1.0
-    tau_igv: float = 2.0
-    tau_temp: float = 10.0
-    tau_nox: float = 5.0
-    tau_co: float = 3.0
-    tau_power: float = 8.5
-
-    # 임계치 — [조사 필요]
-    nox_threshold_ppm: float = 50.0
 
     # CORS (개발 시 별도 호스트에서 접근 허용)
     cors_origins: list[str] = [

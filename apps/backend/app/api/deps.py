@@ -62,12 +62,11 @@ def get_session_service(
 
 
 def get_prediction_service(
-    settings: SettingsDep,
     state_store: Annotated[StateStore, Depends(get_state_store)],
     predictor: Annotated[Predictor, Depends(get_predictor)],
 ) -> PredictionService:
-    return PredictionService(settings, state_store, predictor)
+    return PredictionService(state_store, predictor)
 
 
-def get_threshold_service(settings: SettingsDep, db: DbDep) -> ThresholdService:
-    return ThresholdService(settings, db)
+def get_threshold_service(db: DbDep) -> ThresholdService:
+    return ThresholdService(db)

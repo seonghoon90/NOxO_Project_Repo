@@ -1,6 +1,6 @@
 """세션별 백그라운드 시뮬 루프.
 
-각 세션에 대해 asyncio task 1개를 띄우고, sim_dt_seconds 주기로 step을 실행한다.
+각 세션에 대해 asyncio task 1개를 띄우고, dt_config.sim_step.dt 주기로 step을 실행한다.
 실제 step 로직(lag, ML 추론, Zeldovich, 임계치)은 모두 `digital_twin.simulation.sim_step`에
 위임한다. 본 모듈은 asyncio 라이프사이클과 WebSocket broadcast만 책임진다.
 
@@ -71,9 +71,8 @@ class SimLoopManager:
             await self.stop(sid)
 
     async def _run(self, sid: str) -> None:
-        # 백엔드 settings의 dt(WebSocket push 주기)를 DT 설정과 일치시킨다.
-        # 향후 P1-4에서 settings의 sim_dt_seconds를 DT config로 위임하면 본 라인 제거.
-        dt = self.settings.sim_dt_seconds
+        # WebSocket push 주기 = DT step 주기. 단일 진실원은 dt_config.
+        dt = self.dt_config.sim_step.dt
         try:
             while True:
                 state = self.state_store.get(sid)
