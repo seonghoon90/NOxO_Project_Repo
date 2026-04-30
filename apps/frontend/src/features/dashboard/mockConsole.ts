@@ -19,7 +19,7 @@ export type MetricPoint = {
   label: string
   nox: number
   co: number
-  flame: number
+  exhaust: number
   lambda: number
   power: number
 }
@@ -27,7 +27,7 @@ export type MetricPoint = {
 export type ConsoleMetrics = {
   nox: number
   co: number
-  flame: number
+  exhaust: number
   lambda: number
   power: number
   predictedNox: number
@@ -130,7 +130,7 @@ export function createInitialConsoleState(seedHistory = false): ConsoleState {
           label: `${HISTORY_LENGTH - index}s`,
           nox: point.nox,
           co: point.co,
-          flame: point.flame,
+          exhaust: point.exhaust,
           lambda: point.lambda,
           power: point.power,
         }
@@ -176,7 +176,12 @@ export function createStateFromSnapshot(
   const metrics = {
     nox: pickSnapshotValue(outputSource, ['nox'], previous?.metrics.nox ?? 25, 1),
     co: pickSnapshotValue(outputSource, ['co'], previous?.metrics.co ?? 12, 1),
-    flame: pickSnapshotValue(outputSource, ['exhaust_temp'], previous?.metrics.flame ?? 580, 1),
+    exhaust: pickSnapshotValue(
+      outputSource,
+      ['exhaust_temp'],
+      previous?.metrics.exhaust ?? 580,
+      1,
+    ),
     lambda: pickSnapshotValue(outputSource, ['lambda', 'lambda_'], previous?.metrics.lambda ?? 1.1, 2),
     // 백엔드 stream/snapshot은 'power' 키 사용 (단위: MW, 태그: IGCC.CC.G1.DWATT).
     // 향후 raw 태그 키로 직송될 가능성 대비해 POWER_RAW_NAME도 fallback에 포함.
@@ -224,13 +229,13 @@ export function deriveMetrics(
     0.5,
     1.5,
   )
-  const flameBase = Math.max(
-    900,
-    1450 + (syngas - 1500) * 0.24 + (load - 75) * 2.4 - (n2 - 200) * 0.3,
+  const exhaustBase = Math.max(
+    400,
+    580 + (syngas - 1500) * 0.024 + (load - 75) * 0.24 - (n2 - 200) * 0.03,
   )
-  const flame = flameBase + Math.sin(tick * 0.22) * 1.8
+  const exhaust = exhaustBase + Math.sin(tick * 0.22) * 0.8
   const noxBase =
-    25 * Math.exp((flameBase - 1450) / 120) * (1 + 0.6 * Math.max(0, lambda - 1))
+    25 * Math.exp((exhaustBase - 580) / 12) * (1 + 0.6 * Math.max(0, lambda - 1))
   const nox = noxBase + Math.sin(tick * 0.16) * 0.8
   const coBase = 12 + 80 * (lambda - 1) ** 2
   const co = coBase + Math.sin(tick * 0.25) * 0.4
@@ -242,7 +247,7 @@ export function deriveMetrics(
   return {
     nox: round(nox, 1),
     co: round(co, 1),
-    flame: round(flame, 1),
+    exhaust: round(exhaust, 1),
     lambda: round(lambda, 2),
     power: round(power, 1),
     predictedNox: round(predictedNox, 1),
@@ -289,7 +294,7 @@ export function appendHistory(
       label: index === 0 ? 'now' : `${index}s`,
       nox: metrics.nox,
       co: metrics.co,
-      flame: metrics.flame,
+      exhaust: metrics.exhaust,
       lambda: metrics.lambda,
       power: metrics.power,
     },

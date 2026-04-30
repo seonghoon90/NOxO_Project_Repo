@@ -13,7 +13,7 @@ export type AppOutletContext = {
 }
 
 const navItems = [
-  { to: '/', label: '서비스 (메인)' },
+  { to: '/', label: '대시보드' },
   { to: '/about', label: '프로젝트 소개' },
   { to: '/database', label: 'DB 구조' },
   { to: '/digital-twin', label: 'Digital Twin' },
@@ -89,14 +89,14 @@ export function App() {
                 className={mode === 'sim' ? 'mode-opt active' : 'mode-opt'}
                 onClick={() => setMode('sim')}
               >
-                시뮬 모드
+                시뮬레이션
               </button>
               <button
                 type="button"
                 className={mode === 'pred' ? 'mode-opt active' : 'mode-opt'}
                 onClick={() => setMode('pred')}
               >
-                실시간 예측 모드
+                실시간 예측
               </button>
             </div>
             <div className={`pill-live ${streamLabel.tone}`}>

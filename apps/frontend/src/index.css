@@ -169,7 +169,35 @@ a {
   border-color: rgba(239, 68, 68, 0.34);
 }
 
+.stream-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font: 500 11px var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--green);
+  background: var(--green-bg);
+  border: 1px solid rgba(16, 185, 129, 0.24);
+}
+
+.stream-badge.normal,
+.stream-badge.caution {
+  color: var(--amber);
+  background: rgba(245, 158, 11, 0.1);
+  border-color: rgba(245, 158, 11, 0.34);
+}
+
+.stream-badge.alert {
+  color: var(--red);
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.34);
+}
+
 .dot,
+.stream-badge::before,
 .status-dot::before,
 .callout-dot {
   content: '';
@@ -612,7 +640,7 @@ a {
   color: var(--blue);
 }
 
-.legend-flame {
+.legend-exhaust {
   color: var(--amber);
 }
 
@@ -795,6 +823,75 @@ a {
   height: 1px;
   margin: 10px 0 6px;
   background: rgba(255, 255, 255, 0.06);
+}
+
+.summary-highlight {
+  display: grid;
+  gap: 8px;
+  padding: 6px 0 4px;
+}
+
+.summary-label,
+.summary-metric-label {
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 11px;
+}
+
+.summary-value {
+  font: 700 30px/1 var(--font-mono);
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.summary-value-safe {
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.summary-value-caution {
+  color: #d6a93a;
+}
+
+.summary-value-danger {
+  color: #dd6b6b;
+}
+
+.summary-unit {
+  margin-left: 6px;
+  font-size: 0.42em;
+  color: var(--text-3);
+}
+
+.summary-grid {
+  display: grid;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.summary-range-metric {
+  display: grid;
+  gap: 6px;
+}
+
+.summary-range-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.summary-range-label {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 11px;
+}
+
+.summary-metric-value {
+  font: 600 19px/1.2 var(--font-mono);
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.summary-metric-unit {
+  margin-left: 6px;
+  font-size: 0.62em;
+  color: var(--text-3);
 }
 
 .modal-backdrop {

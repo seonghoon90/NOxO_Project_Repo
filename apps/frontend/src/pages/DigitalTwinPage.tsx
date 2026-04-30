@@ -1,7 +1,7 @@
 const tauRows = [
   ['NOx', '2.4 s', '화염 내 질소산화물 생성 반응 속도', '빠름'],
   ['CO', '1.8 s', '불완전 연소 CO 생성·소멸 반응 속도', '빠름'],
-  ['화염온도', '5.2 s', '연소기 열용량에 의한 온도 관성', '중간'],
+  ['배기온도', '5.2 s', '터빈·배기 라인 열용량에 의한 온도 관성', '중간'],
   ['λ (공기비)', '0.9 s', '연료-공기 혼합 시간', '매우 빠름'],
   ['효율', '8.5 s', '터빈 열역학적 균형에 의한 지연', '느림'],
 ]
@@ -22,7 +22,7 @@ export function DigitalTwinPage() {
             <h1 className="hero-title">합성가스 발전 공정의 물리 기반 디지털 트윈</h1>
             <p className="hero-copy">
               실제 발전소의 운전 거동을 수식으로 재현한 시뮬레이션 엔진입니다. 제어 변수를 조작하면 시간 상수 τ에
-              따라 NOx, CO, 화염온도, 효율이 순차적으로 변화합니다.
+              따라 NOx, CO, 배기온도, 효율이 순차적으로 변화합니다.
             </p>
           </div>
           <div className="formula-card">
@@ -43,7 +43,7 @@ export function DigitalTwinPage() {
             <ProcessCard
               title="② 합성가스 반응기"
               subtitle="Syngas Reactor"
-              body="연료와 N2가 혼합·연소되고 공기비 λ와 화염온도가 결정됩니다. NOx 생성의 핵심 지점입니다."
+              body="연료와 N2가 혼합·연소되고 공기비 λ가 결정됩니다. 이 연소 상태가 뒤쪽 배기온도와 NOx 형성에 영향을 줍니다."
               active
             />
             <ProcessCard

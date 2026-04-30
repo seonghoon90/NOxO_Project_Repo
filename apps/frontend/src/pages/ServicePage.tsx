@@ -12,6 +12,7 @@ import { useConsoleState, type StreamStatus } from '../features/dashboard/useCon
 import type { AppOutletContext } from '../app/App'
 
 const variableOrder: VariableKey[] = ['syngas', 'n2', 'load']
+const POWER_LIMIT = 240
 
 export function ServicePage() {
   const { mode, settingsOpen, closeSettings, reportStreamStatus } = useOutletContext<AppOutletContext>()
@@ -37,12 +38,20 @@ export function ServicePage() {
   const streamLabel = streamStatusLabel(status)
   const noxStatus = displayedNox > NOX_LIMIT ? '위험' : streamLabel.text
   const controlCards = variableOrder.map((key) => state.variables[key])
+  const noxValues = state.history.length > 0 ? state.history.map((point) => point.nox) : [displayedNox]
+  const powerValues = state.history.length > 0 ? state.history.map((point) => point.power) : [state.metrics.power]
+  const noxHeadroom = NOX_LIMIT - displayedNox
+  const powerHeadroom = state.metrics.power - POWER_LIMIT
+  const noxHeadroomTone = headroomTone(noxHeadroom, 12, 5)
+  const powerHeadroomTone = headroomTone(powerHeadroom, 12, 5)
+  const noxRange = getRange(noxValues)
+  const powerRange = getRange(powerValues)
   const tableRows = [
     ['NOx', displayedNox.toFixed(1), 'ppm', NOX_LIMIT.toFixed(1), '5.0s', displayedNox > NOX_LIMIT ? '위험' : '정상'],
     ['발전량', state.metrics.power.toFixed(1), 'MW', '248.6', '8.5s', state.metrics.power < 240 ? '주의' : '정상'],
-    ['CO', state.metrics.co.toFixed(1), 'ppm', '200.0', '1.8s', '정상'],
-    ['화염온도', state.metrics.flame.toFixed(1), 'K', '1450.0', '10.0s', state.metrics.flame > 1500 ? '주의' : '정상'],
-    ['λ', state.metrics.lambda.toFixed(2), '-', '1.10', '0.9s', '정상'],
+    ['일산화탄소 (CO)', state.metrics.co.toFixed(1), 'ppm', '200.0', '1.8s', '정상'],
+    ['배기온도', state.metrics.exhaust.toFixed(1), '°C', '580.0', '10.0s', state.metrics.exhaust > 600 ? '주의' : '정상'],
+    ['공기비 (λ)', state.metrics.lambda.toFixed(2), '-', '1.10', '0.9s', '정상'],
   ]
   const handleCloseSettings = useCallback(() => {
     setDraftConfig(null)
@@ -125,13 +134,13 @@ export function ServicePage() {
                     />
                   </div>
                   <div className="overlay-anchor top-mid">
-                    <OverlayMetric label="λ" value={state.metrics.lambda.toFixed(2)} />
+                    <OverlayMetric label="공기비 (λ)" value={state.metrics.lambda.toFixed(2)} />
                   </div>
                   <div className="overlay-anchor top-right-left">
-                    <OverlayMetric label="화염온도" value={`${state.metrics.flame.toFixed(1)} K`} caution />
+                    <OverlayMetric label="배기온도" value={`${state.metrics.exhaust.toFixed(1)} °C`} caution />
                   </div>
                   <div className="overlay-anchor top-right">
-                    <OverlayMetric label="CO" value={`${state.metrics.co.toFixed(1)} ppm`} />
+                    <OverlayMetric label="일산화탄소 (CO)" value={`${state.metrics.co.toFixed(1)} ppm`} />
                   </div>
                   <div className="overlay-anchor right-mid">
                     <OverlayMetric label="NOx" value={`${displayedNox.toFixed(1)} ppm`} primary />
@@ -163,7 +172,7 @@ export function ServicePage() {
                   <div className="chart-title">NOx 시계열</div>
                   <div className="chart-subtitle">ppm · 최근 60s</div>
                 </div>
-                <span className={`status-dot ${streamLabel.tone}`}>{streamLabel.text}</span>
+                <span className={`stream-badge ${streamLabel.tone}`}>{streamLabel.text}</span>
               </header>
               <div className="chart-body">
                 <NoxChart history={state.history} current={displayedNox} />
@@ -173,13 +182,13 @@ export function ServicePage() {
             <section className="panel chart-card">
               <header className="chart-header">
                 <div>
-                  <div className="chart-title">CO / λ / 화염온도</div>
+                  <div className="chart-title">일산화탄소 (CO) / 공기비 (λ) / 배기온도</div>
                   <div className="chart-subtitle">정규화 · 최근 60s</div>
                 </div>
                 <div className="chart-legend mono">
-                  <span className="legend-co">CO</span>
-                  <span className="legend-lambda">λ</span>
-                  <span className="legend-flame">화염</span>
+                  <span className="legend-co">일산화탄소</span>
+                  <span className="legend-lambda">공기비</span>
+                  <span className="legend-exhaust">배기온도</span>
                 </div>
               </header>
               <div className="chart-body">
@@ -278,28 +287,40 @@ export function ServicePage() {
           </div>
 
           <div className="sidebar-section telemetry">
-            <div className="sidebar-title">멀티 변수 패널</div>
-            <TelemetryRow
-              label={state.variables.syngas.label}
-              value={formatValue(state.variables.syngas.value, state.variables.syngas.digits)}
-              unit={state.variables.syngas.unit}
-            />
-            <TelemetryRow
-              label={state.variables.n2.label}
-              value={formatValue(state.variables.n2.value, state.variables.n2.digits)}
-              unit={state.variables.n2.unit}
-            />
-            <TelemetryRow
-              label={state.variables.load.label}
-              value={formatValue(state.variables.load.value, state.variables.load.digits)}
-              unit={state.variables.load.unit}
-            />
+            <div className="sidebar-title">운영 요약</div>
+            <div className="summary-highlight">
+              <div className="summary-label">NOx 임계 여유</div>
+              <div className={`summary-value ${noxHeadroomTone}`}>
+                {noxHeadroom >= 0 ? `+${noxHeadroom.toFixed(1)}` : `${noxHeadroom.toFixed(1)}`}
+                <span className="summary-unit">ppm</span>
+              </div>
+            </div>
+            <div className="summary-highlight">
+              <div className="summary-label">발전량 임계 여유</div>
+              <div className={`summary-value ${powerHeadroomTone}`}>
+                {powerHeadroom >= 0 ? `+${powerHeadroom.toFixed(1)}` : `${powerHeadroom.toFixed(1)}`}
+                <span className="summary-unit">MW</span>
+              </div>
+            </div>
             <div className="telemetry-divider" />
-            <TelemetryRow label="NOx" value={displayedNox.toFixed(1)} unit="ppm" />
-            <TelemetryRow label="발전량" value={state.metrics.power.toFixed(1)} unit="MW" />
-            <TelemetryRow label="CO" value={state.metrics.co.toFixed(1)} unit="ppm" />
-            <TelemetryRow label="화염온도" value={state.metrics.flame.toFixed(1)} unit="K" caution />
-            <TelemetryRow label="λ" value={state.metrics.lambda.toFixed(2)} unit="-" />
+            <div className="summary-grid">
+              <SummaryRangeMetric
+                label="최근 60초 NOx"
+                minLabel="최솟값"
+                minValue={noxRange.min.toFixed(1)}
+                maxLabel="최댓값"
+                maxValue={noxRange.max.toFixed(1)}
+                unit="ppm"
+              />
+              <SummaryRangeMetric
+                label="최근 60초 발전량"
+                minLabel="최솟값"
+                minValue={powerRange.min.toFixed(1)}
+                maxLabel="최댓값"
+                maxValue={powerRange.max.toFixed(1)}
+                unit="MW"
+              />
+            </div>
           </div>
         </aside>
       </section>
@@ -488,24 +509,38 @@ function KpiCard({
   )
 }
 
-function TelemetryRow({
+function SummaryRangeMetric({
   label,
-  value,
+  minLabel,
+  minValue,
+  maxLabel,
+  maxValue,
   unit,
-  caution,
 }: {
   label: string
-  value: number | string
+  minLabel: string
+  minValue: string
+  maxLabel: string
+  maxValue: string
   unit: string
-  caution?: boolean
 }) {
   return (
-    <div className="telemetry-row">
-      <span className="telemetry-name">{label}</span>
-      <span>
-        <span className={caution ? 'telemetry-value caution-text' : 'telemetry-value'}>{value}</span>
-        <span className="telemetry-unit">{unit}</span>
-      </span>
+    <div className="summary-range-metric">
+      <div className="summary-metric-label">{label}</div>
+      <div className="summary-range-row">
+        <span className="summary-range-label">{minLabel}</span>
+        <span className="summary-metric-value">
+          {minValue}
+          <span className="summary-metric-unit">{unit}</span>
+        </span>
+      </div>
+      <div className="summary-range-row">
+        <span className="summary-range-label">{maxLabel}</span>
+        <span className="summary-metric-value">
+          {maxValue}
+          <span className="summary-metric-unit">{unit}</span>
+        </span>
+      </div>
     </div>
   )
 }
@@ -514,15 +549,18 @@ function NoxChart({ history, current }: { history: MetricPoint[]; current: numbe
   const width = 560
   const height = 170
   const bottomLabelY = height - 12
+  const thresholdPinnedY = 22
   if (history.length < 2) {
     return <ChartPlaceholder width={width} height={height} />
   }
   const values = history.map((point) => point.nox)
-  const max = Math.max(NOX_LIMIT * 1.1, ...values) * 1.03
-  const min = Math.min(...values) - 8
+  const focusedRange = createRange(values, 0.28, 1.2)
+  const max = focusedRange.max
+  const min = focusedRange.min
+  const thresholdInRange = NOX_LIMIT <= max
   const line = buildLinePath(values, min, max, width, height)
   const area = `${line} L ${width} ${height} L 0 ${height} Z`
-  const thresholdY = scaleY(NOX_LIMIT, min, max, height)
+  const thresholdY = thresholdInRange ? scaleY(NOX_LIMIT, min, max, height) : thresholdPinnedY
   const currentY = scaleY(current, min, max, height)
 
   return (
@@ -574,10 +612,10 @@ function MultiChart({ history }: { history: MetricPoint[] }) {
   }
   const coValues = history.map((point) => point.co)
   const lambdaValues = history.map((point) => point.lambda)
-  const flameValues = history.map((point) => point.flame)
+  const exhaustValues = history.map((point) => point.exhaust)
   const coRange = createRange(coValues, 0.12, 0.6)
   const lambdaRange = createRange(lambdaValues, 0.18, 0.02)
-  const flameRange = createRange(flameValues, 0.08, 1.2)
+  const exhaustRange = createRange(exhaustValues, 0.08, 1.2)
 
   return (
     <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
@@ -611,7 +649,7 @@ function MultiChart({ history }: { history: MetricPoint[] }) {
         strokeLinecap="round"
       />
       <path
-        d={buildSeriesPath(flameValues, flameRange.min, flameRange.max, padding.left, padding.top, plotWidth, plotHeight)}
+        d={buildSeriesPath(exhaustValues, exhaustRange.min, exhaustRange.max, padding.left, padding.top, plotWidth, plotHeight)}
         fill="none"
         stroke="#F59E0B"
         strokeWidth="1.8"
@@ -630,10 +668,10 @@ function MultiChart({ history }: { history: MetricPoint[] }) {
         λ {lambdaRange.min.toFixed(2)}
       </text>
       <text x={width - 2} y="12" textAnchor="end" className="svg-label" fill="#F59E0B">
-        {flameRange.max.toFixed(1)} K
+        {exhaustRange.max.toFixed(1)} °C
       </text>
       <text x={width - 6} y={bottomLabelY} textAnchor="end" className="svg-label" fill="#F59E0B">
-        {flameRange.min.toFixed(1)} K
+        {exhaustRange.min.toFixed(1)} °C
       </text>
       <text x={padding.left} y={bottomLabelY} className="svg-label">
         -60s
@@ -765,6 +803,19 @@ function scaleY(value: number, min: number, max: number, height: number) {
 
 function formatValue(value: number, digits: number) {
   return value.toFixed(digits)
+}
+
+function getRange(values: number[]) {
+  return {
+    min: Math.min(...values),
+    max: Math.max(...values),
+  }
+}
+
+function headroomTone(value: number, cautionThreshold: number, dangerThreshold: number) {
+  if (value <= dangerThreshold) return 'summary-value-danger'
+  if (value <= cautionThreshold) return 'summary-value-caution'
+  return 'summary-value-safe'
 }
 
 function statusClass(status: string) {
