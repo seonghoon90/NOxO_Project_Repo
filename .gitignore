@@ -4,6 +4,9 @@
 .vscode/
 *.swp
 
+# Claude Code 로컬 설정
+.claude/
+
 # Environment
 .env
 .env.*
