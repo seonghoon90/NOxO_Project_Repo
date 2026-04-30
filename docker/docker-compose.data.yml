@@ -1,3 +1,5 @@
+name: noxo_project_repo
+
 services:
   postgres:
     image: postgres:15-alpine
@@ -27,8 +29,8 @@ services:
     ports:
       - "${AIRFLOW_PORT:-8080}:8080"
     volumes:
-      - ./airflow/dags:/opt/airflow/dags
-      - ./:/opt/airflow/project
+      - ../airflow/dags:/opt/airflow/dags
+      - ../:/opt/airflow/project
     command: standalone
 
 volumes:
