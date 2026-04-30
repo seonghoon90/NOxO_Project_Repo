@@ -1,0 +1,15 @@
+services:
+  postgres:
+    restart: unless-stopped
+
+  backend:
+    build:
+      target: prod
+    restart: unless-stopped
+
+  frontend:
+    build:
+      target: prod
+    ports:
+      - "80:80"
+    restart: unless-stopped

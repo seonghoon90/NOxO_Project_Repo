@@ -1,0 +1,51 @@
+services:
+  postgres:
+    # DB 정의서 v1.0 §2.2 기준 PostgreSQL 15
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_DB: ${POSTGRES_DB:-igcc_db}
+      TZ: Asia/Seoul
+      PGTZ: Asia/Seoul
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # 초기화 스크립트는 향후 추가 — [DB 협의 필요]
+      # - ../database/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [noxo-net]
+
+  backend:
+    build:
+      context: ..
+      dockerfile: apps/backend/Dockerfile
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-igcc_db}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      TZ: Asia/Seoul
+    volumes:
+      - ../data:/app/data:ro
+      - dt_models:/app/digital-twin/models
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [noxo-net]
+
+  frontend:
+    build:
+      context: ../apps/frontend
+      dockerfile: Dockerfile
+    depends_on: [backend]
+    networks: [noxo-net]
+
+volumes:
+  pgdata:
+  dt_models:
+
+networks:
+  noxo-net:
+    driver: bridge
