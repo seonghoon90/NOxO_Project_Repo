@@ -11,5 +11,25 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
+  airflow:
+    image: apache/airflow:2.10.5-python3.12
+    container_name: noxo_airflow
+    depends_on:
+      - postgres
+    environment:
+      AIRFLOW__CORE__EXECUTOR: SequentialExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "true"
+      NOXO_PROJECT_ROOT: /opt/airflow/project
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-igcc_db}
+      SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL}
+      _PIP_ADDITIONAL_REQUIREMENTS: pandas python-dotenv psycopg2-binary
+    ports:
+      - "${AIRFLOW_PORT:-8080}:8080"
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./:/opt/airflow/project
+    command: standalone
+
 volumes:
   postgres_data:
