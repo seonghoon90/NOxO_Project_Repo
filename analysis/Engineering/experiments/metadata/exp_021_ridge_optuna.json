@@ -1,0 +1,18 @@
+{
+  "experiment_id": "exp_021_ridge_optuna",
+  "model": "Ridge",
+  "timestamp": "2026-04-30T14:26:06.756825",
+  "training_time_seconds": 0.08132100105285645,
+  "performance": {
+    "train_mae": 0.007205957214355362,
+    "train_rmse": 0.012631867478246572,
+    "val_mae": 0.007065982529832228,
+    "val_rmse": 0.011487404979661426,
+    "test_mae": 0.007784077957484142,
+    "test_rmse": 0.012396921520459679
+  },
+  "best_params": {
+    "alpha": 12.530250032172443
+  },
+  "data_type": "real_data_optuna"
+}
