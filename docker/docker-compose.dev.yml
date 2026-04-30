@@ -1,0 +1,24 @@
+services:
+  postgres:
+    ports:
+      - "5432:5432"
+
+  backend:
+    build:
+      target: dev
+    volumes:
+      - ../apps/backend:/app/apps/backend
+      - ../digital-twin:/app/digital-twin
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build:
+      target: dev
+    volumes:
+      - ../apps/frontend:/app
+      - /app/node_modules
+    environment:
+      VITE_PROXY_TARGET: http://backend:8000
+    ports:
+      - "5173:5173"
