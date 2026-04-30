@@ -1,0 +1,15 @@
+{
+  "experiment_id": "exp_019_lightgbm_realdata",
+  "model": "LightGBM_RealData",
+  "timestamp": "2026-04-30T14:23:39.229078",
+  "training_time_seconds": 6.202322959899902,
+  "performance": {
+    "train_mae": 0.007097988962528713,
+    "train_rmse": 0.012571777001778162,
+    "val_mae": 0.008570388777096384,
+    "val_rmse": 0.012974603660715357,
+    "test_mae": 0.01023144941474462,
+    "test_rmse": 0.01924490084999497
+  },
+  "data_type": "real_data"
+}

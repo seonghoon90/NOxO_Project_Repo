@@ -1,0 +1,28 @@
+{
+  "experiment_id": "exp_023_lightgbm_optuna",
+  "model": "LightGBM",
+  "timestamp": "2026-04-30T14:41:07.084299",
+  "training_time_seconds": 3.2788479328155518,
+  "performance": {
+    "train_mae": 0.006997692293047857,
+    "train_rmse": 0.012867410078862378,
+    "val_mae": 0.007345507671718456,
+    "val_rmse": 0.011763478274540676,
+    "test_mae": 0.008820962800572167,
+    "test_rmse": 0.016439346015399876
+  },
+  "best_params": {
+    "learning_rate": 0.0739888916416889,
+    "num_leaves": 46,
+    "max_depth": 9,
+    "min_child_samples": 275,
+    "subsample": 0.6455752163375591,
+    "colsample_bytree": 0.9899144193623708,
+    "lambda_l1": 0.0003191884847844018,
+    "lambda_l2": 0.00020478680306290032,
+    "objective": "regression",
+    "metric": "mae",
+    "verbose": -1
+  },
+  "data_type": "real_data_optuna"
+}
