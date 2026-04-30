@@ -15,6 +15,7 @@ import math
 
 from app.adapters.predictor.base import Predictor
 from digital_twin.simulation import ControlVars, OutputVars
+from digital_twin.simulation.features import compute_efficiency
 
 
 class StubPredictor:
@@ -38,11 +39,14 @@ class StubPredictor:
         nox = self._nox(exhaust_temp, lambda_)
         co = self._co(lambda_)
         power = self._power(controls)
+        # efficiency는 features 근사식 재사용 (Stub은 자체 계산 없음)
+        efficiency = compute_efficiency(controls.syngas_flow, exhaust_temp)
         return OutputVars(
             nox=nox,
             co=co,
             exhaust_temp=exhaust_temp,
             lambda_=lambda_,
+            efficiency=efficiency,
             power=power,
         )
 
