@@ -46,8 +46,6 @@ data/**
 docs/**
 !docs/
 !docs/GIT_CONVENTIONS.md
-!docs/commands/
-!docs/commands/learn.md
 models/**
 !models/
 !models/**/
