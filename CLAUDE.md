@@ -41,4 +41,4 @@ NOxO_Project_Repo/
 작업 중 실수가 발생하면 `/learn [메모]`로 해당 영역 CLAUDE.md의 "⚠️ 학습된 주의사항" 섹션에 누적한다.
 - 인자 없이 호출하면 최근 대화에서 자동 추론
 - 인자가 있으면 그 내용을 추가
-- 커맨드 정의: `docs/commands/learn.md`
+- 커맨드 위치: `.claude/commands/learn.md` (Claude) / `.codex/commands/learn.md` (Codex)
