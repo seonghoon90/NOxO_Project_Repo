@@ -22,7 +22,6 @@ export function ServicePage() {
     setActiveVar,
     stepActiveVar,
     resetControls,
-    toggleOverlay,
     updateActiveVariableConfig,
     restoreActiveVariableDefaults,
   } = useConsoleState(mode)
@@ -112,56 +111,18 @@ export function ServicePage() {
               <div className="panel-header-left">
                 <span className="panel-title">공정 모니터링</span>
               </div>
-              <button
-                type="button"
-                className={state.overlayVisible ? 'overlay-toggle' : 'overlay-toggle off'}
-                onClick={toggleOverlay}
-              >
-                <EyeIcon />
-                오버레이 표시
-              </button>
             </header>
-            <div className="plant-body">
-              <div className="plant-frame" />
-              <div className="plant-hint mono">도면 이미지 자리 (plant-diagram.svg)</div>
-              <PlantDiagram n2Label={state.variables.n2.shortLabel} />
-              {state.overlayVisible ? (
-                <div className="overlay-layer">
-                  <div className="overlay-anchor top-left">
-                    <OverlayMetric
-                      label={state.variables.syngas.shortLabel}
-                      value={`${formatValue(state.variables.syngas.value, state.variables.syngas.digits)} ${state.variables.syngas.unit}`}
-                    />
-                  </div>
-                  <div className="overlay-anchor top-mid">
-                    <OverlayMetric label="공기비 (λ)" value={state.metrics.lambda.toFixed(2)} />
-                  </div>
-                  <div className="overlay-anchor top-right-left">
-                    <OverlayMetric label="배기온도" value={`${state.metrics.exhaust.toFixed(1)} °C`} caution />
-                  </div>
-                  <div className="overlay-anchor top-right">
-                    <OverlayMetric label="일산화탄소 (CO)" value={`${state.metrics.co.toFixed(1)} ppm`} />
-                  </div>
-                  <div className="overlay-anchor right-mid">
-                    <OverlayMetric label="NOx" value={`${displayedNox.toFixed(1)} ppm`} primary />
-                  </div>
-                  <div className="overlay-anchor bottom-left">
-                    <OverlayMetric
-                      label={state.variables.n2.shortLabel}
-                      value={`${formatValue(state.variables.n2.value, state.variables.n2.digits)} ${state.variables.n2.unit}`}
-                    />
-                  </div>
-                  <div className="overlay-anchor bottom-mid-left">
-                    <OverlayMetric
-                      label={state.variables.load.shortLabel}
-                      value={`${formatValue(state.variables.load.value, state.variables.load.digits)} ${state.variables.load.unit}`}
-                    />
-                  </div>
-                  <div className="overlay-anchor bottom-mid-right">
-                    <OverlayMetric label="발전량" value={`${state.metrics.power.toFixed(1)} MW`} />
-                  </div>
-                </div>
-              ) : null}
+            <div className="plant-body" style={{ height: 500 }}>
+              <HmiMonitor
+                sg={state.variables.syngas.value}
+                n2={state.variables.n2.value}
+                igv={state.variables.load.value}
+                nox={displayedNox}
+                co={state.metrics.co}
+                exhaust={state.metrics.exhaust}
+                lambda={state.metrics.lambda}
+                power={state.metrics.power}
+              />
             </div>
           </section>
 
@@ -683,63 +644,6 @@ function MultiChart({ history }: { history: MetricPoint[] }) {
   )
 }
 
-function PlantDiagram({ n2Label }: { n2Label: string }) {
-  return (
-    <svg className="plant-svg" viewBox="0 0 900 330" preserveAspectRatio="xMidYMid meet">
-      <rect x="68" y="146" width="110" height="38" rx="7" className="plant-node" />
-      <text x="123" y="169" textAnchor="middle" className="plant-text">
-        연료 공급
-      </text>
-      <rect x="248" y="131" width="170" height="68" rx="8" className="plant-node active" />
-      <text x="333" y="160" textAnchor="middle" className="plant-text active">
-        합성가스
-      </text>
-      <text x="333" y="178" textAnchor="middle" className="plant-text active">
-        반응기
-      </text>
-      <circle cx="520" cy="165" r="46" className="plant-node" />
-      <text x="520" y="162" textAnchor="middle" className="plant-text">
-        가스
-      </text>
-      <text x="520" y="176" textAnchor="middle" className="plant-text">
-        터빈
-      </text>
-      <rect x="652" y="146" width="116" height="38" rx="7" className="plant-node" />
-      <text x="710" y="169" textAnchor="middle" className="plant-text">
-        배기 라인
-      </text>
-      <rect x="272" y="276" width="122" height="28" rx="5" className="plant-node secondary" />
-      <text x="333" y="293" textAnchor="middle" className="plant-text secondary">
-        {n2Label}
-      </text>
-    </svg>
-  )
-}
-
-function OverlayMetric({
-  label,
-  value,
-  caution,
-  primary,
-}: {
-  label: string
-  value: string
-  caution?: boolean
-  primary?: boolean
-}) {
-  const className = primary ? 'overlay-metric primary' : caution ? 'overlay-metric caution' : 'overlay-metric'
-
-  return (
-    <div className={className}>
-      <div className="overlay-metric-label">{label}</div>
-      <div className={caution ? 'overlay-metric-value caution-text' : primary ? 'overlay-metric-value primary-text' : 'overlay-metric-value'}>
-        <span className={caution ? 'overlay-metric-dot caution' : primary ? 'overlay-metric-dot primary' : 'overlay-metric-dot'} />
-        {value}
-      </div>
-    </div>
-  )
-}
-
 function ChartPlaceholder({ width, height }: { width: number; height: number }) {
   return (
     <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
@@ -840,20 +744,6 @@ function streamStatusLabel(status: StreamStatus): { text: string; tone: string }
   }
 }
 
-function EyeIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path
-        d="M2.5 12s3.5-6 9.5-6s9.5 6 9.5 6s-3.5 6-9.5 6s-9.5-6-9.5-6Z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-      />
-      <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" strokeWidth="1.5" />
-    </svg>
-  )
-}
-
 function ArrowDownIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -889,6 +779,336 @@ function CloseIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" strokeWidth="1.6" />
+    </svg>
+  )
+}
+
+// ── NOxO 디자인 토큰 ──────────────────────────────────────
+const C = {
+  bg:      '#0b0f14',
+  surf:    '#11161d',
+  surf2:   '#161d26',
+  surf3:   '#1c242f',
+  line:    'rgba(255,255,255,0.10)',
+  lineS:   'rgba(255,255,255,0.18)',
+  t2:      'rgba(255,255,255,0.58)',
+  t3:      'rgba(255,255,255,0.28)',
+  blue:    '#3b82f6',
+  blueBg:  'rgba(59,130,246,0.09)',
+  green:   '#10b981',
+  greenBg: 'rgba(16,185,129,0.08)',
+  amber:   '#f59e0b',
+  red:     '#ef4444',
+} as const
+
+type HmiProps = {
+  sg: number; n2: number; igv: number
+  nox: number; co: number; exhaust: number; lambda: number; power: number
+}
+
+function HmiMonitor({ sg, n2, igv, nox, co, exhaust, lambda, power }: HmiProps) {
+  const eff      = Math.min(99, Math.max(60, (89 * power) / 248.6)).toFixed(1)
+  const noxColor = nox > 50 ? C.red : C.blue
+  const M = "'JetBrains Mono',monospace"
+
+  return (
+    <svg
+      viewBox="0 0 1456 640"
+      width="100%" height="100%"
+      style={{ display: 'block', background: C.bg }}
+      preserveAspectRatio="xMidYMid meet"
+    >
+      <defs>
+        <linearGradient id="hPink"  x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"   stopColor="#f472b6"/>
+          <stop offset="40%"  stopColor="#ec4899"/>
+          <stop offset="100%" stopColor="#9d174d"/>
+        </linearGradient>
+        <linearGradient id="hOlive" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"   stopColor="#a3e635"/>
+          <stop offset="40%"  stopColor="#84cc16"/>
+          <stop offset="100%" stopColor="#3f6212"/>
+        </linearGradient>
+        <linearGradient id="hAmber" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"   stopColor="#fbbf24"/>
+          <stop offset="40%"  stopColor="#f59e0b"/>
+          <stop offset="100%" stopColor="#78350f"/>
+        </linearGradient>
+        <linearGradient id="hBlue"  x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%"   stopColor="#60a5fa"/>
+          <stop offset="50%"  stopColor="#3b82f6"/>
+          <stop offset="100%" stopColor="#1d4ed8"/>
+        </linearGradient>
+        <linearGradient id="hTurb"  x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"   stopColor="#1e293b"/>
+          <stop offset="60%"  stopColor="#0f172a"/>
+          <stop offset="100%" stopColor="#0a1120"/>
+        </linearGradient>
+        <radialGradient id="hCan" cx="35%" cy="35%">
+          <stop offset="0%"   stopColor="#fbbf24"/>
+          <stop offset="45%"  stopColor="#ef4444"/>
+          <stop offset="100%" stopColor="#7f1d1d"/>
+        </radialGradient>
+      </defs>
+
+      <rect width="1456" height="640" fill={C.bg}/>
+
+      {/* LEFT PANELS */}
+      <rect x="14" y="8" width="126" height="100" fill={C.surf2} stroke={C.line} strokeWidth="1" rx="4"/>
+      <text x="77" y="23" fontSize="9" fontWeight="600" textAnchor="middle" fill={C.t3} letterSpacing="0.08em">PURGE TIMER</text>
+      <rect x="20" y="28" width="114" height="18" rx="3" fill={C.bg} stroke={C.line}/>
+      <text x="77" y="41" fontSize="11" fontWeight="700" textAnchor="middle" fill={C.blue} fontFamily={M}>26373.0</text>
+      <text x="77" y="58" fontSize="9" fontWeight="600" textAnchor="middle" fill={C.t3} letterSpacing="0.06em">RE PURGE</text>
+      <rect x="20" y="62" width="114" height="18" rx="3" fill={C.bg} stroke={C.line}/>
+      <text x="77" y="75" fontSize="11" fontWeight="700" textAnchor="middle" fill={C.blue} fontFamily={M}>11.3</text>
+
+      <rect x="155" y="8" width="122" height="98" fill={C.surf2} stroke={C.lineS} strokeWidth="1" rx="4"/>
+      <text x="216" y="22" fontSize="9" fontWeight="700" textAnchor="middle" fill={C.t3} letterSpacing="0.1em">SYNGAS</text>
+      <circle cx="168" cy="34" r="5" fill={C.green} opacity=".7"/>
+      <circle cx="168" cy="50" r="5" fill={C.green} opacity=".7"/>
+      <circle cx="168" cy="66" r="5" fill={C.amber} opacity=".6"/>
+      <text x="216" y="38" fontSize="11" fontWeight="700" fill={C.blue} fontFamily={M}>{sg.toFixed(1)}</text>
+      <text x="249" y="38" fontSize="8" fill={C.t3}>raw</text>
+      <text x="216" y="54" fontSize="10" fontWeight="600" fill={C.t2}>184.4</text>
+      <text x="249" y="54" fontSize="8" fill={C.t3}>°C</text>
+      <text x="216" y="70" fontSize="10" fontWeight="600" fill={C.t2}>44.7</text>
+      <text x="249" y="70" fontSize="8" fill={C.t3}>kg/s</text>
+      <text x="216" y="84" fontSize="8" fill={C.t3}>9086.5 kg/m³</text>
+      <text x="216" y="98" fontSize="8" fontWeight="600" fill={C.green}>GC Normal</text>
+
+      <rect x="155" y="185" width="122" height="72" fill={C.surf2} stroke={C.line} strokeWidth="1" rx="4"/>
+      <text x="216" y="199" fontSize="9" fontWeight="700" textAnchor="middle" fill={C.t3} letterSpacing="0.08em">N2 INJECT</text>
+      <text x="216" y="215" fontSize="11" fontWeight="700" fill={C.blue} fontFamily={M}>{n2.toFixed(1)}</text>
+      <text x="262" y="215" fontSize="8" fill={C.t3}>raw</text>
+      <text x="216" y="230" fontSize="10" fontWeight="600" fill={C.t2}>36.0</text>
+      <text x="249" y="230" fontSize="8" fill={C.t3}>°C</text>
+      <text x="216" y="245" fontSize="10" fontWeight="600" fill={C.t2}>0.3</text>
+      <text x="244" y="245" fontSize="8" fill={C.t3}>kg/s</text>
+
+      <rect x="14" y="190" width="134" height="118" fill={C.surf2} stroke={C.line} strokeWidth="1" rx="4"/>
+      <text x="81" y="204" fontSize="9" fontWeight="700" textAnchor="middle" fill={C.t3} letterSpacing="0.08em">FUEL SPLIT</text>
+      {([ ['FSR','69.0','%'],['N2 FSR','0.0','%'],['SG FSR','69.0','%'],
+           ['FX1','100.0','%'],['SIM','128.4','s'],['Eff',eff,'%'] ] as [string,string,string][])
+        .map(([label, val, unit], i) => (
+        <g key={label}>
+          <text x="22" y={218+i*15} fontSize="8" fill={C.t3}>{label}</text>
+          <text x="82" y={218+i*15} fontSize="10" fontWeight="600"
+            fill={label==='Eff'?C.green:C.blue} fontFamily={M}>{val}</text>
+          <text x="112" y={218+i*15} fontSize="8" fill={C.t3}>{unit}</text>
+        </g>
+      ))}
+
+      {/* SYNGAS 메인 배관 */}
+      <rect x="273" y="102" width="440" height="12" fill="url(#hPink)" rx="2"/>
+      <rect x="273" y="103" width="440" height="4" fill="#f9a8d4" opacity=".25"/>
+      <g transform="translate(305,98)">
+        <polygon points="0,0 20,10 0,20" fill={C.green} stroke="#064e3b" strokeWidth="1.2"/>
+        <polygon points="20,0 0,10 20,20" fill={C.green} stroke="#064e3b" strokeWidth="1.2"/>
+        <line x1="10" y1="0" x2="10" y2="-7" stroke="#064e3b" strokeWidth="1.5"/>
+        <line x1="10" y1="20" x2="10" y2="27" stroke="#064e3b" strokeWidth="1.5"/>
+        <text x="10" y="-10" fontSize="8" textAnchor="middle" fill={C.t3}>VS4-11</text>
+      </g>
+      <g transform="translate(380,98)">
+        <polygon points="0,0 20,10 0,20" fill={C.green} stroke="#064e3b" strokeWidth="1.2"/>
+        <polygon points="20,0 0,10 20,20" fill={C.green} stroke="#064e3b" strokeWidth="1.2"/>
+        <line x1="10" y1="0" x2="10" y2="-7" stroke="#064e3b" strokeWidth="1.5"/>
+        <line x1="10" y1="20" x2="10" y2="27" stroke="#064e3b" strokeWidth="1.5"/>
+        <text x="10" y="-10" fontSize="8" textAnchor="middle" fill={C.t3}>VSR-11</text>
+      </g>
+      <circle cx="470" cy="108" r="8" fill={C.surf3} stroke={C.lineS} strokeWidth="1"/>
+      <rect x="446" y="78" width="82" height="22" rx="3" fill={C.surf2} stroke={C.line}/>
+      <text x="487" y="88" fontSize="7" fontWeight="700" textAnchor="middle" fill={C.t3}>FPSG2</text>
+      <text x="487" y="97" fontSize="8" fontWeight="600" textAnchor="middle" fill={C.blue} fontFamily={M}>27.0 kg/cm²</text>
+      <line x1="487" y1="100" x2="470" y2="108" stroke={C.line} strokeWidth="1"/>
+      <g transform="translate(548,98)">
+        <polygon points="0,0 20,10 0,20" fill={C.red} stroke="#7f1d1d" strokeWidth="1.2"/>
+        <polygon points="20,0 0,10 20,20" fill={C.red} stroke="#7f1d1d" strokeWidth="1.2"/>
+        <text x="10" y="-3" fontSize="7" textAnchor="middle" fill={C.t3}>VGC-11A</text>
+      </g>
+      <rect x="526" y="124" width="72" height="24" rx="3" fill={C.surf2} stroke={C.line}/>
+      <text x="562" y="134" fontSize="7" textAnchor="middle" fill={C.t3}>DM 45.9 %</text>
+      <text x="562" y="144" fontSize="7" textAnchor="middle" fill={C.t3}>FB 45.9 %</text>
+      <rect x="600" y="55" width="12" height="60" fill="url(#hPink)"/>
+      <rect x="600" y="55" width="220" height="12" fill="url(#hPink)"/>
+      <rect x="808" y="55" width="12" height="60" fill="url(#hPink)"/>
+      <rect x="713" y="102" width="107" height="12" fill="url(#hPink)"/>
+      <g transform="translate(596,60) rotate(90)">
+        <polygon points="0,0 16,8 0,16" fill={C.red} stroke="#7f1d1d" strokeWidth="1.2"/>
+        <polygon points="16,0 0,8 16,16" fill={C.red} stroke="#7f1d1d" strokeWidth="1.2"/>
+      </g>
+      <rect x="556" y="35" width="70" height="20" rx="3" fill={C.surf2} stroke={C.line}/>
+      <text x="591" y="45" fontSize="7" textAnchor="middle" fill={C.t3}>VGC-11</text>
+      <text x="591" y="53" fontSize="7" textAnchor="middle" fill={C.blue} fontFamily={M}>DM 76.0%</text>
+      <g transform="translate(804,60) rotate(90)">
+        <polygon points="0,0 16,8 0,16" fill={C.red} stroke="#7f1d1d" strokeWidth="1.2"/>
+        <polygon points="16,0 0,8 16,16" fill={C.red} stroke="#7f1d1d" strokeWidth="1.2"/>
+      </g>
+      <rect x="812" y="35" width="58" height="20" rx="3" fill={C.surf2} stroke={C.line}/>
+      <text x="841" y="45" fontSize="7" textAnchor="middle" fill={C.t3}>VGC-12</text>
+      <circle cx="760" cy="108" r="8" fill={C.surf3} stroke={C.lineS} strokeWidth="1"/>
+      <rect x="730" y="122" width="80" height="20" rx="3" fill={C.surf2} stroke={C.line}/>
+      <text x="770" y="131" fontSize="7" textAnchor="middle" fill={C.t3}>FPG 3</text>
+      <text x="770" y="139" fontSize="8" fontWeight="600" textAnchor="middle" fill={C.blue} fontFamily={M}>15.7 kg/cm²</text>
+      <circle cx="870" cy="108" r="9" fill={C.surf3} stroke={C.lineS} strokeWidth="1"/>
+      <text x="870" y="112" fontSize="8" fontWeight="700" textAnchor="middle" fill={C.t2}>10</text>
+
+      {/* N2 배관 */}
+      <rect x="273" y="222" width="440" height="12" fill="url(#hOlive)" rx="2"/>
+      <rect x="273" y="223" width="440" height="4" fill="#bef264" opacity=".2"/>
+      <g transform="translate(305,218)">
+        <polygon points="0,0 20,10 0,20" fill={C.green} stroke="#064e3b" strokeWidth="1.2"/>
+        <polygon points="20,0 0,10 20,20" fill={C.green} stroke="#064e3b" strokeWidth="1.2"/>
+        <line x1="10" y1="0" x2="10" y2="-7" stroke="#064e3b" strokeWidth="1.5"/>
+        <line x1="10" y1="20" x2="10" y2="27" stroke="#064e3b" strokeWidth="1.5"/>
+        <text x="10" y="-10" fontSize="8" textAnchor="middle" fill={C.t3}>VS4-1</text>
+      </g>
+      <g transform="translate(380,218)">
+        <polygon points="0,0 20,10 0,20" fill={C.green} stroke="#064e3b" strokeWidth="1.2"/>
+        <polygon points="20,0 0,10 20,20" fill={C.green} stroke="#064e3b" strokeWidth="1.2"/>
+        <line x1="10" y1="0" x2="10" y2="-7" stroke="#064e3b" strokeWidth="1.5"/>
+        <line x1="10" y1="20" x2="10" y2="27" stroke="#064e3b" strokeWidth="1.5"/>
+        <text x="10" y="-10" fontSize="8" textAnchor="middle" fill={C.t3}>VSR-1</text>
+      </g>
+      <circle cx="466" cy="228" r="8" fill={C.surf3} stroke={C.lineS} strokeWidth="1"/>
+      <rect x="440" y="242" width="68" height="20" rx="3" fill={C.surf2} stroke={C.line}/>
+      <text x="474" y="251" fontSize="7" textAnchor="middle" fill={C.t3}>FPG2</text>
+      <text x="474" y="259" fontSize="8" fontWeight="600" textAnchor="middle" fill={C.blue} fontFamily={M}>0.0 kg/cm²</text>
+      <g transform="translate(516,218)">
+        <polygon points="0,0 20,10 0,20" fill={C.red} stroke="#7f1d1d" strokeWidth="1.2"/>
+        <polygon points="20,0 0,10 20,20" fill={C.red} stroke="#7f1d1d" strokeWidth="1.2"/>
+        <text x="10" y="-3" fontSize="7" textAnchor="middle" fill={C.t3}>VGC-1</text>
+      </g>
+      <rect x="500" y="242" width="72" height="20" rx="3" fill={C.surf2} stroke={C.line}/>
+      <text x="536" y="251" fontSize="7" textAnchor="middle" fill={C.t3}>DM -25.0%</text>
+      <text x="536" y="259" fontSize="7" textAnchor="middle" fill={C.t3}>FB  0.1%</text>
+
+      {/* 인렛 덕트 + IGV */}
+      <rect x="580" y="200" width="78" height="180" fill={C.surf3} stroke={C.line} strokeWidth="1" rx="2"/>
+      {([
+        [230,12,'INLET','53.0 mmH₂O'],
+        [260,13,null,'30.1 °C'],
+        [290,14,null,'755.2 mmHg'],
+      ] as [number,number,string|null,string][]).map(([cy,n,label,val])=>(
+        <g key={n}>
+          <circle cx="600" cy={cy} r="9" fill={C.surf2} stroke={C.lineS} strokeWidth="1"/>
+          <text x="600" y={cy+4} fontSize="8" fontWeight="700" textAnchor="middle" fill={C.t2}>{n}</text>
+          {label&&<text x="618" y={cy-6} fontSize="7" fill={C.t3}>{label}</text>}
+          <rect x="618" y={cy-2} width="82" height="13" rx="2" fill={C.surf2} stroke={C.line}/>
+          <text x="659" y={cy+8} fontSize="8" fontWeight="600" textAnchor="middle" fill={C.blue} fontFamily={M}>{val}</text>
+        </g>
+      ))}
+      <circle cx="630" cy="362" r="9" fill={C.surf2} stroke={C.lineS} strokeWidth="1"/>
+      <text x="630" y="366" fontSize="8" fontWeight="700" textAnchor="middle" fill={C.t2}>15</text>
+      <rect x="590" y="375" width="106" height="40" rx="3" fill={C.surf2} stroke={C.lineS} strokeWidth="1"/>
+      <text x="643" y="387" fontSize="8" fontWeight="700" textAnchor="middle" fill={C.t3} letterSpacing="0.08em">IGV</text>
+      <text x="643" y="400" fontSize="9" textAnchor="middle" fill={C.blue} fontFamily={M}>DM {igv.toFixed(1)} %</text>
+      <text x="643" y="412" fontSize="9" textAnchor="middle" fill={C.blue} fontFamily={M}>FB {igv.toFixed(1)} %</text>
+
+      {/* 가스 터빈 본체 */}
+      <polygon points="660,145 1120,170 1120,500 660,520" fill="url(#hTurb)" stroke={C.lineS} strokeWidth="2"/>
+      <ellipse cx="660" cy="332" rx="22" ry="188" fill="#1e293b" stroke={C.lineS} strokeWidth="2"/>
+      <ellipse cx="660" cy="332" rx="16" ry="140" fill="#1a2332" stroke={C.line} strokeWidth="1.5"/>
+      <ellipse cx="660" cy="332" rx="10" ry="90"  fill="#162030" stroke={C.line} strokeWidth="1"/>
+      <ellipse cx="660" cy="332" rx="5"  ry="44"  fill="#1c2a3a" stroke={C.line} strokeWidth="1"/>
+      {[740,820,910,1010].map(x=>(
+        <line key={x} x1={x} y1="151" x2={x} y2="513"
+          stroke={C.lineS} strokeWidth="1" strokeDasharray="5,4" opacity=".5"/>
+      ))}
+      {([[700,175],[770,155],[860,132],[960,108],[1060,85]] as [number,number][]).map(([cx,ry],i)=>(
+        <ellipse key={i} cx={cx} cy="332" rx={14-i*1.2} ry={ry}
+          fill="#162030" stroke={C.lineS} strokeWidth="1" opacity={0.7-i*0.06}/>
+      ))}
+      <rect x="660" y="322" width="460" height="20" rx="4" fill="#1a2332" stroke={C.lineS} strokeWidth="1.5"/>
+      <rect x="660" y="326" width="460" height="12" rx="3" fill="#1e2d42"/>
+      {([[740,175,'A'],[740,246,'B'],[740,418,'C'],[740,488,'D']] as [number,number,string][]).map(([cx,cy,l])=>(
+        <g key={l}>
+          <ellipse cx={cx} cy={cy} rx="38" ry="24" fill="url(#hCan)" stroke="#7f1d1d" strokeWidth="1.5"/>
+          <text x={cx} y={cy+5} fontSize="12" fontWeight="700" textAnchor="middle" fill="#fff" opacity=".9">{l}</text>
+          <rect x={cx-16} y={cy} width="30" height="18" fill="#7f1d1d" stroke="#6b1515" strokeWidth="1"/>
+        </g>
+      ))}
+      <circle cx="870" cy="195" r="9" fill={C.surf2} stroke={C.lineS} strokeWidth="1"/>
+      <text x="870" y="199" fontSize="8" fontWeight="700" textAnchor="middle" fill={C.t2}>16</text>
+      <rect x="840" y="170" width="80" height="20" rx="3" fill={C.surf2} stroke={C.line}/>
+      <text x="880" y="179" fontSize="7" textAnchor="middle" fill={C.t3}>CPD</text>
+      <text x="880" y="188" fontSize="8" fontWeight="600" textAnchor="middle" fill={C.blue} fontFamily={M}>13.1 kg/cm²</text>
+      <circle cx="920" cy="380" r="9" fill={C.surf2} stroke={C.lineS} strokeWidth="1"/>
+      <text x="920" y="384" fontSize="8" fontWeight="700" textAnchor="middle" fill={C.t2}>17</text>
+      <rect x="930" y="370" width="74" height="20" rx="3" fill={C.surf2} stroke={C.line}/>
+      <text x="967" y="379" fontSize="7" textAnchor="middle" fill={C.t3}>CTD</text>
+      <text x="967" y="388" fontSize="8" fontWeight="600" textAnchor="middle" fill={C.amber} fontFamily={M}>391.5 °C</text>
+      <rect x="800" y="530" width="104" height="24" rx="4" fill={C.blueBg} stroke="rgba(59,130,246,0.35)" strokeWidth="1"/>
+      <text x="852" y="546" fontSize="13" fontWeight="700" textAnchor="middle" fill={C.blue} fontFamily={M}>λ = {lambda.toFixed(2)}</text>
+
+      {/* CBV */}
+      {([[185,'CBV#1 CLSD'],[207,'CBV#3 CLSD'],[445,'CBV#4 CLSD'],[467,'CBV#2 CLSD']] as [number,string][]).map(([y,l])=>(
+        <g key={l}>
+          <rect x="1126" y={y} width="78" height="16" rx="3" fill={C.greenBg} stroke="rgba(16,185,129,0.3)" strokeWidth="1"/>
+          <text x="1165" y={y+11} fontSize="8" textAnchor="middle" fill={C.green} fontFamily={M}>{l}</text>
+        </g>
+      ))}
+
+      {/* 오른쪽 수치 패널 */}
+      <rect x="1214" y="8" width="230" height="490" fill={C.surf2} stroke={C.line} strokeWidth="1" rx="4"/>
+      <text x="1329" y="24" fontSize="9" fontWeight="700" textAnchor="middle" fill={C.t3} letterSpacing="0.1em">PROCESS DATA</text>
+      <line x1="1216" y1="30" x2="1440" y2="30" stroke={C.line} strokeWidth="1"/>
+      {([
+        ['IGV',    igv.toFixed(1),     '°',    C.blue],
+        ['NOx',    nox.toFixed(1),     'ppm',  noxColor],
+        ['CO',     co.toFixed(1),      'ppm',  C.blue],
+        ['Exh.',   exhaust.toFixed(1), '°C',   C.amber],
+        ['λ',      lambda.toFixed(2),  '',     C.blue],
+        ['Eff.',   eff,                '%',    C.green],
+        ['Power',  power.toFixed(1),   'MW',   C.blue],
+        ['SYNGAS', sg.toFixed(1),      'raw',  C.blue],
+        ['N2',     n2.toFixed(1),      'raw',  C.blue],
+        ['Speed',  '100.0',            '%',    C.blue],
+        ['RPM',    '3600',             'rpm',  C.blue],
+        ['Vib',    '6.7',              'mm/s', C.amber],
+      ] as [string,string,string,string][]).map(([label,val,unit,clr],i)=>(
+        <g key={label}>
+          <text x="1222" y={48+i*36} fontSize="8" fill={C.t3}>{label}</text>
+          <text x="1222" y={64+i*36} fontSize="14" fontWeight="700" fill={clr} fontFamily={M}>{val}</text>
+          {unit&&<text x={1222+val.length*8+4} y={64+i*36} fontSize="9" fill={C.t3}>{unit}</text>}
+          <line x1="1216" y1={72+i*36} x2="1440" y2={72+i*36} stroke={C.line} strokeWidth="1"/>
+        </g>
+      ))}
+
+      {/* NPNJ2 */}
+      <rect x="1050" y="80" width="66" height="22" rx="3" fill={C.surf2} stroke={C.line}/>
+      <text x="1083" y="90" fontSize="7" textAnchor="middle" fill={C.t3}>NPNJ2</text>
+      <text x="1083" y="99" fontSize="8" fontWeight="600" textAnchor="middle" fill={C.blue} fontFamily={M}>16.0 kg/cm²</text>
+      <rect x="1083" y="102" width="8" height="88" fill="url(#hBlue)" rx="2"/>
+      <g transform="translate(1078,128)">
+        <polygon points="0,0 16,8 0,16" fill={C.green} stroke="#064e3b" strokeWidth="1.2"/>
+        <polygon points="16,0 0,8 16,16" fill={C.green} stroke="#064e3b" strokeWidth="1.2"/>
+        <text x="8" y="-3" fontSize="7" textAnchor="middle" fill={C.t3}>VS7-1</text>
+      </g>
+
+      {/* N2 하단 배관 */}
+      <rect x="155" y="558" width="122" height="66" fill={C.surf2} stroke={C.line} strokeWidth="1" rx="4"/>
+      <text x="216" y="572" fontSize="9" fontWeight="700" textAnchor="middle" fill={C.t3} letterSpacing="0.08em">N2 DILUT</text>
+      <text x="216" y="588" fontSize="11" fontWeight="700" textAnchor="middle" fill={C.blue} fontFamily={M}>{n2.toFixed(1)}</text>
+      <text x="216" y="602" fontSize="8" textAnchor="middle" fill={C.t3}>32.4 °C</text>
+      <text x="216" y="614" fontSize="8" textAnchor="middle" fill={C.t3}>0.3 kg/s</text>
+      <rect x="273" y="575" width="520" height="12" fill="url(#hAmber)" rx="2"/>
+      <rect x="273" y="576" width="520" height="4" fill="#fde68a" opacity=".2"/>
+      <g transform="translate(440,571)">
+        <polygon points="0,0 20,10 0,20" fill={C.green} stroke="#064e3b" strokeWidth="1.2"/>
+        <polygon points="20,0 0,10 20,20" fill={C.green} stroke="#064e3b" strokeWidth="1.2"/>
+        <text x="10" y="-3" fontSize="8" textAnchor="middle" fill={C.t3}>VS3-1</text>
+      </g>
+      <g transform="translate(620,571)">
+        <polygon points="0,0 20,10 0,20" fill={C.green} stroke="#064e3b" strokeWidth="1.2"/>
+        <polygon points="20,0 0,10 20,20" fill={C.green} stroke="#064e3b" strokeWidth="1.2"/>
+        <text x="10" y="-3" fontSize="8" textAnchor="middle" fill={C.t3}>VA4-1</text>
+      </g>
+      <rect x="710" y="450" width="12" height="137" fill="url(#hAmber)" rx="2"/>
+      <circle cx="716" cy="468" r="9" fill={C.surf2} stroke={C.lineS} strokeWidth="1"/>
+      <text x="716" y="472" fontSize="8" fontWeight="700" textAnchor="middle" fill={C.t2}>18</text>
+      <rect x="680" y="478" width="106" height="28" rx="3" fill={C.surf2} stroke={C.line}/>
+      <text x="733" y="490" fontSize="7" textAnchor="middle" fill={C.t3}>IBH  DM -25.0%</text>
+      <text x="733" y="500" fontSize="7" textAnchor="middle" fill={C.t3}>FB  0.2%</text>
     </svg>
   )
 }
