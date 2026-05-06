@@ -46,6 +46,8 @@ data/**
 docs/**
 !docs/
 !docs/GIT_CONVENTIONS.md
+!docs/ci-cd/
+!docs/ci-cd/**
 models/**
 !models/
 !models/**/
