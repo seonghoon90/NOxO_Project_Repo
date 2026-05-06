@@ -7,7 +7,7 @@ pipeline {
     }
 
     environment {
-        COMPOSE_FRONT_BACK = 'docker/docker-compose.yml -f docker/docker-compose.dev.yml'
+        COMPOSE_FRONT_BACK = 'docker/docker-compose.yml'
         COMPOSE_DATA = 'docker/docker-compose.data.yml'
         CI_ENV_FILE = 'docker/.env.ci'
     }
@@ -49,7 +49,7 @@ SLACK_WEBHOOK_URL=
 
         stage('Frontend Build') {
             steps {
-                sh 'docker compose --env-file ${CI_ENV_FILE} -f ${COMPOSE_FRONT_BACK} run --rm --no-deps frontend npm run build'
+                sh 'docker compose --env-file ${CI_ENV_FILE} -f ${COMPOSE_FRONT_BACK} build frontend'
             }
         }
     }
