@@ -78,6 +78,12 @@ SLACK_WEBHOOK_URL=
                                 -f docker/docker-compose.prod.yml \
                                 -f docker/docker-compose.ec2.yml \
                                 up -d --build
+                            docker compose --profile local-db --env-file .env \
+                                -f docker/docker-compose.yml \
+                                -f docker/docker-compose.prod.yml \
+                                -f docker/docker-compose.ec2.yml \
+                                ps
+                            curl -fsS --retry 10 --retry-delay 3 --retry-connrefused http://localhost/api/health
                         "
                     '''
                 }

@@ -110,6 +110,7 @@ Slack Notification
 ```
 
 배포 stage는 EC2 서버의 `/home/ubuntu/NOxO_Project_Repo`에서 최신 `dev`를 pull한 뒤 운영용 compose 조합으로 컨테이너를 재기동합니다.
+재기동 후에는 `http://localhost/api/health`를 확인해 백엔드가 실제로 응답하는지 검증합니다.
 
 ```bash
 docker compose --profile local-db --env-file .env \
