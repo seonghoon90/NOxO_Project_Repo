@@ -83,3 +83,38 @@ docker compose --profile local-db --env-file .env \
   -f docker/docker-compose.ec2.yml \
   ps
 ```
+
+## Jenkins CD Credential 설정
+
+`Jenkinsfile`의 EC2 배포 stage는 Git에 pem 키나 Slack Webhook을 저장하지 않습니다.
+아래 값은 Jenkins UI의 Credentials에만 등록합니다.
+
+| Credential ID | Kind | 용도 |
+| --- | --- | --- |
+| `ec2-team1-ssh-key` | SSH Username with private key | Jenkins가 EC2에 SSH 접속할 때 사용하는 pem 키 |
+| `slack-webhook-url` | Secret text | CI/CD 성공 또는 실패 결과를 Slack으로 알림 |
+
+`ec2-team1-ssh-key` 생성 시 username은 `ubuntu`로 입력하고, private key에는 pem 파일 내용을 붙여 넣습니다.
+
+## dev 브랜치 자동 배포 흐름
+
+Jenkins job이 `dev` 브랜치의 `Jenkinsfile`을 실행하면 아래 순서로 진행됩니다.
+
+```text
+Compose Config
+Build Test Images
+Backend Tests
+Frontend Build
+Deploy to EC2
+Slack Notification
+```
+
+배포 stage는 EC2 서버의 `/home/ubuntu/NOxO_Project_Repo`에서 최신 `dev`를 pull한 뒤 운영용 compose 조합으로 컨테이너를 재기동합니다.
+
+```bash
+docker compose --profile local-db --env-file .env \
+  -f docker/docker-compose.yml \
+  -f docker/docker-compose.prod.yml \
+  -f docker/docker-compose.ec2.yml \
+  up -d --build
+```
