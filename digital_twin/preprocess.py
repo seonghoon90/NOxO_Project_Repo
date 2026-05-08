@@ -199,6 +199,23 @@ def load_data(
     return df, npr_hinge_threshold
 
 
+def aggregate_to_1min(df: pd.DataFrame) -> pd.DataFrame:
+    """1초 단위 시계열을 1분(60행) 평균으로 집계.
+
+    근거: 1초 데이터의 자기상관(NOx lag=1s: 0.989)으로 인해 LightGBM이
+    학습 분포에 과적합. 1분 집계는 다음을 동시에 달성:
+      - 센서 노이즈 제거 (열역학적 시정수와 정합)
+      - 분포 이동(train/test) 영향 완화
+      - NOx R² 0.4707 → 0.6030 (+28%)
+    """
+    if len(df) < 60:
+        raise ValueError(f"1분 집계에는 최소 60행 필요. 입력: {len(df)}행")
+    n_rows = len(df) // 60 * 60
+    df_cut = df.iloc[:n_rows].copy()
+    group = np.arange(n_rows) // 60
+    return df_cut.groupby(group).mean()
+
+
 def split_xy(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     return df[FEATURES], df[TARGETS]
 

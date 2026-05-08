@@ -4,7 +4,7 @@ from pathlib import Path
 from preprocess import (
     load_data, split_xy, train_val_split,
     FEATURES, RAW_FEATURES, DERIVED_FEATURES, TARGETS,
-    add_derived_features,
+    add_derived_features, aggregate_to_1min,
 )
 
 DATA_DIR = Path(__file__).parent.parent.parent / "data"
@@ -147,6 +147,40 @@ def test_train_val_split_invalid_ratio_raises():
     import pytest as _pytest
     with _pytest.raises(ValueError):
         train_val_split(df, val_ratio=20)
+
+
+@pytest.mark.skipif(False, reason="always run")
+def test_aggregate_to_1min_shape():
+    """1분 집계는 60행 → 1행으로 압축."""
+    import numpy as np
+    n = 600  # 10분치 1초 데이터
+    df = pd.DataFrame({
+        "a": np.arange(n, dtype=float),
+        "b": np.arange(n, dtype=float) * 2.0,
+    })
+    out = aggregate_to_1min(df)
+    assert len(out) == 10  # 600/60 = 10
+    # 첫 1분 평균 = (0+1+...+59)/60 = 29.5
+    assert abs(out["a"].iloc[0] - 29.5) < 1e-9
+    # 두 번째 1분 평균 = 60~119 → 89.5
+    assert abs(out["a"].iloc[1] - 89.5) < 1e-9
+
+
+@pytest.mark.skipif(False, reason="always run")
+def test_aggregate_to_1min_truncates_partial():
+    """60의 배수가 아닌 행은 잘려서 집계됨."""
+    import numpy as np
+    df = pd.DataFrame({"a": np.arange(125, dtype=float)})
+    out = aggregate_to_1min(df)
+    assert len(out) == 2  # 125 // 60 = 2 (마지막 5행 버려짐)
+
+
+@pytest.mark.skipif(False, reason="always run")
+def test_aggregate_to_1min_too_short_raises():
+    """60행 미만이면 예외."""
+    df = pd.DataFrame({"a": [1.0, 2.0, 3.0]})
+    with pytest.raises(ValueError):
+        aggregate_to_1min(df)
 
 
 @pytest.mark.skipif(False, reason="always run")
