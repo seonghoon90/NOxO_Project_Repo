@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   appendHistory,
   applyVariableStep,
+  CONTROL_VARIABLE_KEYS,
   createStateFromSnapshot,
   createInitialConsoleState,
   deriveMetrics,
@@ -351,9 +352,9 @@ async function startSession(mode: Mode) {
   }
 
   const initialCondition = {
-    [variableSeed.syngas.rawName]: variableSeed.syngas.base,
-    [variableSeed.n2.rawName]: variableSeed.n2.base,
-    [variableSeed.load.rawName]: variableSeed.load.base,
+    [variableSeed.syngasFlow.rawName]: variableSeed.syngasFlow.base,
+    [variableSeed.n2Offset.rawName]: variableSeed.n2Offset.base,
+    [variableSeed.igvOpening.rawName]: variableSeed.igvOpening.base,
   }
 
   const response = await fetch(`${apiBaseUrl()}/api/session/start`, {
@@ -380,20 +381,13 @@ async function fetchSnapshot(sid: string): Promise<BackendConsoleSnapshot | null
 }
 
 function resetVariableValues(variables: ConsoleState['variables']): ConsoleState['variables'] {
-  return {
-    syngas: {
-      ...variables.syngas,
-      value: variableSeed.syngas.base,
-    },
-    n2: {
-      ...variables.n2,
-      value: variableSeed.n2.base,
-    },
-    load: {
-      ...variables.load,
-      value: variableSeed.load.base,
-    },
-  }
+  return CONTROL_VARIABLE_KEYS.reduce<ConsoleState['variables']>((acc, key) => {
+    acc[key] = {
+      ...variables[key],
+      value: variableSeed[key].base,
+    }
+    return acc
+  }, structuredClone(variables))
 }
 
 function resetConsoleState(current: ConsoleState, mode: Mode, tick: number): ConsoleState {
@@ -413,9 +407,9 @@ async function sendControl(
   variables: ConsoleState['variables'],
 ) {
   const payload = {
-    [variableSeed.syngas.rawName]: variables.syngas.value,
-    [variableSeed.n2.rawName]: variables.n2.value,
-    [variableSeed.load.rawName]: variables.load.value,
+    [variableSeed.syngasFlow.rawName]: variables.syngasFlow.value,
+    [variableSeed.n2Offset.rawName]: variables.n2Offset.value,
+    [variableSeed.igvOpening.rawName]: variables.igvOpening.value,
   }
 
   await fetch(`${apiBaseUrl()}/api/session/${sid}/control`, {

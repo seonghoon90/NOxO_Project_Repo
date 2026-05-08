@@ -1,5 +1,15 @@
 export type Mode = 'sim' | 'pred'
-export type VariableKey = 'syngas' | 'n2' | 'load'
+export type VariableKey =
+  | 'syngasFlow'
+  | 'igvOpening'
+  | 'n2Offset'
+  | 'n2Valve1'
+  | 'syngasSrv'
+  | 'syngasGcv1'
+  | 'syngasGcv1a'
+  | 'syngasGcv2'
+  | 'ibhValve'
+  | 'n2Flow'
 
 export type VariableConfig = {
   key: VariableKey
@@ -54,6 +64,13 @@ export type BackendConsoleSnapshot = {
   syngas_flow?: number
   n2_offset?: number
   igv_opening?: number
+  n2_valve_1?: number
+  syngas_srv?: number
+  syngas_gcv_1?: number
+  syngas_gcv_1a?: number
+  syngas_gcv_2?: number
+  ibh_valve?: number
+  n2_flow?: number
   lambda?: number
   lambda_?: number
   exhaust_temp?: number
@@ -74,10 +91,27 @@ export type BackendConsoleSnapshot = {
 export const NOX_LIMIT = 50
 export const HISTORY_LENGTH = 60
 export const POWER_RAW_NAME = 'IGCC.CC.G1.DWATT'
+export const CONTROL_VARIABLE_KEYS: VariableKey[] = [
+  'syngasFlow',
+  'igvOpening',
+  'n2Offset',
+  'n2Valve1',
+  'syngasSrv',
+  'syngasGcv1',
+  'syngasGcv1a',
+  'syngasGcv2',
+  'ibhValve',
+  'n2Flow',
+]
+export const PRIMARY_VARIABLE_KEYS: VariableKey[] = [
+  'syngasFlow',
+  'n2Offset',
+  'igvOpening',
+]
 
 export const variableSeed: Record<VariableKey, VariableConfig> = {
-  syngas: {
-    key: 'syngas',
+  syngasFlow: {
+    key: 'syngasFlow',
     label: '합성가스 유량',
     shortLabel: '합성가스',
     rawName: 'IGCC.CC.G1.ca_fqsg_cl',
@@ -89,10 +123,23 @@ export const variableSeed: Record<VariableKey, VariableConfig> = {
     max: 2200,
     value: 1500,
   },
-  n2: {
-    key: 'n2',
-    label: '질소가스 주입 오프셋',
-    shortLabel: '질소오프셋',
+  igvOpening: {
+    key: 'igvOpening',
+    label: 'IGV 개도',
+    shortLabel: 'IGV',
+    rawName: 'IGCC.CC.G1.csgv',
+    unit: '°',
+    digits: 1,
+    step: 1,
+    base: 75,
+    min: 30,
+    max: 100,
+    value: 75,
+  },
+  n2Offset: {
+    key: 'n2Offset',
+    label: '질소 오프셋',
+    shortLabel: 'N2 오프셋',
     rawName: 'IGCC.CC.G1.NQKR3_MONITOR',
     unit: 'raw',
     digits: 1,
@@ -102,27 +149,102 @@ export const variableSeed: Record<VariableKey, VariableConfig> = {
     max: 500,
     value: 200,
   },
-  load: {
-    key: 'load',
-    label: 'IGV 개도',
-    shortLabel: 'IGV',
-    rawName: 'IGCC.CC.G1.csgv',
+  n2Valve1: {
+    key: 'n2Valve1',
+    label: 'N2 제어밸브 #1',
+    shortLabel: 'NICVS1',
+    rawName: 'IGCC.CC.G1.nicvs1',
     unit: '%',
     digits: 1,
     step: 1,
-    base: 75,
-    min: 30,
+    base: 28.4,
+    min: 0,
     max: 100,
-    value: 75,
+    value: 28.4,
+  },
+  syngasSrv: {
+    key: 'syngasSrv',
+    label: 'Syngas SRV',
+    shortLabel: 'FSAGR',
+    rawName: 'IGCC.CC.G1.FSAGR',
+    unit: '%',
+    digits: 1,
+    step: 1,
+    base: 39.3,
+    min: 0,
+    max: 100,
+    value: 39.3,
+  },
+  syngasGcv1: {
+    key: 'syngasGcv1',
+    label: 'Syngas GCV #1',
+    shortLabel: 'FSAG11',
+    rawName: 'IGCC.CC.G1.FSAG11',
+    unit: '%',
+    digits: 1,
+    step: 1,
+    base: 28.4,
+    min: 0,
+    max: 100,
+    value: 28.4,
+  },
+  syngasGcv1a: {
+    key: 'syngasGcv1a',
+    label: 'Syngas GCV #1A',
+    shortLabel: 'FSAG11A',
+    rawName: 'IGCC.CC.G1.FSAG11A',
+    unit: '%',
+    digits: 1,
+    step: 1,
+    base: 45.9,
+    min: 0,
+    max: 100,
+    value: 45.9,
+  },
+  syngasGcv2: {
+    key: 'syngasGcv2',
+    label: 'Syngas GCV #2',
+    shortLabel: 'FSAG12',
+    rawName: 'IGCC.CC.G1.FSAG12',
+    unit: '%',
+    digits: 1,
+    step: 1,
+    base: 15.0,
+    min: 0,
+    max: 100,
+    value: 15.0,
+  },
+  ibhValve: {
+    key: 'ibhValve',
+    label: 'IBH 가열밸브',
+    shortLabel: 'CSBHX',
+    rawName: 'IGCC.CC.G1.CSBHX',
+    unit: '%',
+    digits: 1,
+    step: 1,
+    base: 25.0,
+    min: 0,
+    max: 100,
+    value: 25.0,
+  },
+  n2Flow: {
+    key: 'n2Flow',
+    label: 'N2 주입 유량',
+    shortLabel: 'NQJ',
+    rawName: 'IGCC.CC.G1.NQJ',
+    unit: 'kg/s',
+    digits: 1,
+    step: 0.5,
+    base: 30.6,
+    min: 0,
+    max: 60,
+    value: 30.6,
   },
 }
 
 export function createInitialConsoleState(seedHistory = false): ConsoleState {
   const variables = cloneVariableSeed()
   const metrics = deriveMetrics(variables, 'sim', 0)
-
-  // 백엔드 연결 모드에서는 빈 history로 시작 — 실데이터로만 채워지도록.
-  // mock fallback 모드에서만 seed history를 채워 차트가 첫 렌더부터 자연스럽게 보이게 한다.
   const history: MetricPoint[] = seedHistory
     ? Array.from({ length: HISTORY_LENGTH }, (_, index) => {
         const point = deriveMetrics(variables, 'sim', index * 0.14)
@@ -138,7 +260,7 @@ export function createInitialConsoleState(seedHistory = false): ConsoleState {
     : []
 
   return {
-    activeVar: 'syngas',
+    activeVar: 'syngasFlow',
     overlayVisible: true,
     variables,
     metrics,
@@ -157,40 +279,74 @@ export function createStateFromSnapshot(
   const controlSource = snapshot.current ?? snapshot
   const outputSource = snapshot.output ?? snapshot
   const variables = previous ? structuredClone(previous.variables) : cloneVariableSeed()
-  variables.syngas.value = pickSnapshotValue(controlSource, [
-    'syngas_flow',
-    'fuel',
-    variableSeed.syngas.rawName,
-  ], variables.syngas.value, variables.syngas.digits)
-  variables.n2.value = pickSnapshotValue(controlSource, [
-    'n2_offset',
-    'n2',
-    variableSeed.n2.rawName,
-  ], variables.n2.value, variables.n2.digits)
-  variables.load.value = pickSnapshotValue(controlSource, [
-    'igv_opening',
-    'load',
-    variableSeed.load.rawName,
-  ], variables.load.value, variables.load.digits)
+
+  variables.syngasFlow.value = pickSnapshotValue(
+    controlSource,
+    ['syngas_flow', 'fuel', variableSeed.syngasFlow.rawName],
+    variables.syngasFlow.value,
+    variables.syngasFlow.digits,
+  )
+  variables.igvOpening.value = pickSnapshotValue(
+    controlSource,
+    ['igv_opening', 'load', variableSeed.igvOpening.rawName],
+    variables.igvOpening.value,
+    variables.igvOpening.digits,
+  )
+  variables.n2Offset.value = pickSnapshotValue(
+    controlSource,
+    ['n2_offset', 'n2', variableSeed.n2Offset.rawName],
+    variables.n2Offset.value,
+    variables.n2Offset.digits,
+  )
+  variables.n2Valve1.value = pickSnapshotValue(
+    controlSource,
+    ['n2_valve_1', 'nicvs1', variableSeed.n2Valve1.rawName],
+    variables.n2Valve1.value,
+    variables.n2Valve1.digits,
+  )
+  variables.syngasSrv.value = pickSnapshotValue(
+    controlSource,
+    ['syngas_srv', 'fsagr', variableSeed.syngasSrv.rawName],
+    variables.syngasSrv.value,
+    variables.syngasSrv.digits,
+  )
+  variables.syngasGcv1.value = pickSnapshotValue(
+    controlSource,
+    ['syngas_gcv_1', 'fsag11', variableSeed.syngasGcv1.rawName],
+    variables.syngasGcv1.value,
+    variables.syngasGcv1.digits,
+  )
+  variables.syngasGcv1a.value = pickSnapshotValue(
+    controlSource,
+    ['syngas_gcv_1a', 'fsag11a', variableSeed.syngasGcv1a.rawName],
+    variables.syngasGcv1a.value,
+    variables.syngasGcv1a.digits,
+  )
+  variables.syngasGcv2.value = pickSnapshotValue(
+    controlSource,
+    ['syngas_gcv_2', 'fsag12', variableSeed.syngasGcv2.rawName],
+    variables.syngasGcv2.value,
+    variables.syngasGcv2.digits,
+  )
+  variables.ibhValve.value = pickSnapshotValue(
+    controlSource,
+    ['ibh_valve', 'csbhx', variableSeed.ibhValve.rawName],
+    variables.ibhValve.value,
+    variables.ibhValve.digits,
+  )
+  variables.n2Flow.value = pickSnapshotValue(
+    controlSource,
+    ['n2_flow', 'nqj', variableSeed.n2Flow.rawName],
+    variables.n2Flow.value,
+    variables.n2Flow.digits,
+  )
 
   const metrics = {
     nox: pickSnapshotValue(outputSource, ['nox'], previous?.metrics.nox ?? 25, 1),
     co: pickSnapshotValue(outputSource, ['co'], previous?.metrics.co ?? 12, 1),
-    exhaust: pickSnapshotValue(
-      outputSource,
-      ['exhaust_temp'],
-      previous?.metrics.exhaust ?? 580,
-      1,
-    ),
+    exhaust: pickSnapshotValue(outputSource, ['exhaust_temp'], previous?.metrics.exhaust ?? 580, 1),
     lambda: pickSnapshotValue(outputSource, ['lambda', 'lambda_'], previous?.metrics.lambda ?? 1.1, 2),
-    // 백엔드 stream/snapshot은 'power' 키 사용 (단위: MW, 태그: IGCC.CC.G1.DWATT).
-    // 향후 raw 태그 키로 직송될 가능성 대비해 POWER_RAW_NAME도 fallback에 포함.
-    power: pickSnapshotValue(
-      outputSource,
-      ['power', POWER_RAW_NAME],
-      previous?.metrics.power ?? 248.6,
-      1,
-    ),
+    power: pickSnapshotValue(outputSource, ['power', POWER_RAW_NAME], previous?.metrics.power ?? 248.6, 1),
     predictedNox: pickSnapshotValue(
       outputSource,
       ['predicted_nox'],
@@ -200,7 +356,7 @@ export function createStateFromSnapshot(
   }
 
   return {
-    activeVar: previous?.activeVar ?? 'syngas',
+    activeVar: previous?.activeVar ?? 'syngasFlow',
     overlayVisible: previous?.overlayVisible ?? true,
     variables,
     metrics,
@@ -208,39 +364,57 @@ export function createStateFromSnapshot(
   }
 }
 
-/**
- * 백엔드 미연결(WS 실패 등) 시 fallback 전용 mock 시뮬레이터.
- * 정상 운영에서는 createStateFromSnapshot이 백엔드 stream/snapshot에서 받은 값을
- * 그대로 사용하며, 본 함수는 호출되지 않는다.
- *
- * 식은 backend의 StubPredictor와 동일하게 맞춰 fallback 전환 시 값 점프를 최소화한다.
- */
 export function deriveMetrics(
   variables: Record<VariableKey, VariableConfig>,
   mode: Mode,
   tick: number,
 ): ConsoleMetrics {
-  const syngas = variables.syngas.value
-  const n2 = variables.n2.value
-  const load = variables.load.value
+  const syngas = variables.syngasFlow.value
+  const igv = variables.igvOpening.value
+  const n2Offset = variables.n2Offset.value
+  const n2Valve = variables.n2Valve1.value
+  const syngasSrv = variables.syngasSrv.value
+  const syngasGcv1 = variables.syngasGcv1.value
+  const syngasGcv1a = variables.syngasGcv1a.value
+  const syngasGcv2 = variables.syngasGcv2.value
+  const ibhValve = variables.ibhValve.value
+  const n2Flow = variables.n2Flow.value
+
+  const syngasValveAvg = (syngasSrv + syngasGcv1 + syngasGcv1a + syngasGcv2) / 4 / 100
+  const n2Assist = clamp((n2Valve / 100) * 0.45 + (n2Flow / 60) * 0.55, 0, 1)
+  const ibhHeat = clamp(ibhValve / 100, 0, 1)
 
   const lambda = clamp(
-    1.1 * (Math.max(load, 1) / 75) / (Math.max(syngas, 1) / 1500) + (n2 - 200) * 0.0005,
+    1.08 * (Math.max(igv, 1) / 75) / (Math.max(syngas, 1) / 1500)
+      + (n2Offset - 200) * 0.0005
+      + n2Assist * 0.08,
     0.5,
     1.5,
   )
   const exhaustBase = Math.max(
     400,
-    580 + (syngas - 1500) * 0.024 + (load - 75) * 0.24 - (n2 - 200) * 0.03,
+    560
+      + (syngas - 1500) * 0.022
+      + syngasValveAvg * 18
+      + (igv - 75) * 0.22
+      + ibhHeat * 10
+      - n2Assist * 18,
   )
   const exhaust = exhaustBase + Math.sin(tick * 0.22) * 0.8
   const noxBase =
-    25 * Math.exp((exhaustBase - 580) / 12) * (1 + 0.6 * Math.max(0, lambda - 1))
+    21
+    * Math.exp((exhaustBase - 560) / 16)
+    * (1 + 0.7 * Math.max(0, lambda - 1))
+    * (1 + syngasValveAvg * 0.18 - n2Assist * 0.08)
   const nox = noxBase + Math.sin(tick * 0.16) * 0.8
-  const coBase = 12 + 80 * (lambda - 1) ** 2
+  const coBase = 10 + 65 * (lambda - 1) ** 2 + ibhHeat * 1.5
   const co = coBase + Math.sin(tick * 0.25) * 0.4
-  // backend StubPredictor._power와 동일한 식 — fallback 전환 시 점프 방지용
-  const powerBase = 248.6 + (syngas - 1500) * 0.045 + (load - 75) * 1.35 - (n2 - 200) * 0.08
+  const powerBase =
+    244
+    + (syngas - 1500) * 0.04
+    + (igv - 75) * 1.2
+    + syngasValveAvg * 5
+    - n2Assist * 2
   const power = Math.max(0, powerBase + Math.sin(tick * 0.18) * 1.2)
   const predictedNox = nox + 6 + (mode === 'pred' ? 4 : 0)
 
@@ -261,12 +435,7 @@ export function applyVariableStep(
   tick: number,
 ) {
   const active = state.variables[state.activeVar]
-  const nextValue = clamp(
-    active.value + active.step * direction,
-    active.min,
-    active.max,
-  )
-
+  const nextValue = clamp(active.value + active.step * direction, active.min, active.max)
   const variables = {
     ...state.variables,
     [state.activeVar]: {
@@ -288,7 +457,7 @@ export function appendHistory(
   metrics: ConsoleMetrics,
   index: number,
 ) {
-  const next = [
+  return [
     ...history.slice(-HISTORY_LENGTH + 1),
     {
       label: index === 0 ? 'now' : `${index}s`,
@@ -299,8 +468,6 @@ export function appendHistory(
       power: metrics.power,
     },
   ]
-
-  return next
 }
 
 function clamp(value: number, min: number, max: number) {
