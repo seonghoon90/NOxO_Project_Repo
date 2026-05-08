@@ -1,5 +1,11 @@
 {
-  "model_type": "MultiOutputRegressor(LGBMRegressor)",
+  "model_type": "Ensemble: MultiOutput(LGBMRegressor) + MultiOutput(StandardScaler→Ridge)",
+  "ensemble": {
+    "w_ridge": 0.7,
+    "w_lgb": 0.30000000000000004,
+    "ridge_alpha": 0.01
+  },
+  "aggregation": "1min (60s mean)",
   "features": [
     "IGCC.CC.G1.FPSG",
     "IGCC.CC.G1.FTSG",
@@ -37,51 +43,154 @@
     "IGCC.CC.G1.ROUTPUT_6",
     "IGCC.IG.PIC7069A.PV",
     "IGCC.IG.ZT7069B.PV",
-    "IGCC.DeNOX.AIT_H1_902",
     "IGCC.DeNOX.TT_H1_90123",
     "IGCC.CC.G1.itdp",
-    "IGCC.CC.G1.tcsph1"
+    "IGCC.CC.G1.tcsph1",
+    "feat_NPR_avg",
+    "feat_NPR_gap",
+    "feat_NPR_hinge",
+    "feat_NPR_x_NQJ",
+    "feat_NQJ_lag_1min",
+    "feat_NQJ_lag_3min",
+    "feat_NQJ_lag_5min",
+    "feat_TTXM_lag_1min",
+    "feat_TTXM_roll_5min",
+    "feat_TTXM_roll_15min"
   ],
   "targets": [
     "IGCC.DeNOX.AT_H1_901_PV",
     "IGCC.CC.G1.DWATT",
     "IGCC.CC.G1.TTXM"
   ],
-  "n_features": 40,
-  "train_samples": 1209599,
-  "test_samples": 86400,
+  "n_features": 49,
+  "train_samples_1min": 20152,
+  "test_samples_1min": 1432,
+  "feature_engineering": {
+    "removed": [
+      "IGCC.DeNOX.AIT_H1_902 (H1: 준누수 제외)"
+    ],
+    "added_h5_npr": [
+      "feat_NPR_avg",
+      "feat_NPR_gap",
+      "feat_NPR_hinge",
+      "feat_NPR_x_NQJ"
+    ],
+    "added_h3_nqj_lag": [
+      "feat_NQJ_lag_1min",
+      "feat_NQJ_lag_3min",
+      "feat_NQJ_lag_5min"
+    ],
+    "added_h4_ttxm": [
+      "feat_TTXM_lag_1min",
+      "feat_TTXM_roll_5min",
+      "feat_TTXM_roll_15min"
+    ],
+    "npr_hinge_threshold": 1.256052
+  },
   "train_performance": {
-    "IGCC.DeNOX.AT_H1_901_PV": {
-      "mae": 0.007208023329009707,
-      "rmse": 0.012923853226239995,
-      "r2": 0.9950610759218509
+    "ensemble": {
+      "IGCC.DeNOX.AT_H1_901_PV": {
+        "mae": 0.05037958013443777,
+        "rmse": 0.06792520718775964,
+        "r2": 0.846762414005281
+      },
+      "IGCC.CC.G1.DWATT": {
+        "mae": 0.11619075347417263,
+        "rmse": 0.15602821510209194,
+        "r2": 0.9996132501918098
+      },
+      "IGCC.CC.G1.TTXM": {
+        "mae": 0.20026701337800723,
+        "rmse": 0.26949270509776835,
+        "r2": 0.9984276883078593
+      }
     },
-    "IGCC.CC.G1.DWATT": {
-      "mae": 0.23184978078812787,
-      "rmse": 0.3204058241048291,
-      "r2": 0.9983792729973464
+    "lgb_only": {
+      "IGCC.DeNOX.AT_H1_901_PV": {
+        "mae": 0.03983009800170756,
+        "rmse": 0.054124663781126174,
+        "r2": 0.902704269904368
+      },
+      "IGCC.CC.G1.DWATT": {
+        "mae": 0.12028624713869014,
+        "rmse": 0.15840504804977892,
+        "r2": 0.9996013774515169
+      },
+      "IGCC.CC.G1.TTXM": {
+        "mae": 0.17254699892597852,
+        "rmse": 0.2222509733583444,
+        "r2": 0.998930620240596
+      }
     },
-    "IGCC.CC.G1.TTXM": {
-      "mae": 0.3688059156633227,
-      "rmse": 0.5005227360750827,
-      "r2": 0.9946245126340217
+    "ridge_only": {
+      "IGCC.DeNOX.AT_H1_901_PV": {
+        "mae": 0.05822425859890299,
+        "rmse": 0.0777753737760454,
+        "r2": 0.7990964679549105
+      },
+      "IGCC.CC.G1.DWATT": {
+        "mae": 0.13118188344364656,
+        "rmse": 0.17873846809614843,
+        "r2": 0.9994924721377862
+      },
+      "IGCC.CC.G1.TTXM": {
+        "mae": 0.23507457004182472,
+        "rmse": 0.323520110455697,
+        "r2": 0.9977340663921672
+      }
     }
   },
   "test_performance": {
-    "IGCC.DeNOX.AT_H1_901_PV": {
-      "mae": 0.00979374924869454,
-      "rmse": 0.0183296507809124,
-      "r2": 0.9833693067794455
+    "ensemble": {
+      "IGCC.DeNOX.AT_H1_901_PV": {
+        "mae": 0.059474665151838677,
+        "rmse": 0.07130770492891694,
+        "r2": 0.7051371277674233
+      },
+      "IGCC.CC.G1.DWATT": {
+        "mae": 0.1131778246023167,
+        "rmse": 0.14722186678741037,
+        "r2": 0.999302606481674
+      },
+      "IGCC.CC.G1.TTXM": {
+        "mae": 0.20655373959122497,
+        "rmse": 0.2644923548199225,
+        "r2": 0.9970624878841083
+      }
     },
-    "IGCC.CC.G1.DWATT": {
-      "mae": 0.23036054821640176,
-      "rmse": 0.3051306830903866,
-      "r2": 0.9970195060289021
+    "lgb_only": {
+      "IGCC.DeNOX.AT_H1_901_PV": {
+        "mae": 0.06390556389232505,
+        "rmse": 0.08274021214312845,
+        "r2": 0.6030092073174919
+      },
+      "IGCC.CC.G1.DWATT": {
+        "mae": 0.14292027378746303,
+        "rmse": 0.18443615182387385,
+        "r2": 0.9989054757942174
+      },
+      "IGCC.CC.G1.TTXM": {
+        "mae": 0.24196621385870318,
+        "rmse": 0.3118313390305998,
+        "r2": 0.9959168725198352
+      }
     },
-    "IGCC.CC.G1.TTXM": {
-      "mae": 0.4075285250037066,
-      "rmse": 0.5387405020375365,
-      "r2": 0.9879423299653716
+    "ridge_only": {
+      "IGCC.DeNOX.AT_H1_901_PV": {
+        "mae": 0.06094549096516571,
+        "rmse": 0.07314587744921731,
+        "r2": 0.6897392183591702
+      },
+      "IGCC.CC.G1.DWATT": {
+        "mae": 0.11994503669665452,
+        "rmse": 0.155551744172643,
+        "r2": 0.9992214562255092
+      },
+      "IGCC.CC.G1.TTXM": {
+        "mae": 0.2153024376991227,
+        "rmse": 0.27443127036434944,
+        "r2": 0.9968375722509903
+      }
     }
   }
 }

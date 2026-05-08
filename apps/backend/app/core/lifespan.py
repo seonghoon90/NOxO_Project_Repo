@@ -10,7 +10,8 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.adapters.predictor import StubPredictor
+from app.adapters.forecaster import StubForecaster
+from app.adapters.simulator import StubSimulator
 from app.config import get_settings
 from app.core.input_injector import InputInjector
 from app.core.logging import configure_logging
@@ -30,20 +31,23 @@ async def lifespan(app: FastAPI):
     state_store = InMemoryStateStore()
     injector = InputInjector()
     ws_manager = WebSocketManager()
-    predictor = StubPredictor()
+    # 두 어댑터 별도 DI 슬롯 — `BACKEND_ARCHITECTURE.md §10`
+    simulator = StubSimulator()
+    forecaster = StubForecaster()
     sim_loop = SimLoopManager(
         settings=settings,
         state_store=state_store,
         injector=injector,
         ws_manager=ws_manager,
-        predictor=predictor,
+        simulator=simulator,
     )
 
     app.state.settings = settings
     app.state.state_store = state_store
     app.state.input_injector = injector
     app.state.ws_manager = ws_manager
-    app.state.predictor = predictor
+    app.state.simulator = simulator
+    app.state.forecaster = forecaster
     app.state.sim_loop = sim_loop
 
     try:

@@ -81,18 +81,39 @@ def sim_step(
     tau = config.time_constants
 
     # ----------------------------------------------------------
-    # [Step 2] 제어 변수 lag — target → current 점진 수렴
+    # [Step 2] 제어 변수 lag — target → current 점진 수렴 (10개 변수)
     # 가이드 §6 내부 처리 순서 2번
     # ----------------------------------------------------------
     state.current = ControlVars(
         syngas_flow=apply_first_order_lag_exact(
             state.current.syngas_flow, state.target.syngas_flow, dt, tau.fuel
         ),
+        igv_opening=apply_first_order_lag_exact(
+            state.current.igv_opening, state.target.igv_opening, dt, tau.igv
+        ),
         n2_offset=apply_first_order_lag_exact(
             state.current.n2_offset, state.target.n2_offset, dt, tau.n2
         ),
-        igv_opening=apply_first_order_lag_exact(
-            state.current.igv_opening, state.target.igv_opening, dt, tau.igv
+        n2_valve_1=apply_first_order_lag_exact(
+            state.current.n2_valve_1, state.target.n2_valve_1, dt, tau.n2_valve_1
+        ),
+        syngas_srv=apply_first_order_lag_exact(
+            state.current.syngas_srv, state.target.syngas_srv, dt, tau.syngas_srv
+        ),
+        syngas_gcv_1=apply_first_order_lag_exact(
+            state.current.syngas_gcv_1, state.target.syngas_gcv_1, dt, tau.syngas_gcv_1
+        ),
+        syngas_gcv_1a=apply_first_order_lag_exact(
+            state.current.syngas_gcv_1a, state.target.syngas_gcv_1a, dt, tau.syngas_gcv_1a
+        ),
+        syngas_gcv_2=apply_first_order_lag_exact(
+            state.current.syngas_gcv_2, state.target.syngas_gcv_2, dt, tau.syngas_gcv_2
+        ),
+        ibh_valve=apply_first_order_lag_exact(
+            state.current.ibh_valve, state.target.ibh_valve, dt, tau.ibh_valve
+        ),
+        n2_flow=apply_first_order_lag_exact(
+            state.current.n2_flow, state.target.n2_flow, dt, tau.n2_flow
         ),
     )
 
@@ -117,11 +138,10 @@ def sim_step(
     ml_output = predict_fn(state.current)
     state.output_target = OutputVars(
         nox=ml_output.nox,
-        co=ml_output.co,
         exhaust_temp=ml_output.exhaust_temp,
+        power=ml_output.power,
         lambda_=lambda_now,           # features 결과로 덮어쓰기
         efficiency=ml_output.efficiency,
-        power=ml_output.power,
     )
 
     # ----------------------------------------------------------
@@ -167,16 +187,13 @@ def sim_step(
     )
 
     # ----------------------------------------------------------
-    # [Step 7] CO / 효율 계산
+    # [Step 7] 효율 / 발전량 lag 계산
     # 가이드 §6 내부 처리 순서 7번 / 단계 2 파생 피처
+    # ------------------------------------------------------------
+    # `co`는 학습 타겟에서 제외(REFACTOR_FLAME_TEMP_TO_EXHAUST_TEMP.md).
+    # `efficiency`는 DT 단독 호환을 위해 features 근사식을 유지.
+    # 백엔드 sim_loop는 power/(syngas_flow×LHV)로 덮어써 SoT를 단일화한다.
     # ----------------------------------------------------------
-    co_lag = apply_first_order_lag_exact(
-        state.output.co,
-        state.output_target.co,
-        dt,
-        tau.co,
-    )
-
     efficiency_now = features.compute_efficiency(
         syngas_flow=state.current.syngas_flow,
         exhaust_temp=exhaust_temp_next,
@@ -191,11 +208,10 @@ def sim_step(
 
     state.output = OutputVars(
         nox=nox_blended,
-        co=co_lag,
         exhaust_temp=exhaust_temp_next,
+        power=power_lag,
         lambda_=lambda_now,
         efficiency=efficiency_now,
-        power=power_lag,
     )
 
     # ----------------------------------------------------------
@@ -235,13 +251,12 @@ def create_initial_state(
 
     output_with_lambda = OutputVars(
         nox=initial_output.nox,
-        co=initial_output.co,
         exhaust_temp=initial_output.exhaust_temp,
+        power=initial_output.power,
         lambda_=lambda_init,
         efficiency=features.compute_efficiency(
             initial_controls.syngas_flow, initial_output.exhaust_temp
         ),
-        power=initial_output.power,
     )
 
     return SimulationState(

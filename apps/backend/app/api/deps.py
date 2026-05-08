@@ -10,14 +10,15 @@ from fastapi import Depends, Request
 
 from sqlalchemy.orm import Session
 
-from app.adapters.predictor import Predictor
+from app.adapters.forecaster import Forecaster
+from app.adapters.simulator import Simulator
 from app.config import Settings, get_settings
 from app.core.input_injector import InputInjector
 from app.core.sim_loop import SimLoopManager
 from app.core.state_store import StateStore
 from app.core.ws_manager import WebSocketManager
 from app.db.session import get_db_session
-from app.services.prediction_service import PredictionService
+from app.services.forecast_service import ForecastService
 from app.services.sensor_service import SensorService
 from app.services.session_service import SessionService
 from app.services.threshold_service import ThresholdService
@@ -39,8 +40,12 @@ def get_sim_loop(request: Request) -> SimLoopManager:
     return request.app.state.sim_loop
 
 
-def get_predictor(request: Request) -> Predictor:
-    return request.app.state.predictor
+def get_simulator(request: Request) -> Simulator:
+    return request.app.state.simulator
+
+
+def get_forecaster(request: Request) -> Forecaster:
+    return request.app.state.forecaster
 
 
 SettingsDep = Annotated[Settings, Depends(get_settings)]
@@ -61,11 +66,11 @@ def get_session_service(
     return SessionService(settings, state_store, injector, sim_loop, ws_manager)
 
 
-def get_prediction_service(
+def get_forecast_service(
     state_store: Annotated[StateStore, Depends(get_state_store)],
-    predictor: Annotated[Predictor, Depends(get_predictor)],
-) -> PredictionService:
-    return PredictionService(state_store, predictor)
+    forecaster: Annotated[Forecaster, Depends(get_forecaster)],
+) -> ForecastService:
+    return ForecastService(state_store, forecaster)
 
 
 def get_threshold_service(db: DbDep) -> ThresholdService:

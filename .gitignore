@@ -70,3 +70,4 @@ reports/generated/
 *.crt
 secrets/
 digital-twin/models/*.pkl
+digital_twin/models/*.pkl

@@ -25,6 +25,11 @@ class Settings(BaseSettings):
     # τ / dt / 임계치는 digital_twin.simulation.DEFAULT_CONFIG가 단일 진실원.
     sim_max_sessions: int = 10
 
+    # 합성가스 LHV (Lower Heating Value) — efficiency 후처리에 사용.
+    # `BACKEND_PRD.md §11` / `DT_ARCHITECTURE.md §10` — `[조사 필요]` 단위 환산.
+    # 가안: 합성가스 LHV ≈ 11 MJ/Nm³. 실측 평균값 확보 후 재산정 필요.
+    syngas_lhv: float = 11.0
+
     # CORS (개발 시 별도 호스트에서 접근 허용)
     cors_origins: list[str] = [
         "http://localhost:5173",

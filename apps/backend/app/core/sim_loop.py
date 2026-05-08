@@ -13,7 +13,7 @@ step 흐름:
 import asyncio
 import logging
 
-from app.adapters.predictor import Predictor
+from app.adapters.simulator import Simulator
 from app.config import Settings
 from app.core.input_injector import InputInjector
 from app.core.state_store import StateStore
@@ -22,11 +22,38 @@ from app.schemas.stream import StreamMessage
 from digital_twin.simulation import (
     DEFAULT_CONFIG,
     DTConfig,
+    OutputVars,
     SimulationState,
     sim_step,
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _override_efficiency_with_lhv(
+    output: OutputVars,
+    *,
+    syngas_flow: float,
+    lhv: float,
+) -> OutputVars:
+    """효율 후처리: power / (syngas_flow × LHV).
+
+    DT 단독 호환을 위해 features.compute_efficiency가 채워둔 값을
+    백엔드 sim_loop에서 LHV 기반 식으로 덮어쓴다 (단일 진실원 일원화).
+    분모 0/음수 가드 + [0, 1] 클램프.
+    """
+    denom = syngas_flow * lhv
+    if denom <= 0.0:
+        return output
+    eta = output.power / denom
+    eta = max(0.0, min(1.0, eta))
+    return OutputVars(
+        nox=output.nox,
+        exhaust_temp=output.exhaust_temp,
+        power=output.power,
+        lambda_=output.lambda_,
+        efficiency=eta,
+    )
 
 
 class SimLoopManager:
@@ -38,14 +65,14 @@ class SimLoopManager:
         state_store: StateStore,
         injector: InputInjector,
         ws_manager: WebSocketManager,
-        predictor: Predictor,
+        simulator: Simulator,
         dt_config: DTConfig = DEFAULT_CONFIG,
     ) -> None:
         self.settings = settings
         self.state_store = state_store
         self.injector = injector
         self.ws_manager = ws_manager
-        self.predictor = predictor
+        self.simulator = simulator
         self.dt_config = dt_config
         self._tasks: dict[str, asyncio.Task] = {}
 
@@ -96,20 +123,37 @@ class SimLoopManager:
             state.target = new_target
 
         # 2. DT 코어에 위임 (Step 2~8: lag, ML 추론, Zeldovich, warning 갱신 모두 DT가 수행)
-        sim_step(state, self.predictor.predict, self.dt_config)
+        sim_step(state, self.simulator.predict, self.dt_config)
+
+        # 3. efficiency 후처리 — `DT_ARCHITECTURE.md §10` / `BACKEND_PRD.md §11`
+        # 발전 효율은 백엔드 sim_loop에서 power/(syngas_flow × LHV)로 계산하여
+        # WS 메시지 `efficiency` 필드에 포함. LHV 단위 환산은 `[조사 필요]` —
+        # 가안 상수로 진행 (실측 데이터 확보 후 재산정).
+        state.output = _override_efficiency_with_lhv(
+            state.output,
+            syngas_flow=state.current.syngas_flow,
+            lhv=self.settings.syngas_lhv,
+        )
 
     def _snapshot_payload(self, state: SimulationState) -> dict:
         msg = StreamMessage(
             sid=state.sid,
             t=round(state.t, 3),
             syngas_flow=state.current.syngas_flow,
-            n2_offset=state.current.n2_offset,
             igv_opening=state.current.igv_opening,
+            n2_offset=state.current.n2_offset,
+            n2_valve_1=state.current.n2_valve_1,
+            syngas_srv=state.current.syngas_srv,
+            syngas_gcv_1=state.current.syngas_gcv_1,
+            syngas_gcv_1a=state.current.syngas_gcv_1a,
+            syngas_gcv_2=state.current.syngas_gcv_2,
+            ibh_valve=state.current.ibh_valve,
+            n2_flow=state.current.n2_flow,
             nox=state.output.nox,
-            co=state.output.co,
             exhaust_temp=state.output.exhaust_temp,
             lambda_=state.output.lambda_,
             power=state.output.power,
+            efficiency=state.output.efficiency,
             warning=state.warning,
             ts=state.last_updated,
         )
