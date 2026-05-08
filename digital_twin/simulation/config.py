@@ -23,11 +23,22 @@ from dataclasses import dataclass, field
 # ============================================================
 @dataclass(frozen=True)
 class OperatingPoint:
-    """기준(정격) 운전점. 파생 피처 계산 기준값으로 사용된다."""
+    """기준(정격) 운전점. 파생 피처 계산 기준값으로 사용된다.
 
-    syngas_flow: float = 1500.0    # 합성가스 유량 기준점 [단위 미정, 가안]
-    n2_offset: float = 200.0       # 희석질소 오프셋 기준점 [단위 미정, 가안]
-    igv_opening: float = 75.0      # IGV 개도 기준점 [%]
+    제어 변수 10개의 기준값(`BACKEND_ARCHITECTURE.md §7` 예시 기준).
+    신규 7개 변수의 단위/한계는 [추후 결정] — 임의 가안값.
+    """
+
+    syngas_flow: float = 1500.0    # 합성가스 유량 [가안]
+    igv_opening: float = 75.0      # IGV 개도 [%]
+    n2_offset: float = 200.0       # 희석질소 오프셋 [가안]
+    n2_valve_1: float = 50.0       # N2 주입 제어밸브 #1 개도 [%, 가안]
+    syngas_srv: float = 60.0       # Syngas SRV 개도 [%, 가안]
+    syngas_gcv_1: float = 55.0     # Syngas GCV #1 개도 [%, 가안]
+    syngas_gcv_1a: float = 55.0    # Syngas GCV #1A 개도 [%, 가안]
+    syngas_gcv_2: float = 55.0     # Syngas GCV #2 개도 [%, 가안]
+    ibh_valve: float = 30.0        # IBH 입구 가열 제어밸브 개도 [%, 가안]
+    n2_flow: float = 100.0         # N2 주입 유량 [가안]
     exhaust_temp: float = 580.0    # 배기온도 기준점 [°C] IGCC.CC.G1.TTXM 평균 가안
     air_flow: float = 4500.0       # IGV 75%일 때 추정 공기유량 [kg/h, 가안]
 
@@ -38,10 +49,12 @@ class OperatingPoint:
 # ============================================================
 @dataclass(frozen=True)
 class InitialOutput:
-    """세션 시작 시 t=0 출력 초기값."""
+    """세션 시작 시 t=0 출력 초기값.
+
+    `co`는 학습 타겟에서 제외(`REFACTOR_FLAME_TEMP_TO_EXHAUST_TEMP.md`).
+    """
 
     nox: float = 20.0          # [ppm, 가안]
-    co: float = 10.0           # [ppm, 가안]
     exhaust_temp: float = 580.0  # [°C]
     lambda_: float = 1.10      # [무차원]
     efficiency: float = 0.89   # [무차원]
@@ -55,17 +68,29 @@ class InitialOutput:
 # ============================================================
 @dataclass(frozen=True)
 class TimeConstants:
-    """변수별 1차 lag 시간상수. 단위: 초."""
+    """변수별 1차 lag 시간상수. 단위: 초.
 
-    # 입력(제어 변수) lag
+    기존 3개(fuel/n2/igv) + 신규 7개 제어 변수 — 신규 변수 τ는 가안 1.0초.
+    [조사 필요] 실제 운전 데이터 회귀로 갱신 예정.
+    """
+
+    # 입력(제어 변수) lag — 기존 3개
     fuel: float = 1.0    # 합성가스 유량 응답
     n2: float = 1.0      # 희석질소 응답
     igv: float = 2.0     # IGV 개도 응답 (기계적 액추에이터)
 
-    # 출력(연소 결과) lag
+    # 입력(제어 변수) lag — 신규 7개 [가안]
+    n2_valve_1: float = 1.0
+    syngas_srv: float = 1.0
+    syngas_gcv_1: float = 1.0
+    syngas_gcv_1a: float = 1.0
+    syngas_gcv_2: float = 1.0
+    ibh_valve: float = 1.0
+    n2_flow: float = 1.0
+
+    # 출력(연소 결과) lag — `co` 제거
     temp: float = 10.0   # 배기온도 — 열관성으로 가장 느림
     nox: float = 5.0     # NOx 응답
-    co: float = 3.0      # CO 응답
     power: float = 8.5   # 발전량 응답
 
 

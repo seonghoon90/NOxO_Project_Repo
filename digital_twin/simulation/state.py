@@ -38,16 +38,32 @@ _IO = DEFAULT_CONFIG.initial_output
 class ControlVars:
     """제어 입력 — 단일 step에 적용될 운전 목표값.
 
+    `DT_ARCHITECTURE.md §4` 정의에 따라 합성가스 발전 설비 제어 변수 10개를
+    보유한다. 단위/운영 한계는 [추후 결정] — 가안값으로 진행.
+
     Attributes:
-        syngas_flow: 합성가스 유량. 단위는 [추후 결정] (가안: kg/h 또는 Nm3/h).
-        n2_offset:   희석질소 유량 오프셋. NOx 저감을 위한 lean 운전 보조.
-        igv_opening: 가스터빈 IGV(입구 가이드 베인) 개도(%).
-                     공기 유량을 직접 제어하므로 공기비 λ에 1차적 영향.
+        syngas_flow:   합성가스 유량 (IGCC.CC.G1.ca_fqsg_cl).
+        igv_opening:   IGV(입구 가이드 베인) 개도 (IGCC.CC.G1.csgv) [%].
+        n2_offset:     연료 대비 N2 오프셋 (IGCC.CC.G1.NQKR3_MONITOR).
+        n2_valve_1:    N2 주입 제어밸브 #1 개도 (IGCC.CC.G1.nicvs1) [%].
+        syngas_srv:    Syngas SRV(VSR-11) 개도 (IGCC.CC.G1.FSAGR) [%].
+        syngas_gcv_1:  Syngas GCV #1 개도 (IGCC.CC.G1.FSAG11) [%].
+        syngas_gcv_1a: Syngas GCV #1A 개도 (IGCC.CC.G1.FSAG11A) [%].
+        syngas_gcv_2:  Syngas GCV #2 개도 (IGCC.CC.G1.FSAG12) [%].
+        ibh_valve:     IBH 입구 가열 제어밸브 개도 (IGCC.CC.G1.CSBHX) [%].
+        n2_flow:       N2 주입 유량 (IGCC.CC.G1.NQJ).
     """
 
     syngas_flow: float
-    n2_offset: float
     igv_opening: float
+    n2_offset: float
+    n2_valve_1: float
+    syngas_srv: float
+    syngas_gcv_1: float
+    syngas_gcv_1a: float
+    syngas_gcv_2: float
+    ibh_valve: float
+    n2_flow: float
 
 
 # ============================================================
@@ -62,21 +78,25 @@ class ControlVars:
 class OutputVars:
     """모델 산출 변수.
 
+    `DT_ARCHITECTURE.md §4` 정의에 따라 ML 모델 직접 출력은 nox/exhaust_temp/power 3개,
+    lambda_/efficiency는 features 수식으로 산출(파생)한다. 본 dataclass는
+    WS 메시지 평면 구조 직렬화 편의를 위해 5개를 한 자리에 묶어둔다.
+
+    `co`는 학습 타겟에서 제외(`REFACTOR_FLAME_TEMP_TO_EXHAUST_TEMP.md`).
+
     Attributes:
-        nox:        NOx 농도. 단위 가안 [ppm]. Zeldovich + ML 하이브리드 결과.
-        co:         CO 농도. 단위 가안 [ppm]. λ에 강하게 의존.
-        exhaust_temp: 배기 온도. IGCC.CC.G1.TTXM 실측값 기반. 단위 [°C].
-        lambda_:    공기비(λ). 무차원. λ=1이 stoichiometric.
-        efficiency: 발전 효율. 무차원(0~1) 또는 % [추후 결정].
-        power:      발전량 [MW]. (추후 정상상태 ML 회귀로 산출)
+        nox:        NOx 농도 [ppm]. Zeldovich + ML 하이브리드 결과.
+        exhaust_temp: 배기 온도 [°C]. IGCC.CC.G1.TTXM 실측값 기반.
+        power:      발전량 [MW]. ML 회귀 산출.
+        lambda_:    공기비(λ). 무차원. features.compute_lambda 산출.
+        efficiency: 발전 효율. 백엔드 sim_loop 후처리(`power/(syngas_flow×LHV)`).
     """
 
     nox: float
-    co: float
     exhaust_temp: float
+    power: float
     lambda_: float
     efficiency: float
-    power: float
 
 
 # ============================================================
@@ -100,10 +120,32 @@ class SimulationState:
     # ---- 제어 변수: target → (lag) → current ----
     # [가이드 단계 5 "lag 모델"의 입력 lag 영역]
     target: ControlVars = field(
-        default_factory=lambda: ControlVars(_OP.syngas_flow, _OP.n2_offset, _OP.igv_opening)
+        default_factory=lambda: ControlVars(
+            syngas_flow=_OP.syngas_flow,
+            igv_opening=_OP.igv_opening,
+            n2_offset=_OP.n2_offset,
+            n2_valve_1=_OP.n2_valve_1,
+            syngas_srv=_OP.syngas_srv,
+            syngas_gcv_1=_OP.syngas_gcv_1,
+            syngas_gcv_1a=_OP.syngas_gcv_1a,
+            syngas_gcv_2=_OP.syngas_gcv_2,
+            ibh_valve=_OP.ibh_valve,
+            n2_flow=_OP.n2_flow,
+        )
     )
     current: ControlVars = field(
-        default_factory=lambda: ControlVars(_OP.syngas_flow, _OP.n2_offset, _OP.igv_opening)
+        default_factory=lambda: ControlVars(
+            syngas_flow=_OP.syngas_flow,
+            igv_opening=_OP.igv_opening,
+            n2_offset=_OP.n2_offset,
+            n2_valve_1=_OP.n2_valve_1,
+            syngas_srv=_OP.syngas_srv,
+            syngas_gcv_1=_OP.syngas_gcv_1,
+            syngas_gcv_1a=_OP.syngas_gcv_1a,
+            syngas_gcv_2=_OP.syngas_gcv_2,
+            ibh_valve=_OP.ibh_valve,
+            n2_flow=_OP.n2_flow,
+        )
     )
 
     # ---- 출력 변수: ML 추론 → output_target → (lag/ODE) → output ----
@@ -111,21 +153,19 @@ class SimulationState:
     output_target: OutputVars = field(
         default_factory=lambda: OutputVars(
             nox=_IO.nox,
-            co=_IO.co,
             exhaust_temp=_IO.exhaust_temp,
+            power=_IO.power,
             lambda_=_IO.lambda_,
             efficiency=_IO.efficiency,
-            power=_IO.power,
         )
     )
     output: OutputVars = field(
         default_factory=lambda: OutputVars(
             nox=_IO.nox,
-            co=_IO.co,
             exhaust_temp=_IO.exhaust_temp,
+            power=_IO.power,
             lambda_=_IO.lambda_,
             efficiency=_IO.efficiency,
-            power=_IO.power,
         )
     )
 
