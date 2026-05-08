@@ -3,6 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 
 from app.api.deps import get_session_service
+from app.domain.tags import control_vars_to_tag_dict
 from digital_twin.simulation import SimulationState
 from app.schemas.common import AckResponse
 from app.schemas.session import (
@@ -23,25 +24,13 @@ def _to_snapshot(state: SimulationState) -> SnapshotResponse:
     return SnapshotResponse(
         sid=state.sid,
         t=round(state.t, 3),
-        target=ControlPayload(
-            **{
-                "IGCC.CC.G1.ca_fqsg_cl": state.target.syngas_flow,
-                "IGCC.CC.G1.NQKR3_MONITOR": state.target.n2_offset,
-                "IGCC.CC.G1.csgv": state.target.igv_opening,
-            }
-        ),
-        current=ControlPayload(
-            **{
-                "IGCC.CC.G1.ca_fqsg_cl": state.current.syngas_flow,
-                "IGCC.CC.G1.NQKR3_MONITOR": state.current.n2_offset,
-                "IGCC.CC.G1.csgv": state.current.igv_opening,
-            }
-        ),
+        target=ControlPayload(**control_vars_to_tag_dict(state.target)),
+        current=ControlPayload(**control_vars_to_tag_dict(state.current)),
         output=OutputPayload(
             nox=state.output.nox,
-            co=state.output.co,
             exhaust_temp=state.output.exhaust_temp,
             power=state.output.power,
+            efficiency=state.output.efficiency,
             **{"lambda": state.output.lambda_},
         ),
         warning=state.warning,
