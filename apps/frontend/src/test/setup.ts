@@ -7,8 +7,9 @@ afterEach(() => {
 })
 
 // jsdom 미구현 mock (Task 9 cascade hook 테스트가 의존)
+// `'animate' in Element.prototype` narrowing 회피를 위해 Record 캐스트 사용
 if (typeof Element !== 'undefined' && !('animate' in Element.prototype)) {
-  Element.prototype.animate = function () {
+  ;(Element.prototype as unknown as Record<string, unknown>).animate = function () {
     return {
       cancel: () => {},
       finish: () => {},
