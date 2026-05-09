@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:ui": "vitest --ui"
+    "test:ui": "vitest --ui",
+    "hmi:build": "tsx scripts/buildHmiSvg.ts"
   },
   "dependencies": {
     "react": "^19.2.5",
