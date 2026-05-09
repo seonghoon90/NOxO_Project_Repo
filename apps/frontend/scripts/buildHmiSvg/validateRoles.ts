@@ -1,9 +1,5 @@
 import { BuildValidationError, type MissingRole, type RoleConflict } from './BuildValidationError'
-
-interface RoleEntry {
-  id: string
-  kind: string
-}
+import type { RoleEntry } from './roleEntry'
 
 export function validateRoles(
   originalIds: Set<string>,

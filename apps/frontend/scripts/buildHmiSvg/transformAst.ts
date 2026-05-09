@@ -1,5 +1,6 @@
 import type { INode } from 'svgson'
 import { pathBBox } from './pathBBox'
+import type { RoleEntry } from './roleEntry'
 
 export interface KpiAnchor {
   x: number
@@ -12,11 +13,6 @@ export type KpiAnchorKey = 'nox' | 'ttxm' | 'dwatt' | 'lambda'
 export interface TransformResult {
   ast: INode
   kpiAnchors: Partial<Record<KpiAnchorKey, KpiAnchor>>
-}
-
-interface RoleEntry {
-  id: string
-  kind: string
 }
 
 // 'kpi-value-nox' → 'nox'
@@ -42,6 +38,10 @@ export function collectIds(node: INode): Set<string> {
   }
 }
 
+/**
+ * AST를 in-place로 변형해 data-role 부여 + kpi-value-remove element 제거 + KPI_ANCHORS 산출.
+ * 주의: rootInput은 호출 후 변형된 상태로 남는다 (deep-clone 안 함).
+ */
 export function transformAst(
   rootInput: INode,
   roleMap: Readonly<Record<string, Readonly<RoleEntry>>>,
@@ -96,8 +96,8 @@ export function transformAst(
     return node
   }
 
-  // root 자신도 remove 대상일 수 있으므로 root children에서 처리
-  // visit은 자식 레벨에서 remove 처리 — root-level path 제거는 래퍼로 처리
+  // rootInput 자체가 kpi-value-remove 대상일 수도 있어 visit가 children 루프에서 처리할 수 있게 fakeRoot로 한 단계 감쌈.
+  // fakeRoot의 name='__root__'은 디버그용이고 id가 없어 removeIds/idToRole 어느 쪽에도 매칭되지 않음.
   const fakeRoot: INode = {
     name: '__root__',
     type: 'element',
@@ -106,6 +106,7 @@ export function transformAst(
     children: [rootInput],
   }
   visit(fakeRoot)
+  // rootInput이 remove 대상이면 children이 비어 폴백으로 원본을 반환 — 실 빌드에서는 발생 X
   const ast = fakeRoot.children[0] ?? rootInput
 
   return { ast, kpiAnchors }
