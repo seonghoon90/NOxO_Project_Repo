@@ -1,4 +1,22 @@
-/* placeholder — Task 14에서 채워짐 */
+/* HmiSchematic — 모든 시각 효과를 data-role 셀렉터로 매핑 */
+
+.root {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: #0E141B;
+  color: #E8F1F8;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* ========== KPI 동적 텍스트 ========== */
 .kpiTexts text {
   font-family: 'Inter', 'Pretendard', -apple-system, sans-serif;
   font-size: 28px;
@@ -8,6 +26,94 @@
   dominant-baseline: alphabetic;
 }
 
-.flameOuter { fill: rgba(255,140,40,0.4); }
-.flameMid { fill: rgba(255,180,80,0.7); }
-.flameInner { fill: rgba(255,230,160,0.95); }
+/* ========== Flame Overlay ========== */
+.flameOuter { fill: rgba(255, 140, 40, 0.40); filter: blur(2px); }
+.flameMid   { fill: rgba(255, 180, 80, 0.70); filter: blur(1px); }
+.flameInner { fill: rgba(255, 230, 160, 0.95); }
+
+.root :global([data-role="flame"]) {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: flame-flicker 1.6s ease-in-out infinite alternate;
+  opacity: var(--flame-intensity, 0);
+}
+
+@keyframes flame-flicker {
+  0%   { transform: scaleY(0.9)  scaleX(1.0); opacity: var(--flame-intensity, 0); }
+  50%  { transform: scaleY(1.05) scaleX(0.97); }
+  100% { transform: scaleY(0.95) scaleX(1.02); opacity: calc(var(--flame-intensity, 0) * 0.85); }
+}
+
+/* ========== Flow dash 애니메이션 ========== */
+@keyframes dash-flow {
+  to { stroke-dashoffset: -18; }
+}
+
+.root :global([data-role="flow-fuel"]) path[stroke-dasharray] {
+  animation: dash-flow var(--flow-fuel-duration, 1.2s) linear infinite;
+  animation-play-state: var(--flow-fuel-state, paused);
+}
+.root :global([data-role="flow-nox"]) path[stroke-dasharray] {
+  animation: dash-flow var(--flow-nox-duration, 1.2s) linear infinite;
+  animation-play-state: var(--flow-nox-state, paused);
+}
+.root :global([data-role="flow-air"]) path[stroke-dasharray] {
+  animation: dash-flow var(--flow-air-duration, 1.2s) linear infinite;
+  animation-play-state: var(--flow-air-state, paused);
+}
+.root :global([data-role="flow-cards"]) path[stroke-dasharray] {
+  animation: dash-flow var(--flow-cards-duration, 1.2s) linear infinite;
+  animation-play-state: var(--flow-cards-state, running);
+}
+
+/* ========== KPI Box Glow ========== */
+@keyframes glow-pulse-crit {
+  0%, 100% { filter: drop-shadow(0 0 4px rgba(255, 80, 80, 0.4)); }
+  50%      { filter: drop-shadow(0 0 12px rgba(255, 80, 80, 0.9)); }
+}
+
+.root[data-kpi-nox="warn"] :global([data-role="card-box-nox"]) {
+  filter: drop-shadow(0 0 6px rgba(255, 200, 80, 0.6));
+}
+.root[data-kpi-nox="crit"] :global([data-role="card-box-nox"]) {
+  animation: glow-pulse-crit 0.8s ease-in-out infinite;
+}
+.root[data-kpi-ttxm="warn"] :global([data-role="card-box-ttxm"]) {
+  filter: drop-shadow(0 0 6px rgba(255, 200, 80, 0.6));
+}
+.root[data-kpi-ttxm="crit"] :global([data-role="card-box-ttxm"]) {
+  animation: glow-pulse-crit 0.8s ease-in-out infinite;
+}
+.root[data-kpi-dwatt="warn"] :global([data-role="card-box-dwatt"]) {
+  filter: drop-shadow(0 0 6px rgba(255, 200, 80, 0.6));
+}
+.root[data-kpi-dwatt="crit"] :global([data-role="card-box-dwatt"]) {
+  animation: glow-pulse-crit 0.8s ease-in-out infinite;
+}
+.root[data-kpi-lambda="warn"] :global([data-role="card-box-lambda"]) {
+  filter: drop-shadow(0 0 6px rgba(255, 200, 80, 0.6));
+}
+.root[data-kpi-lambda="crit"] :global([data-role="card-box-lambda"]) {
+  animation: glow-pulse-crit 0.8s ease-in-out infinite;
+}
+
+/* KPI 텍스트 색상 */
+.root[data-kpi-nox="warn"]  :global([data-role="kpi-text-nox"])  { fill: #FFD480; }
+.root[data-kpi-nox="crit"]  :global([data-role="kpi-text-nox"])  { fill: #FF8080; }
+.root[data-kpi-ttxm="warn"] :global([data-role="kpi-text-ttxm"]) { fill: #FFD480; }
+.root[data-kpi-ttxm="crit"] :global([data-role="kpi-text-ttxm"]) { fill: #FF8080; }
+.root[data-kpi-dwatt="warn"] :global([data-role="kpi-text-dwatt"]) { fill: #FFD480; }
+.root[data-kpi-dwatt="crit"] :global([data-role="kpi-text-dwatt"]) { fill: #FF8080; }
+.root[data-kpi-lambda="warn"] :global([data-role="kpi-text-lambda"]) { fill: #FFD480; }
+.root[data-kpi-lambda="crit"] :global([data-role="kpi-text-lambda"]) { fill: #FF8080; }
+
+/* ========== prefers-reduced-motion ========== */
+@media (prefers-reduced-motion: reduce) {
+  .root *,
+  .root *::before,
+  .root *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
