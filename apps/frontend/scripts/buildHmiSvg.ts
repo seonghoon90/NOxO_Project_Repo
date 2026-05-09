@@ -49,12 +49,11 @@ export async function buildHmiSvg(args: BuildArgs): Promise<BuildResult> {
         params: {
           overrides: {
             cleanupIds: false,
+            removeViewBox: false,
             removeUnknownsAndDefaults: { keepDataAttrs: true },
           },
         },
       },
-      // preset-default 에 속하지 않으므로 별도 비활성화
-      { name: 'removeViewBox', active: false },
     ],
   })
 

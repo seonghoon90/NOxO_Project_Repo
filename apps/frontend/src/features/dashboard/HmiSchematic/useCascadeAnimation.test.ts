@@ -87,7 +87,7 @@ describe('useCascadeAnimation', () => {
       root.appendChild(box)
     }
     document.body.appendChild(root)
-    const { result, rerender } = renderHook(
+    const { rerender } = renderHook(
       ({ flow }: { flow: number }) => {
         const ref = useRef<HTMLElement | null>(root)
         useCascadeAnimation(flow, ref)
