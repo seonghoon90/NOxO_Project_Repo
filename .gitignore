@@ -71,3 +71,6 @@ reports/generated/
 secrets/
 digital-twin/models/*.pkl
 digital_twin/models/*.pkl
+
+# Superpowers brainstorm sessions
+.superpowers/
