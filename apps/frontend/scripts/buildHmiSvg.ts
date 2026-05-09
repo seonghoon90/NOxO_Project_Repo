@@ -58,11 +58,18 @@ export async function buildHmiSvg(args: BuildArgs): Promise<BuildResult> {
     ],
   })
 
-  // [5] viewBox는 source SVG 크기로 고정 (1316×540)
+  // [5] viewBox 동적 파싱 — silent drift 방지
+  const vbAttr = ast.attributes?.viewBox ?? '0 0 1316 540'
+  const vbParts = vbAttr.split(/\s+/).map(Number)
+  const vbWidth = Number.isFinite(vbParts[2]) ? vbParts[2] : 1316
+  const vbHeight = Number.isFinite(vbParts[3]) ? vbParts[3] : 540
+  if (vbWidth !== 1316 || vbHeight !== 540) {
+    console.warn(`[buildHmiSvg] viewBox 변경 감지: SVG=${vbWidth}x${vbHeight}, 기존 기준 1316x540`)
+  }
   const rolesTs = emitRolesTs({
     roleMap: map,
     kpiAnchors: transformed.kpiAnchors,
-    viewBox: { width: 1316, height: 540 },
+    viewBox: { width: vbWidth, height: vbHeight },
   })
 
   return { svg: optimized.data, rolesTs, kpiAnchors: transformed.kpiAnchors }
