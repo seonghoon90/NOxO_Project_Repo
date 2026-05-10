@@ -78,5 +78,25 @@ export function cssVarsFromProps(inputs: SchematicInputs): Record<string, string
     '--card-glow-ttxm':   ttxmR,
     '--card-glow-lambda': lambdaR,
     '--card-glow-dwatt':  powerR,
+    // combustor 가열 강도
+    // 연료계 75% (분배 밸브 평균 60% + 합성가스량 15%)
+    // 공기/냉각 25% (IGV 10% + N2 역가중 10% + TTXM 5%)
+    ...(() => {
+      const heat = clamp(
+        0.60 * ((srvR + g1R + g1aR + g2R) / 4)
+        + 0.15 * synR
+        + 0.10 * igvR
+        + 0.10 * (1 - n2R)
+        + 0.05 * ttxmR,
+        0, 1,
+      )
+      // 시각 강도는 heat^3 큐빅 곡선 — 정상(heat~0.3)은 거의 안 보이고
+      // max에서만 강하게 빛나도록 비대칭화
+      const intensity = heat * heat * heat
+      return {
+        '--combustor-heat': heat,
+        '--combustor-intensity': intensity,
+      }
+    })(),
   }
 }

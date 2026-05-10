@@ -123,6 +123,7 @@ export function ServicePage() {
                 ttxm={state.metrics.exhaust}
                 lambda={state.metrics.lambda}
                 power={state.metrics.power}
+                history={state.history}
               />
             </div>
           </section>

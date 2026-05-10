@@ -3,47 +3,60 @@ import { formatKpi } from './numericHelpers'
 import styles from './HmiSchematic.module.css'
 
 export interface KpiTextsProps {
+  // 메인 KPI 4
   nox: number
   ttxm: number
   dwatt: number
   lambda: number
+  // 보조 카드 9
+  syngas: number
+  fsagr: number
+  fsag11: number
+  fsag11a: number
+  fsag12: number
+  nicvs1: number
+  nqj: number
+  csbhx: number
+  csgv: number
+  nqkr3: number
 }
+
+type AnchorKey = keyof typeof KPI_ANCHORS
+
+const ITEMS: ReadonlyArray<{ key: AnchorKey; digits: number }> = [
+  { key: 'nox', digits: 1 },
+  { key: 'ttxm', digits: 1 },
+  { key: 'dwatt', digits: 1 },
+  { key: 'lambda', digits: 2 },
+  { key: 'syngas', digits: 1 },
+  { key: 'fsagr', digits: 1 },
+  { key: 'fsag11', digits: 1 },
+  { key: 'fsag11a', digits: 1 },
+  { key: 'fsag12', digits: 1 },
+  { key: 'nicvs1', digits: 1 },
+  { key: 'nqj', digits: 1 },
+  { key: 'csbhx', digits: 1 },
+  { key: 'csgv', digits: 1 },
+  { key: 'nqkr3', digits: 1 },
+]
 
 export function KpiTexts(props: KpiTextsProps) {
   return (
     <g data-role="kpi-texts" className={styles.kpiTexts}>
-      <text
-        x={KPI_ANCHORS.nox.x}
-        y={KPI_ANCHORS.nox.y}
-        textAnchor={KPI_ANCHORS.nox.textAnchor}
-        data-role="kpi-text-nox"
-      >
-        {formatKpi(props.nox, 1)}
-      </text>
-      <text
-        x={KPI_ANCHORS.ttxm.x}
-        y={KPI_ANCHORS.ttxm.y}
-        textAnchor={KPI_ANCHORS.ttxm.textAnchor}
-        data-role="kpi-text-ttxm"
-      >
-        {formatKpi(props.ttxm, 1)}
-      </text>
-      <text
-        x={KPI_ANCHORS.dwatt.x}
-        y={KPI_ANCHORS.dwatt.y}
-        textAnchor={KPI_ANCHORS.dwatt.textAnchor}
-        data-role="kpi-text-dwatt"
-      >
-        {formatKpi(props.dwatt, 1)}
-      </text>
-      <text
-        x={KPI_ANCHORS.lambda.x}
-        y={KPI_ANCHORS.lambda.y}
-        textAnchor={KPI_ANCHORS.lambda.textAnchor}
-        data-role="kpi-text-lambda"
-      >
-        {formatKpi(props.lambda, 2)}
-      </text>
+      {ITEMS.map(({ key, digits }) => {
+        const anchor = KPI_ANCHORS[key]
+        return (
+          <text
+            key={key}
+            x={anchor.x}
+            y={anchor.y}
+            textAnchor={anchor.textAnchor}
+            data-role={`kpi-text-${key}`}
+          >
+            {formatKpi(props[key], digits)}
+          </text>
+        )
+      })}
     </g>
   )
 }

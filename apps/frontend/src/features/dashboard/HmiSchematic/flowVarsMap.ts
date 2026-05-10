@@ -20,11 +20,17 @@ interface Stage {
   state: 'running' | 'paused'
 }
 
+// ratio 0~1 → 연속 보간 duration
+//   < 0.05 : 정지 (잡음 데이터 스파이크 방지)
+//   ≥ 0.05 : 4.0s(느림) → 0.4s(빠름) 반비례 보간
+//   공식: duration = 4.0 / (1 + ratio * 9)  → ratio 0.05=2.76s, 0.5=0.73s, 1.0=0.4s
 function stageOf(ratio: number): Stage {
-  if (!Number.isFinite(ratio) || ratio < 0.10) return { duration: '1.2s', state: 'paused' }
-  if (ratio < 0.40) return { duration: '2.5s', state: 'running' }
-  if (ratio < 0.75) return { duration: '1.2s', state: 'running' }
-  return { duration: '0.5s', state: 'running' }
+  if (!Number.isFinite(ratio) || ratio < 0.05) {
+    return { duration: '1.2s', state: 'paused' }
+  }
+  const r = Math.min(Math.max(ratio, 0), 1)
+  const duration = 4.0 / (1 + r * 9)
+  return { duration: `${duration.toFixed(2)}s`, state: 'running' }
 }
 
 export function getFlowAnimationVars(inputs: FlowInputs): FlowVars {
