@@ -1,0 +1,1658 @@
+{
+  "viewBox": {
+    "width": 1316,
+    "height": 540
+  },
+  "counts": {
+    "total": 256,
+    "withId": 185,
+    "groups": 53,
+    "kpiCardCandidates": 7,
+    "flowGroups": 3,
+    "dashedPaths": 9,
+    "combustorByName": 1,
+    "combustorByFill": 18,
+    "labelGlyphs": 15
+  },
+  "ids": [
+    "navy-gradient-background",
+    "Vector",
+    "grid-vertical",
+    "Vector_2",
+    "grid-horizontal",
+    "bottom-shadow-band",
+    "background-layer",
+    "Vector_3",
+    "Vector_4",
+    "Vector_5",
+    "Vector_6",
+    "Vector_7",
+    "Vector_8",
+    "Vector_9",
+    "Vector_10",
+    "Vector_11",
+    "Vector_12",
+    "flow_fuel_pink",
+    "Vector_13",
+    "Vector_14",
+    "Vector_15",
+    "Vector_16",
+    "flow_nox_green",
+    "Vector_17",
+    "Vector_18",
+    "Vector_19",
+    "Vector_20",
+    "flow_air_blue",
+    "Vector_21",
+    "Vector_22",
+    "valve-FSAGR",
+    "Vector_23",
+    "Vector_24",
+    "valve-FSAG11",
+    "Vector_25",
+    "Vector_26",
+    "valve-FSAG11A",
+    "Vector_27",
+    "Vector_28",
+    "valve-FSAG12",
+    "Vector_29",
+    "Vector_30",
+    "valve-nicvs1",
+    "Vector_31",
+    "Vector_32",
+    "valve-NOJ",
+    "Vector_33",
+    "Vector_34",
+    "valve-csgv",
+    "Vector_35",
+    "Vector_36",
+    "valve-CSBHX",
+    "Vector_37",
+    "ca_fqsg_cl",
+    "1500.0",
+    "kg/s",
+    "BOX_ca_fqsg_cl",
+    "Vector_38",
+    "NQKR3_MONITOR",
+    "200.0",
+    "raw",
+    "BOX_NQKR3_MONITOR",
+    "&#237;&#149;&#169;&#236;&#132;&#177;&#234;&#176;&#128;&#236;&#138;&#164; &#234;&#179;&#132;&#237;&#134;&#181;",
+    "&#236;&#167;&#136;&#236;&#134;&#140; &#234;&#179;&#132;&#237;&#134;&#181;",
+    "&#234;&#179;&#181;&#234;&#184;&#176; &#234;&#179;&#132;&#237;&#134;&#181;",
+    "Vector_39",
+    "FSAGR",
+    "76.0",
+    "%",
+    "BOX_FSAGR",
+    "Vector_40",
+    "FSAG11",
+    "45.0",
+    "%_2",
+    "Vector_41",
+    "BOX_FSAG11",
+    "Vector_42",
+    "FSAG11A",
+    "45.9",
+    "%_3",
+    "Vector_43",
+    "BOX_FSAG11A",
+    "Vector_44",
+    "FSAG12",
+    "76.0_2",
+    "%_4",
+    "Vector_45",
+    "BOX_FSAG12",
+    "Vector_46",
+    "nicvs1",
+    "75.0",
+    "%_5",
+    "BOX_nicvs1",
+    "Vector_47",
+    "NOJ",
+    "15.7",
+    "kg/s_2",
+    "BOX_NOJ",
+    "Vector_48",
+    "CSBHX",
+    "75.0_2",
+    "%_6",
+    "BOX_CSBHX",
+    "Vector_49",
+    "csgv",
+    "75.0_3",
+    "BOX_csgv",
+    "box_GENERATOR",
+    "logo",
+    "G",
+    "GENERATOR",
+    "dot_GENERATOR",
+    "dot_GENERATOR_2",
+    "BOX_GENERATOR",
+    "box_COMPRESSOR",
+    "COMPRESSOR",
+    "dot_COMPRESSOR",
+    "BOX_COMPRESSOR",
+    "COMBUSTOR",
+    "box_TURBINE",
+    "TURBINE",
+    "dot_TURBINE",
+    "BOX_TURBINE",
+    "EXHAUST",
+    "Vector_50",
+    "Vector_51",
+    "Vector_52",
+    "Vector_53",
+    "Vector_54",
+    "Vector_55",
+    "Vector_56",
+    "Vector_57",
+    "Vector_58",
+    "Vector_59",
+    "Vector_60",
+    "Vector_61",
+    "Vector_62",
+    "Machine",
+    "Vector_63",
+    "Vector_64",
+    "Vector_65",
+    "exhaust-smoke-glow",
+    "line_to_NOx",
+    "line_to_TTXM",
+    "line_to_DWATT",
+    "line_to_lambda",
+    "line_to_cards",
+    "dot_NOx",
+    "box_NOx",
+    "NOx",
+    "26.5",
+    "ppm",
+    "spark_NOx",
+    "metric_NOx",
+    "box_DWATT",
+    "dot_DWATT",
+    "DWATT",
+    "248.6",
+    "MW",
+    "spark_DWATT",
+    "target-DWATT",
+    "box_TTXM",
+    "dot_TTXM",
+    "TTXM",
+    "580.0",
+    "&#194;&#176;C",
+    "spark_TTXM",
+    "target-TTXM",
+    "box_lambda",
+    "dot_lambda",
+    "&#206;&#187; (lambda)",
+    "1.10",
+    "spark_lambda",
+    "target-lambda",
+    "filter0_f_1_2",
+    "paint0_linear_1_2",
+    "paint1_linear_1_2",
+    "paint2_linear_1_2",
+    "paint3_linear_1_2",
+    "paint4_linear_1_2",
+    "paint5_linear_1_2",
+    "paint6_linear_1_2",
+    "paint7_linear_1_2",
+    "paint8_linear_1_2",
+    "paint9_linear_1_2"
+  ],
+  "groups": [
+    {
+      "id": "Vector",
+      "bbox": {
+        "x": 24,
+        "y": 0,
+        "width": 1258,
+        "height": 454.61
+      },
+      "childCount": 2,
+      "parentId": "grid-vertical"
+    },
+    {
+      "id": "grid-vertical",
+      "bbox": {
+        "x": 24,
+        "y": 0,
+        "width": 1258,
+        "height": 454.61
+      },
+      "childCount": 1,
+      "parentId": "background-layer"
+    },
+    {
+      "id": "Vector_2",
+      "bbox": {
+        "x": 0,
+        "y": 99.21,
+        "width": 1316,
+        "height": 347.86
+      },
+      "childCount": 2,
+      "parentId": "grid-horizontal"
+    },
+    {
+      "id": "grid-horizontal",
+      "bbox": {
+        "x": 0,
+        "y": 99.21,
+        "width": 1316,
+        "height": 347.86
+      },
+      "childCount": 1,
+      "parentId": "background-layer"
+    },
+    {
+      "id": "background-layer",
+      "bbox": {
+        "x": 0,
+        "y": 0,
+        "width": 1316,
+        "height": 540
+      },
+      "childCount": 4,
+      "parentId": null
+    },
+    {
+      "id": "flow_fuel_pink",
+      "bbox": {
+        "x": 166,
+        "y": 163.56,
+        "width": 641,
+        "height": 87.44
+      },
+      "childCount": 10,
+      "parentId": null
+    },
+    {
+      "id": "flow_nox_green",
+      "bbox": {
+        "x": 166,
+        "y": 290.4,
+        "width": 405,
+        "height": 7.54
+      },
+      "childCount": 4,
+      "parentId": null
+    },
+    {
+      "id": "flow_air_blue",
+      "bbox": {
+        "x": 95,
+        "y": 313,
+        "width": 476,
+        "height": 91.67
+      },
+      "childCount": 4,
+      "parentId": null
+    },
+    {
+      "id": "Vector_21",
+      "bbox": {
+        "x": 247,
+        "y": 173.61,
+        "width": 26,
+        "height": 22.6
+      },
+      "childCount": 2,
+      "parentId": "valve-FSAGR"
+    },
+    {
+      "id": "Vector_22",
+      "bbox": {
+        "x": 260,
+        "y": 172.35,
+        "width": 0,
+        "height": 25.12
+      },
+      "childCount": 2,
+      "parentId": "valve-FSAGR"
+    },
+    {
+      "id": "valve-FSAGR",
+      "bbox": {
+        "x": 247,
+        "y": 172.35,
+        "width": 26,
+        "height": 25.12
+      },
+      "childCount": 2,
+      "parentId": null
+    },
+    {
+      "id": "Vector_23",
+      "bbox": {
+        "x": 502,
+        "y": 152.26,
+        "width": 26,
+        "height": 22.6
+      },
+      "childCount": 2,
+      "parentId": "valve-FSAG11"
+    },
+    {
+      "id": "Vector_24",
+      "bbox": {
+        "x": 515,
+        "y": 151,
+        "width": 0,
+        "height": 25.12
+      },
+      "childCount": 2,
+      "parentId": "valve-FSAG11"
+    },
+    {
+      "id": "valve-FSAG11",
+      "bbox": {
+        "x": 502,
+        "y": 151,
+        "width": 26,
+        "height": 25.12
+      },
+      "childCount": 2,
+      "parentId": null
+    },
+    {
+      "id": "Vector_25",
+      "bbox": {
+        "x": 618,
+        "y": 152.26,
+        "width": 26,
+        "height": 22.6
+      },
+      "childCount": 2,
+      "parentId": "valve-FSAG11A"
+    },
+    {
+      "id": "Vector_26",
+      "bbox": {
+        "x": 631,
+        "y": 151,
+        "width": 0,
+        "height": 25.12
+      },
+      "childCount": 2,
+      "parentId": "valve-FSAG11A"
+    },
+    {
+      "id": "valve-FSAG11A",
+      "bbox": {
+        "x": 618,
+        "y": 151,
+        "width": 26,
+        "height": 25.12
+      },
+      "childCount": 2,
+      "parentId": null
+    },
+    {
+      "id": "Vector_27",
+      "bbox": {
+        "x": 734,
+        "y": 152.26,
+        "width": 26,
+        "height": 22.6
+      },
+      "childCount": 2,
+      "parentId": "valve-FSAG12"
+    },
+    {
+      "id": "Vector_28",
+      "bbox": {
+        "x": 747,
+        "y": 151,
+        "width": 0,
+        "height": 25.12
+      },
+      "childCount": 2,
+      "parentId": "valve-FSAG12"
+    },
+    {
+      "id": "valve-FSAG12",
+      "bbox": {
+        "x": 734,
+        "y": 151,
+        "width": 26,
+        "height": 25.12
+      },
+      "childCount": 2,
+      "parentId": null
+    },
+    {
+      "id": "Vector_29",
+      "bbox": {
+        "x": 257,
+        "y": 282.86,
+        "width": 26,
+        "height": 22.6
+      },
+      "childCount": 2,
+      "parentId": "valve-nicvs1"
+    },
+    {
+      "id": "Vector_30",
+      "bbox": {
+        "x": 270,
+        "y": 281.61,
+        "width": 0,
+        "height": 25.12
+      },
+      "childCount": 2,
+      "parentId": "valve-nicvs1"
+    },
+    {
+      "id": "valve-nicvs1",
+      "bbox": {
+        "x": 257,
+        "y": 281.61,
+        "width": 26,
+        "height": 25.12
+      },
+      "childCount": 2,
+      "parentId": null
+    },
+    {
+      "id": "Vector_31",
+      "bbox": {
+        "x": 467,
+        "y": 282.86,
+        "width": 26,
+        "height": 22.6
+      },
+      "childCount": 2,
+      "parentId": "valve-NOJ"
+    },
+    {
+      "id": "Vector_32",
+      "bbox": {
+        "x": 480,
+        "y": 281.61,
+        "width": 0,
+        "height": 25.12
+      },
+      "childCount": 2,
+      "parentId": "valve-NOJ"
+    },
+    {
+      "id": "valve-NOJ",
+      "bbox": {
+        "x": 467,
+        "y": 281.61,
+        "width": 26,
+        "height": 25.12
+      },
+      "childCount": 2,
+      "parentId": null
+    },
+    {
+      "id": "Vector_33",
+      "bbox": {
+        "x": 441,
+        "y": 389.61,
+        "width": 26,
+        "height": 22.6
+      },
+      "childCount": 2,
+      "parentId": "valve-csgv"
+    },
+    {
+      "id": "Vector_34",
+      "bbox": {
+        "x": 454,
+        "y": 388.35,
+        "width": 0,
+        "height": 25.12
+      },
+      "childCount": 2,
+      "parentId": "valve-csgv"
+    },
+    {
+      "id": "valve-csgv",
+      "bbox": {
+        "x": 441,
+        "y": 388.35,
+        "width": 26,
+        "height": 25.12
+      },
+      "childCount": 2,
+      "parentId": null
+    },
+    {
+      "id": "Vector_35",
+      "bbox": {
+        "x": 264.5,
+        "y": 389.61,
+        "width": 26,
+        "height": 22.6
+      },
+      "childCount": 2,
+      "parentId": "valve-CSBHX"
+    },
+    {
+      "id": "Vector_36",
+      "bbox": {
+        "x": 277.5,
+        "y": 388.35,
+        "width": 0,
+        "height": 25.12
+      },
+      "childCount": 2,
+      "parentId": "valve-CSBHX"
+    },
+    {
+      "id": "valve-CSBHX",
+      "bbox": {
+        "x": 264.5,
+        "y": 388.35,
+        "width": 26,
+        "height": 25.12
+      },
+      "childCount": 2,
+      "parentId": null
+    },
+    {
+      "id": "BOX_ca_fqsg_cl",
+      "bbox": {
+        "x": 31,
+        "y": 149.65,
+        "width": 123,
+        "height": 65.3
+      },
+      "childCount": 4,
+      "parentId": null
+    },
+    {
+      "id": "BOX_NQKR3_MONITOR",
+      "bbox": {
+        "x": 31,
+        "y": 260.26,
+        "width": 123,
+        "height": 64.05
+      },
+      "childCount": 4,
+      "parentId": null
+    },
+    {
+      "id": "BOX_FSAGR",
+      "bbox": {
+        "x": 228,
+        "y": 119.61,
+        "width": 65,
+        "height": 50.23
+      },
+      "childCount": 4,
+      "parentId": null
+    },
+    {
+      "id": "BOX_FSAG11",
+      "bbox": {
+        "x": 478,
+        "y": 81.93,
+        "width": 73,
+        "height": 65.3
+      },
+      "childCount": 5,
+      "parentId": null
+    },
+    {
+      "id": "BOX_FSAG11A",
+      "bbox": {
+        "x": 594,
+        "y": 81.93,
+        "width": 73,
+        "height": 65.3
+      },
+      "childCount": 5,
+      "parentId": null
+    },
+    {
+      "id": "BOX_FSAG12",
+      "bbox": {
+        "x": 710,
+        "y": 81.93,
+        "width": 73,
+        "height": 65.3
+      },
+      "childCount": 5,
+      "parentId": null
+    },
+    {
+      "id": "BOX_nicvs1",
+      "bbox": {
+        "x": 237,
+        "y": 227.61,
+        "width": 65,
+        "height": 50.23
+      },
+      "childCount": 4,
+      "parentId": null
+    },
+    {
+      "id": "BOX_NOJ",
+      "bbox": {
+        "x": 447,
+        "y": 227.61,
+        "width": 65,
+        "height": 50.23
+      },
+      "childCount": 4,
+      "parentId": null
+    },
+    {
+      "id": "BOX_CSBHX",
+      "bbox": {
+        "x": 245,
+        "y": 334.35,
+        "width": 65,
+        "height": 50.23
+      },
+      "childCount": 4,
+      "parentId": null
+    },
+    {
+      "id": "BOX_csgv",
+      "bbox": {
+        "x": 421,
+        "y": 334.35,
+        "width": 65,
+        "height": 50.23
+      },
+      "childCount": 3,
+      "parentId": null
+    },
+    {
+      "id": "BOX_GENERATOR",
+      "bbox": {
+        "x": 564,
+        "y": 246.7,
+        "width": 87,
+        "height": 174.56
+      },
+      "childCount": 6,
+      "parentId": null
+    },
+    {
+      "id": "BOX_COMPRESSOR",
+      "bbox": {
+        "x": 660,
+        "y": 246.44,
+        "width": 88,
+        "height": 175.81
+      },
+      "childCount": 3,
+      "parentId": null
+    },
+    {
+      "id": "BOX_TURBINE",
+      "bbox": {
+        "x": 855,
+        "y": 246.44,
+        "width": 86,
+        "height": 175.81
+      },
+      "childCount": 3,
+      "parentId": null
+    },
+    {
+      "id": "Vector_62",
+      "bbox": {
+        "x": 1012,
+        "y": 262.77,
+        "width": 25,
+        "height": 42.7
+      },
+      "childCount": 2,
+      "parentId": "Machine"
+    },
+    {
+      "id": "Machine",
+      "bbox": {
+        "x": 669,
+        "y": 210,
+        "width": 368,
+        "height": 182.09
+      },
+      "childCount": 13,
+      "parentId": null
+    },
+    {
+      "id": "exhaust-smoke-glow",
+      "bbox": {
+        "x": 1037,
+        "y": 264.02,
+        "width": 62,
+        "height": 37.68
+      },
+      "childCount": 3,
+      "parentId": null
+    },
+    {
+      "id": "line_to_cards",
+      "bbox": {
+        "x": 1040,
+        "y": 123.37,
+        "width": 59,
+        "height": 259.96
+      },
+      "childCount": 4,
+      "parentId": null
+    },
+    {
+      "id": "metric_NOx",
+      "bbox": {
+        "x": 1096.5,
+        "y": 94.49,
+        "width": 183.5,
+        "height": 67.81
+      },
+      "childCount": 6,
+      "parentId": null
+    },
+    {
+      "id": "target-DWATT",
+      "bbox": {
+        "x": 1096.5,
+        "y": 269.05,
+        "width": 183.5,
+        "height": 67.81
+      },
+      "childCount": 6,
+      "parentId": null
+    },
+    {
+      "id": "target-TTXM",
+      "bbox": {
+        "x": 1096.5,
+        "y": 181.14,
+        "width": 183.5,
+        "height": 67.81
+      },
+      "childCount": 6,
+      "parentId": null
+    },
+    {
+      "id": "target-lambda",
+      "bbox": {
+        "x": 1096.5,
+        "y": 355.7,
+        "width": 183.5,
+        "height": 67.81
+      },
+      "childCount": 5,
+      "parentId": null
+    }
+  ],
+  "kpiCards": [
+    {
+      "containerId": "BOX_FSAG11",
+      "bbox": {
+        "x": 478,
+        "y": 81.93,
+        "width": 73,
+        "height": 65.3
+      },
+      "innerPathCount": 5,
+      "innerPathIds": [
+        "Vector_40",
+        "FSAG11",
+        "45.0",
+        "%_2",
+        "Vector_41"
+      ],
+      "fill": null,
+      "stroke": null
+    },
+    {
+      "containerId": "BOX_FSAG11A",
+      "bbox": {
+        "x": 594,
+        "y": 81.93,
+        "width": 73,
+        "height": 65.3
+      },
+      "innerPathCount": 5,
+      "innerPathIds": [
+        "Vector_42",
+        "FSAG11A",
+        "45.9",
+        "%_3",
+        "Vector_43"
+      ],
+      "fill": null,
+      "stroke": null
+    },
+    {
+      "containerId": "BOX_FSAG12",
+      "bbox": {
+        "x": 710,
+        "y": 81.93,
+        "width": 73,
+        "height": 65.3
+      },
+      "innerPathCount": 5,
+      "innerPathIds": [
+        "Vector_44",
+        "FSAG12",
+        "76.0_2",
+        "%_4",
+        "Vector_45"
+      ],
+      "fill": null,
+      "stroke": null
+    },
+    {
+      "containerId": "metric_NOx",
+      "bbox": {
+        "x": 1096.5,
+        "y": 94.49,
+        "width": 183.5,
+        "height": 67.81
+      },
+      "innerPathCount": 6,
+      "innerPathIds": [
+        "dot_NOx",
+        "box_NOx",
+        "NOx",
+        "26.5",
+        "ppm",
+        "spark_NOx"
+      ],
+      "fill": null,
+      "stroke": null
+    },
+    {
+      "containerId": "target-DWATT",
+      "bbox": {
+        "x": 1096.5,
+        "y": 269.05,
+        "width": 183.5,
+        "height": 67.81
+      },
+      "innerPathCount": 6,
+      "innerPathIds": [
+        "box_DWATT",
+        "dot_DWATT",
+        "DWATT",
+        "248.6",
+        "MW",
+        "spark_DWATT"
+      ],
+      "fill": null,
+      "stroke": null
+    },
+    {
+      "containerId": "target-TTXM",
+      "bbox": {
+        "x": 1096.5,
+        "y": 181.14,
+        "width": 183.5,
+        "height": 67.81
+      },
+      "innerPathCount": 6,
+      "innerPathIds": [
+        "box_TTXM",
+        "dot_TTXM",
+        "TTXM",
+        "580.0",
+        "&#194;&#176;C",
+        "spark_TTXM"
+      ],
+      "fill": null,
+      "stroke": null
+    },
+    {
+      "containerId": "target-lambda",
+      "bbox": {
+        "x": 1096.5,
+        "y": 355.7,
+        "width": 183.5,
+        "height": 67.81
+      },
+      "innerPathCount": 5,
+      "innerPathIds": [
+        "box_lambda",
+        "dot_lambda",
+        "&#206;&#187; (lambda)",
+        "1.10",
+        "spark_lambda"
+      ],
+      "fill": null,
+      "stroke": null
+    }
+  ],
+  "flows": {
+    "groups": [
+      {
+        "id": "flow_fuel_pink",
+        "bbox": {
+          "x": 166,
+          "y": 163.56,
+          "width": 641,
+          "height": 87.44
+        },
+        "childCount": 10
+      },
+      {
+        "id": "flow_nox_green",
+        "bbox": {
+          "x": 166,
+          "y": 290.4,
+          "width": 405,
+          "height": 7.54
+        },
+        "childCount": 4
+      },
+      {
+        "id": "flow_air_blue",
+        "bbox": {
+          "x": 95,
+          "y": 313,
+          "width": 476,
+          "height": 91.67
+        },
+        "childCount": 4
+      }
+    ],
+    "dashedPaths": [
+      {
+        "id": "Vector_6",
+        "tag": "path",
+        "fill": null,
+        "stroke": "#FF9AAA",
+        "bbox": {
+          "x": 169,
+          "y": 163.56,
+          "width": 638,
+          "height": 21.35
+        },
+        "parentId": "flow_fuel_pink",
+        "parentChain": [
+          "flow_fuel_pink"
+        ]
+      },
+      {
+        "id": "Vector_9",
+        "tag": "path",
+        "fill": null,
+        "stroke": "#FF9AAA",
+        "bbox": {
+          "x": 807,
+          "y": 164,
+          "width": 0,
+          "height": 87
+        },
+        "parentId": "flow_fuel_pink",
+        "parentChain": [
+          "flow_fuel_pink"
+        ]
+      },
+      {
+        "id": "Vector_12",
+        "tag": "path",
+        "fill": null,
+        "stroke": "#FF9AAA",
+        "bbox": {
+          "x": 424,
+          "y": 186.16,
+          "width": 245,
+          "height": 50
+        },
+        "parentId": "flow_fuel_pink",
+        "parentChain": [
+          "flow_fuel_pink"
+        ]
+      },
+      {
+        "id": "Vector_15",
+        "tag": "path",
+        "fill": null,
+        "stroke": "#CBFF9B",
+        "bbox": {
+          "x": 169,
+          "y": 294.16,
+          "width": 402,
+          "height": 0
+        },
+        "parentId": "flow_nox_green",
+        "parentChain": [
+          "flow_nox_green"
+        ]
+      },
+      {
+        "id": "Vector_19",
+        "tag": "path",
+        "fill": null,
+        "stroke": "#A9D6FF",
+        "bbox": {
+          "x": 98,
+          "y": 400.91,
+          "width": 436.54,
+          "height": 0
+        },
+        "parentId": "flow_air_blue",
+        "parentChain": [
+          "flow_air_blue"
+        ]
+      },
+      {
+        "id": "line_to_NOx",
+        "tag": "path",
+        "fill": null,
+        "stroke": "#6E879C",
+        "bbox": {
+          "x": 1040,
+          "y": 123.37,
+          "width": 56,
+          "height": 159.49
+        },
+        "parentId": "line_to_cards",
+        "parentChain": [
+          "line_to_cards"
+        ]
+      },
+      {
+        "id": "line_to_TTXM",
+        "tag": "path",
+        "fill": null,
+        "stroke": "#6E879C",
+        "bbox": {
+          "x": 1068,
+          "y": 210.02,
+          "width": 31,
+          "height": 72.84
+        },
+        "parentId": "line_to_cards",
+        "parentChain": [
+          "line_to_cards"
+        ]
+      },
+      {
+        "id": "line_to_DWATT",
+        "tag": "path",
+        "fill": null,
+        "stroke": "#6E879C",
+        "bbox": {
+          "x": 1068,
+          "y": 282.86,
+          "width": 31,
+          "height": 15.07
+        },
+        "parentId": "line_to_cards",
+        "parentChain": [
+          "line_to_cards"
+        ]
+      },
+      {
+        "id": "line_to_lambda",
+        "tag": "path",
+        "fill": null,
+        "stroke": "#6E879C",
+        "bbox": {
+          "x": 1068,
+          "y": 282.86,
+          "width": 31,
+          "height": 100.47
+        },
+        "parentId": "line_to_cards",
+        "parentChain": [
+          "line_to_cards"
+        ]
+      }
+    ]
+  },
+  "combustorCandidates": {
+    "byName": [
+      {
+        "id": "COMBUSTOR",
+        "tag": "path",
+        "fill": "#B8CAD8",
+        "stroke": null,
+        "bbox": {
+          "x": 773.6,
+          "y": 404.63,
+          "width": 63.31,
+          "height": 7.5
+        },
+        "parentId": null,
+        "parentChain": []
+      }
+    ],
+    "byFill": [
+      {
+        "id": "Vector_10",
+        "tag": "path",
+        "fill": "#FF6C86",
+        "stroke": null,
+        "bbox": {
+          "x": 166,
+          "y": 181.14,
+          "width": 6,
+          "height": 7.53
+        },
+        "parentId": "flow_fuel_pink",
+        "parentChain": [
+          "flow_fuel_pink"
+        ]
+      },
+      {
+        "id": "ca_fqsg_cl",
+        "tag": "path",
+        "fill": "#FF8EAB",
+        "stroke": null,
+        "bbox": {
+          "x": 68.51,
+          "y": 160.83,
+          "width": 48.08,
+          "height": 9.77
+        },
+        "parentId": "BOX_ca_fqsg_cl",
+        "parentChain": [
+          "BOX_ca_fqsg_cl"
+        ]
+      },
+      {
+        "id": "1500.0",
+        "tag": "path",
+        "fill": "#FFB3C8",
+        "stroke": null,
+        "bbox": {
+          "x": 51.16,
+          "y": 181.27,
+          "width": 57.99,
+          "height": 14.2
+        },
+        "parentId": "BOX_ca_fqsg_cl",
+        "parentChain": [
+          "BOX_ca_fqsg_cl"
+        ]
+      },
+      {
+        "id": "FSAGR",
+        "tag": "path",
+        "fill": "#FF9AAC",
+        "stroke": null,
+        "bbox": {
+          "x": 244.88,
+          "y": 127.13,
+          "width": 31.31,
+          "height": 7.5
+        },
+        "parentId": "BOX_FSAGR",
+        "parentChain": [
+          "BOX_FSAGR"
+        ]
+      },
+      {
+        "id": "76.0",
+        "tag": "path",
+        "fill": "#FFA3B9",
+        "stroke": null,
+        "bbox": {
+          "x": 239.77,
+          "y": 143.21,
+          "width": 30.6,
+          "height": 11.96
+        },
+        "parentId": "BOX_FSAGR",
+        "parentChain": [
+          "BOX_FSAGR"
+        ]
+      },
+      {
+        "id": "FSAG11",
+        "tag": "path",
+        "fill": "#FF9AAC",
+        "stroke": null,
+        "bbox": {
+          "x": 497.88,
+          "y": 90.84,
+          "width": 33.17,
+          "height": 7.5
+        },
+        "parentId": "BOX_FSAG11",
+        "parentChain": [
+          "BOX_FSAG11"
+        ]
+      },
+      {
+        "id": "45.0",
+        "tag": "path",
+        "fill": "#FFA3B9",
+        "stroke": null,
+        "bbox": {
+          "x": 493.93,
+          "y": 107.74,
+          "width": 31.68,
+          "height": 11.95
+        },
+        "parentId": "BOX_FSAG11",
+        "parentChain": [
+          "BOX_FSAG11"
+        ]
+      },
+      {
+        "id": "FSAG11A",
+        "tag": "path",
+        "fill": "#FF9AAC",
+        "stroke": null,
+        "bbox": {
+          "x": 609.88,
+          "y": 90.84,
+          "width": 41.01,
+          "height": 7.5
+        },
+        "parentId": "BOX_FSAG11A",
+        "parentChain": [
+          "BOX_FSAG11A"
+        ]
+      },
+      {
+        "id": "45.9",
+        "tag": "path",
+        "fill": "#FFA3B9",
+        "stroke": null,
+        "bbox": {
+          "x": 609.93,
+          "y": 107.73,
+          "width": 31.88,
+          "height": 11.97
+        },
+        "parentId": "BOX_FSAG11A",
+        "parentChain": [
+          "BOX_FSAG11A"
+        ]
+      },
+      {
+        "id": "FSAG12",
+        "tag": "path",
+        "fill": "#FF9AAC",
+        "stroke": null,
+        "bbox": {
+          "x": 728.88,
+          "y": 90.84,
+          "width": 35.2,
+          "height": 7.5
+        },
+        "parentId": "BOX_FSAG12",
+        "parentChain": [
+          "BOX_FSAG12"
+        ]
+      },
+      {
+        "id": "76.0_2",
+        "tag": "path",
+        "fill": "#FFA3B9",
+        "stroke": null,
+        "bbox": {
+          "x": 726.77,
+          "y": 107.74,
+          "width": 30.6,
+          "height": 11.96
+        },
+        "parentId": "BOX_FSAG12",
+        "parentChain": [
+          "BOX_FSAG12"
+        ]
+      },
+      {
+        "id": "Vector_54",
+        "tag": "path",
+        "fill": "#FF991F",
+        "stroke": "#FFC16C",
+        "bbox": {
+          "x": 803,
+          "y": 325.56,
+          "width": 6,
+          "height": 7.54
+        },
+        "parentId": "Machine",
+        "parentChain": [
+          "Machine"
+        ]
+      },
+      {
+        "id": "Vector_55",
+        "tag": "path",
+        "fill": "#FF991F",
+        "stroke": "#FFC16C",
+        "bbox": {
+          "x": 803,
+          "y": 232.63,
+          "width": 6,
+          "height": 7.54
+        },
+        "parentId": "Machine",
+        "parentChain": [
+          "Machine"
+        ]
+      },
+      {
+        "id": "Vector_56",
+        "tag": "path",
+        "fill": "#FF991F",
+        "stroke": "#FFC16C",
+        "bbox": {
+          "x": 803,
+          "y": 279.09,
+          "width": 6,
+          "height": 7.53
+        },
+        "parentId": "Machine",
+        "parentChain": [
+          "Machine"
+        ]
+      },
+      {
+        "id": "Vector_57",
+        "tag": "path",
+        "fill": "#FF991F",
+        "stroke": "#FFC16C",
+        "bbox": {
+          "x": 803,
+          "y": 369.51,
+          "width": 6,
+          "height": 7.54
+        },
+        "parentId": "Machine",
+        "parentChain": [
+          "Machine"
+        ]
+      },
+      {
+        "id": "dot_TTXM",
+        "tag": "path",
+        "fill": "#FF9A22",
+        "stroke": null,
+        "bbox": {
+          "x": 1096.5,
+          "y": 206.88,
+          "width": 5,
+          "height": 6.28
+        },
+        "parentId": "target-TTXM",
+        "parentChain": [
+          "target-TTXM"
+        ]
+      },
+      {
+        "id": "TTXM",
+        "tag": "path",
+        "fill": "#FFC17D",
+        "stroke": null,
+        "bbox": {
+          "x": 1124.48,
+          "y": 193.91,
+          "width": 26.78,
+          "height": 7.27
+        },
+        "parentId": "target-TTXM",
+        "parentChain": [
+          "target-TTXM"
+        ]
+      },
+      {
+        "id": "580.0",
+        "tag": "path",
+        "fill": "#FFA02F",
+        "stroke": null,
+        "bbox": {
+          "x": 1125.61,
+          "y": 213.29,
+          "width": 53.82,
+          "height": 15.69
+        },
+        "parentId": "target-TTXM",
+        "parentChain": [
+          "target-TTXM"
+        ]
+      }
+    ]
+  },
+  "labelGlyphs": [
+    {
+      "id": "%_2",
+      "tag": "path",
+      "fill": "#E5DCE1",
+      "stroke": null,
+      "bbox": {
+        "x": 529.67,
+        "y": 114.17,
+        "width": 5.16,
+        "height": 5.98
+      },
+      "parentId": "BOX_FSAG11",
+      "parentChain": [
+        "BOX_FSAG11"
+      ]
+    },
+    {
+      "id": "Vector_41",
+      "tag": "path",
+      "fill": "#C7C2CA",
+      "stroke": null,
+      "bbox": {
+        "x": 500,
+        "y": 134.67,
+        "width": 29,
+        "height": 3.77
+      },
+      "parentId": "BOX_FSAG11",
+      "parentChain": [
+        "BOX_FSAG11"
+      ]
+    },
+    {
+      "id": "%_3",
+      "tag": "path",
+      "fill": "#E5DCE1",
+      "stroke": null,
+      "bbox": {
+        "x": 645.67,
+        "y": 114.17,
+        "width": 5.16,
+        "height": 5.98
+      },
+      "parentId": "BOX_FSAG11A",
+      "parentChain": [
+        "BOX_FSAG11A"
+      ]
+    },
+    {
+      "id": "Vector_43",
+      "tag": "path",
+      "fill": "#C7C2CA",
+      "stroke": null,
+      "bbox": {
+        "x": 616,
+        "y": 134.67,
+        "width": 29,
+        "height": 3.77
+      },
+      "parentId": "BOX_FSAG11A",
+      "parentChain": [
+        "BOX_FSAG11A"
+      ]
+    },
+    {
+      "id": "%_4",
+      "tag": "path",
+      "fill": "#E5DCE1",
+      "stroke": null,
+      "bbox": {
+        "x": 761.67,
+        "y": 114.17,
+        "width": 5.16,
+        "height": 5.98
+      },
+      "parentId": "BOX_FSAG12",
+      "parentChain": [
+        "BOX_FSAG12"
+      ]
+    },
+    {
+      "id": "Vector_45",
+      "tag": "path",
+      "fill": "#C7C2CA",
+      "stroke": null,
+      "bbox": {
+        "x": 732,
+        "y": 134.67,
+        "width": 29,
+        "height": 3.77
+      },
+      "parentId": "BOX_FSAG12",
+      "parentChain": [
+        "BOX_FSAG12"
+      ]
+    },
+    {
+      "id": "dot_NOx",
+      "tag": "path",
+      "fill": "#31E2FF",
+      "stroke": null,
+      "bbox": {
+        "x": 1096.5,
+        "y": 120.23,
+        "width": 5,
+        "height": 6.28
+      },
+      "parentId": "metric_NOx",
+      "parentChain": [
+        "metric_NOx"
+      ]
+    },
+    {
+      "id": "NOx",
+      "tag": "path",
+      "fill": "#9FCDE0",
+      "stroke": null,
+      "bbox": {
+        "x": 1124.88,
+        "y": 107.16,
+        "width": 19.24,
+        "height": 7.47
+      },
+      "parentId": "metric_NOx",
+      "parentChain": [
+        "metric_NOx"
+      ]
+    },
+    {
+      "id": "ppm",
+      "tag": "path",
+      "fill": "#D3E8F1",
+      "stroke": null,
+      "bbox": {
+        "x": 1189.84,
+        "y": 134.57,
+        "width": 21.29,
+        "height": 8.33
+      },
+      "parentId": "metric_NOx",
+      "parentChain": [
+        "metric_NOx"
+      ]
+    },
+    {
+      "id": "dot_DWATT",
+      "tag": "path",
+      "fill": "#38A7FF",
+      "stroke": null,
+      "bbox": {
+        "x": 1096.5,
+        "y": 294.79,
+        "width": 5,
+        "height": 6.28
+      },
+      "parentId": "target-DWATT",
+      "parentChain": [
+        "target-DWATT"
+      ]
+    },
+    {
+      "id": "MW",
+      "tag": "path",
+      "fill": "#D1E5F5",
+      "stroke": null,
+      "bbox": {
+        "x": 1191.97,
+        "y": 305.95,
+        "width": 19.02,
+        "height": 8
+      },
+      "parentId": "target-DWATT",
+      "parentChain": [
+        "target-DWATT"
+      ]
+    },
+    {
+      "id": "dot_TTXM",
+      "tag": "path",
+      "fill": "#FF9A22",
+      "stroke": null,
+      "bbox": {
+        "x": 1096.5,
+        "y": 206.88,
+        "width": 5,
+        "height": 6.28
+      },
+      "parentId": "target-TTXM",
+      "parentChain": [
+        "target-TTXM"
+      ]
+    },
+    {
+      "id": "TTXM",
+      "tag": "path",
+      "fill": "#FFC17D",
+      "stroke": null,
+      "bbox": {
+        "x": 1124.48,
+        "y": 193.91,
+        "width": 26.78,
+        "height": 7.27
+      },
+      "parentId": "target-TTXM",
+      "parentChain": [
+        "target-TTXM"
+      ]
+    },
+    {
+      "id": "&#194;&#176;C",
+      "tag": "path",
+      "fill": "#F3D4B4",
+      "stroke": null,
+      "bbox": {
+        "x": 1189.7,
+        "y": 219.19,
+        "width": 11.57,
+        "height": 8.22
+      },
+      "parentId": "target-TTXM",
+      "parentChain": [
+        "target-TTXM"
+      ]
+    },
+    {
+      "id": "dot_lambda",
+      "tag": "path",
+      "fill": "#38A7FF",
+      "stroke": null,
+      "bbox": {
+        "x": 1096.5,
+        "y": 381.44,
+        "width": 5,
+        "height": 6.28
+      },
+      "parentId": "target-lambda",
+      "parentChain": [
+        "target-lambda"
+      ]
+    }
+  ],
+  "warnings": []
+}

@@ -8,7 +8,11 @@ export interface KpiAnchor {
   textAnchor: 'start'
 }
 
-export type KpiAnchorKey = 'nox' | 'ttxm' | 'dwatt' | 'lambda'
+export type KpiAnchorKey =
+  | 'nox' | 'ttxm' | 'dwatt' | 'lambda'
+  | 'syngas' | 'fsagr' | 'fsag11' | 'fsag11a' | 'fsag12'
+  | 'nicvs1' | 'nqj' | 'csbhx' | 'csgv' | 'nqkr3'
+  | 'legend-fuel' | 'legend-n2' | 'legend-air'
 
 export interface TransformResult {
   ast: INode
@@ -17,7 +21,7 @@ export interface TransformResult {
 
 // 'kpi-value-nox' → 'nox'
 function roleToAnchorKey(role: string): KpiAnchorKey | null {
-  const m = role.match(/^kpi-value-(nox|ttxm|dwatt|lambda)$/)
+  const m = role.match(/^kpi-value-(nox|ttxm|dwatt|lambda|syngas|fsagr|fsag11|fsag11a|fsag12|nicvs1|nqj|csbhx|csgv|nqkr3|legend-fuel|legend-n2|legend-air)$/)
   return m ? (m[1] as KpiAnchorKey) : null
 }
 
@@ -106,6 +110,18 @@ export function transformAst(
     children: [rootInput],
   }
   visit(fakeRoot)
+
+  // svg 최상위 첫 자식이 #1E1E1E 전체 배경(rect 또는 svgo 변환 후 path)이면 제거
+  if (rootInput.children && rootInput.children.length > 0) {
+    const first = rootInput.children[0]
+    if (
+      first.type === 'element' &&
+      (first.name === 'rect' || first.name === 'path') &&
+      first.attributes?.fill?.toLowerCase() === '#1e1e1e'
+    ) {
+      rootInput.children.shift()
+    }
+  }
   // rootInput이 remove 대상이면 children이 비어 폴백으로 원본을 반환 — 실 빌드에서는 발생 X
   const ast = fakeRoot.children[0] ?? rootInput
 

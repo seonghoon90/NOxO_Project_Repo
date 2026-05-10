@@ -30,11 +30,12 @@ export function emitRolesTs({ roleMap, kpiAnchors, viewBox }: EmitArgs): string 
   lines.push('export type Role = (typeof ROLES)[keyof typeof ROLES]')
   lines.push('')
 
-  // KPI_ANCHORS
+  // KPI_ANCHORS — dash 포함 키는 따옴표로 감싸서 유효 식별자로
   lines.push('export const KPI_ANCHORS = {')
   for (const [key, anchor] of Object.entries(kpiAnchors)) {
     if (!anchor) continue
-    lines.push(`  ${key}: { x: ${anchor.x}, y: ${anchor.y}, textAnchor: '${anchor.textAnchor}' as const },`)
+    const safeKey = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(key) ? key : `'${key}'`
+    lines.push(`  ${safeKey}: { x: ${anchor.x}, y: ${anchor.y}, textAnchor: '${anchor.textAnchor}' as const },`)
   }
   lines.push('} as const')
   lines.push('')

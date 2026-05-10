@@ -16,11 +16,26 @@ export const ROLE_MAP = {
   'card-box-dwatt':     { id: 'box_DWATT',   kind: 'kpi-box' },
   'card-box-lambda':    { id: 'box_lambda',  kind: 'kpi-box' },
 
-  // 동적 값 path (제거 대상, 4) → KPI_ANCHORS export
-  'kpi-value-nox':      { id: '26.5',  kind: 'kpi-value-remove' },
-  'kpi-value-ttxm':     { id: '580.0', kind: 'kpi-value-remove' },
-  'kpi-value-dwatt':    { id: '248.6', kind: 'kpi-value-remove' },
-  'kpi-value-lambda':   { id: '1.10',  kind: 'kpi-value-remove' },
+  // 동적 값 path (제거 대상, 4 KPI + 9 보조) → KPI_ANCHORS export
+  'kpi-value-nox':      { id: '26.5',   kind: 'kpi-value-remove' },
+  'kpi-value-ttxm':     { id: '580.0',  kind: 'kpi-value-remove' },
+  'kpi-value-dwatt':    { id: '248.6',  kind: 'kpi-value-remove' },
+  'kpi-value-lambda':   { id: '1.10',   kind: 'kpi-value-remove' },
+  'kpi-value-syngas':   { id: '1500.0', kind: 'kpi-value-remove' }, // syngasFlow
+  'kpi-value-fsagr':    { id: '76.0',   kind: 'kpi-value-remove' }, // syngasSrv
+  'kpi-value-fsag11':   { id: '45.0',   kind: 'kpi-value-remove' }, // syngasGcv1
+  'kpi-value-fsag11a':  { id: '45.9',   kind: 'kpi-value-remove' }, // syngasGcv1a
+  'kpi-value-fsag12':   { id: '76.0_2', kind: 'kpi-value-remove' }, // syngasGcv2
+  'kpi-value-nicvs1':   { id: '75.0',   kind: 'kpi-value-remove' }, // n2Valve1
+  'kpi-value-nqj':      { id: '15.7',   kind: 'kpi-value-remove' }, // n2Flow
+  'kpi-value-csbhx':    { id: '75.0_2', kind: 'kpi-value-remove' }, // ibhValve
+  'kpi-value-csgv':     { id: '75.0_3', kind: 'kpi-value-remove' }, // igvOpening
+  'kpi-value-nqkr3':    { id: '200.0',  kind: 'kpi-value-remove' }, // n2Offset
+
+  // 계통 라벨 path 제거 — React가 큰 텍스트로 다시 그림
+  'kpi-value-legend-fuel': { id: '&#237;&#149;&#169;&#236;&#132;&#177;&#234;&#176;&#128;&#236;&#138;&#164; &#234;&#179;&#132;&#237;&#134;&#181;', kind: 'kpi-value-remove' },
+  'kpi-value-legend-n2':   { id: '&#236;&#167;&#136;&#236;&#134;&#140; &#234;&#179;&#132;&#237;&#134;&#181;', kind: 'kpi-value-remove' },
+  'kpi-value-legend-air':  { id: '&#234;&#179;&#181;&#234;&#184;&#176; &#234;&#179;&#132;&#237;&#134;&#181;', kind: 'kpi-value-remove' },
 
   // flow 그룹 (4: 본 흐름 3 + 카드 연결선 1)
   'flow-fuel':  { id: 'flow_fuel_pink',  kind: 'flow-group' },
