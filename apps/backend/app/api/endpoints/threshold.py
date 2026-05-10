@@ -13,5 +13,4 @@ router = APIRouter(prefix="/threshold", tags=["threshold"])
 def get_threshold(
     service: Annotated[ThresholdService, Depends(get_threshold_service)],
 ) -> ThresholdResponse:
-    t = service.get()
-    return ThresholdResponse(nox_ppm_limit=t.nox_ppm_limit)
+    return service.get()

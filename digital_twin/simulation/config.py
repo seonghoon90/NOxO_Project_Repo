@@ -100,13 +100,34 @@ class TimeConstants:
 # ============================================================
 @dataclass(frozen=True)
 class ThresholdConfig:
-    """임계치 및 경고 기준값."""
+    """임계치 및 경고 기준값.
 
-    nox_warning_ppm: float = 50.0     # NOx 경고 임계치 [ppm]
+    nox_warning_ppm은 시뮬 엔진 warning 발화 + 프론트 NOx 경고선 둘 다 기준이 된다.
+    그 외 운영 임계(효율/배기온/λ 운영 한계)는 [가안] — 도메인 전문가 검토 후 교체.
+    """
+
+    # 시뮬 엔진 내부 안전 클램프 — 운영자 화면과 무관, 변경 금지
     nox_ceiling_ppm: float = 1000.0   # Zeldovich ODE 물리적 상한 [ppm]
     nox_floor_ppm: float = 0.0        # NOx 음수 방지 floor [ppm]
     nox_rate_max_ppm_per_s: float = 50.0  # Zeldovich 생성률 폭주 방지 [ppm/s]
     lambda_min: float = 0.5           # 공기비 최소 클램프 (연료과잉 방지)
+
+    # 운영 임계 — 프론트 화면 표시용. 시뮬 동작에는 영향 없음.
+    nox_warning_ppm: float = 50.0     # NOx 경고 임계치 [ppm] — 규제 가안
+
+    # 발전 효율 운영 임계 [가안] — 정격 0.89 기준. 정격 미만일 때만 주의/위험 색.
+    efficiency_caution: float = 0.85  # 미만 시 주의 (주황)
+    efficiency_danger: float = 0.80   # 미만 시 위험 (빨강)
+
+    # 배기온도 상한 운영 임계 [°C, 가안] — 정격 580 기준 상승만 경고
+    exhaust_caution_c: float = 600.0
+    exhaust_danger_c: float = 620.0
+
+    # 공기비(λ) 운영 한계 [무차원, 가안] — lambda_min(0.5)과 별개의 운영 한계
+    lambda_caution_lo: float = 0.9
+    lambda_caution_hi: float = 1.3
+    lambda_danger_lo: float = 0.8
+    lambda_danger_hi: float = 1.4
 
 
 # ============================================================

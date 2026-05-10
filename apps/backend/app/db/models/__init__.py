@@ -1,4 +1,2 @@
-from app.db.models.sensor_data import SensorData
-from app.db.models.threshold_config import ThresholdConfig
-
-__all__ = ["SensorData", "ThresholdConfig"]
+# 현재 ORM 모델 없음. 운영 데이터 조회 페이지 미구현 + 임계값은 DT config 직결.
+__all__: list[str] = []

@@ -8,8 +8,6 @@ from typing import Annotated
 
 from fastapi import Depends, Request
 
-from sqlalchemy.orm import Session
-
 from app.adapters.forecaster import Forecaster
 from app.adapters.simulator import Simulator
 from app.config import Settings, get_settings
@@ -17,9 +15,7 @@ from app.core.input_injector import InputInjector
 from app.core.sim_loop import SimLoopManager
 from app.core.state_store import StateStore
 from app.core.ws_manager import WebSocketManager
-from app.db.session import get_db_session
 from app.services.forecast_service import ForecastService
-from app.services.sensor_service import SensorService
 from app.services.session_service import SessionService
 from app.services.threshold_service import ThresholdService
 
@@ -49,11 +45,6 @@ def get_forecaster(request: Request) -> Forecaster:
 
 
 SettingsDep = Annotated[Settings, Depends(get_settings)]
-DbDep = Annotated["Session | None", Depends(get_db_session)]
-
-
-def get_sensor_service(db: DbDep) -> SensorService:
-    return SensorService(db)
 
 
 def get_session_service(
@@ -73,5 +64,5 @@ def get_forecast_service(
     return ForecastService(state_store, forecaster)
 
 
-def get_threshold_service(db: DbDep) -> ThresholdService:
-    return ThresholdService(db)
+def get_threshold_service() -> ThresholdService:
+    return ThresholdService()

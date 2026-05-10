@@ -180,18 +180,3 @@ def test_snapshot_includes_efficiency_excludes_co(client):
     assert "co" not in snap["output"]
 
     client.post(f"/api/session/{sid}/stop")
-
-
-def test_sensor_endpoints(client):
-    res = client.get("/api/sensor/latest")
-    assert res.status_code == 200
-    body = res.json()
-    # DB 정의서 v1.0 컬럼명을 그대로 응답
-    for key in ("measured_at", "nox_ppm", "syngas_flow", "generator_output"):
-        assert key in body
-
-    res = client.get("/api/sensor/history?limit=10")
-    assert res.status_code == 200
-    items = res.json()
-    assert isinstance(items, list)
-    assert len(items) <= 10
