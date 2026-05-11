@@ -1,3 +1,4 @@
+import asyncio
 from collections import deque
 from unittest.mock import AsyncMock, MagicMock
 import pytest
@@ -94,3 +95,48 @@ def test_build_predict_fn_uses_closure_for_ml_simulator(sim_loop_manager):
     simulator.predict_for_session.assert_called_once()
     args = simulator.predict_for_session.call_args
     assert args.args[1] is ctx
+
+
+async def test_run_deletes_session_context_on_normal_stop(sim_loop_manager, monkeypatch):
+    """정상 종료 시 finally가 session_contexts에서 ctx pop."""
+    mgr, state_store, injector, simulator, contexts = sim_loop_manager
+    state = _make_state()
+    ctx = _make_ctx()
+    contexts["sid1"] = ctx
+    state_store.get.return_value = None  # 즉시 break
+    await mgr._run("sid1")
+    assert "sid1" not in contexts
+
+
+async def test_run_deletes_session_context_on_session_terminated(sim_loop_manager, monkeypatch):
+    """SessionTerminatedError 발생 시 finally cleanup."""
+    from app.exceptions import SessionTerminatedError
+    mgr, state_store, injector, simulator, contexts = sim_loop_manager
+    state = _make_state()
+    ctx = _make_ctx()
+    contexts["sid1"] = ctx
+    state_store.get.return_value = state
+    monkeypatch.setattr(mgr, "_step", MagicMock(side_effect=SessionTerminatedError("ml")))
+    await mgr._run("sid1")
+    assert "sid1" not in contexts
+
+
+async def test_run_calls_state_store_remove_on_cleanup(sim_loop_manager):
+    """state_store.remove(sid) 호출됨 (Q1/U1 — StateStore Protocol)."""
+    mgr, state_store, injector, simulator, contexts = sim_loop_manager
+    state = _make_state()
+    ctx = _make_ctx()
+    contexts["sid1"] = ctx
+    state_store.get.return_value = None
+    await mgr._run("sid1")
+    state_store.remove.assert_called_with("sid1")
+
+
+async def test_stop_all_clears_all_session_contexts(sim_loop_manager):
+    """앱 셧다운 시 모든 세션 cleanup."""
+    mgr, state_store, injector, simulator, contexts = sim_loop_manager
+    contexts["a"] = _make_ctx("a")
+    contexts["b"] = _make_ctx("b")
+    mgr._tasks = {}  # 시뮬: 실제 task 없는 상태
+    await mgr.stop_all()
+    assert len(contexts) == 0

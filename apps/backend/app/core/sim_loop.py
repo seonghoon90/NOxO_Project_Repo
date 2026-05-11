@@ -112,28 +112,71 @@ class SimLoopManager:
             pass
 
     async def stop_all(self) -> None:
-        sids = list(self._tasks.keys())
-        for sid in sids:
-            await self.stop(sid)
+        """앱 셧다운 시 모든 활성 sim_loop task cancel + cleanup."""
+        tasks = list(self._tasks.values())
+        for t in tasks:
+            t.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        # 안전망 — finally가 모두 실행됐으면 이미 비어있음
+        self.session_contexts.clear()
+        self._tasks.clear()
 
     async def _run(self, sid: str) -> None:
-        # WebSocket push 주기 = DT step 주기. 단일 진실원은 dt_config.
+        """sim_loop 본체. finally에서 ctx + state_store cleanup."""
+        from app.exceptions import SessionTerminatedError
+
         dt = self.dt_config.sim_step.dt
         try:
             while True:
                 state = self.state_store.get(sid)
                 if state is None:
                     break
-                self._step(state)
+                try:
+                    self._step(state)
+                except KeyError as e:
+                    logger.error("sim_loop_key_error sid=%s err=%s", sid, e)
+                    break
+                except SessionTerminatedError as e:
+                    logger.error("session_terminated sid=%s reason=%s", sid, e)
+                    await self.ws_manager.broadcast(sid, {
+                        "type": "error",
+                        "reason": "ml_failure_threshold",
+                        "detail": str(e),
+                    })
+                    break
+                # R10 — 기존 `_snapshot_payload` 헬퍼 유지 (sim_loop.py:138)
                 await self.ws_manager.broadcast(sid, self._snapshot_payload(state))
                 await asyncio.sleep(dt)
         except asyncio.CancelledError:
-            logger.info("sim loop cancelled sid=%s", sid)
             raise
         except Exception as exc:
-            logger.exception("sim loop crashed sid=%s err=%s", sid, exc)
+            logger.exception("sim_loop_crashed sid=%s err=%s", sid, exc)
         finally:
+            # Z4 정책: state_store.remove / session_contexts.pop / injector.discard / ws_manager.drop_session
+            # 모두 idempotent. 정상 종료 시 SessionService.stop()이 동일 cleanup을 호출하므로 중복되나 안전.
+            # 비정상 종료(ML 5회 실패 등) 시 service.stop이 호출되지 않을 수 있으므로 finally에서
+            # cleanup하는 게 invariant 보장에 필수.
+            # WARN: 응답 직전 state 삭제로 동일 sid 재진입 시 404 — 정상 동작 (세션은 1회용).
+            #
+            # N-A3 (4차 보강) — 비정상 종료 경로에서도 injector queue / WS connection 누수 방지.
+            # ws_manager.drop_session은 await 필요 (AsyncMock 또는 실제 async impl).
+            #
+            # A2 (5차 보강) — task.cancel() → CancelledError가 finally 내부 await로 재차 던져질 수 있음.
+            # `except Exception`은 BaseException 인 CancelledError를 잡지 못하므로 `_tasks.pop`이 스킵되어
+            # SimLoopManager._tasks dict에 dead task 누적(메모리 leak). 따라서:
+            #   1) _tasks.pop을 가장 먼저 실행 (state 정리는 await 이전에 완료)
+            #   2) await 호출은 (Exception, asyncio.CancelledError) 둘 다 포착하여 누수 방지
             self._tasks.pop(sid, None)
+            self.session_contexts.pop(sid, None)
+            self.state_store.remove(sid)
+            try:
+                self.injector.discard(sid)
+            except Exception:
+                logger.exception("injector_discard_failed sid=%s", sid)
+            try:
+                await self.ws_manager.drop_session(sid)
+            except (Exception, asyncio.CancelledError):
+                logger.exception("ws_drop_session_failed sid=%s", sid)
 
     def _step(self, state: SimulationState) -> None:
         from app.domain.tags import control_vars_to_tag_dict
