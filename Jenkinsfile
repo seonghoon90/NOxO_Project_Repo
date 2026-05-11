@@ -51,7 +51,8 @@ SLACK_WEBHOOK_URL=
 
         stage('Backend Tests') {
             steps {
-                sh 'docker compose --env-file ${CI_ENV_FILE} -f ${COMPOSE_FRONT_BACK} run --rm --no-deps backend pytest -c apps/backend/pytest.ini apps/backend/tests'
+                // -m "not integration" : 실제 모델/DB가 필요한 케이스 (`@pytest.mark.integration`)는 CI에서 제외.
+                sh 'docker compose --env-file ${CI_ENV_FILE} -f ${COMPOSE_FRONT_BACK} run --rm --no-deps backend pytest -c apps/backend/pytest.ini -m "not integration" apps/backend/tests'
             }
         }
 

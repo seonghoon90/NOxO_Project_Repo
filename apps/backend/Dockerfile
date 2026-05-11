@@ -16,8 +16,9 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     TZ=Asia/Seoul \
     PYTHONPATH=/app/apps/backend:/app
+# libgomp1 : lightgbm 런타임 의존성 (libgomp.so.1)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    tzdata curl \
+    tzdata curl libgomp1 \
  && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
@@ -34,8 +35,9 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     TZ=Asia/Seoul \
     PYTHONPATH=/app/apps/backend:/app
+# libgomp1 : lightgbm 런타임 의존성 (libgomp.so.1)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    tzdata curl \
+    tzdata curl libgomp1 \
  && rm -rf /var/lib/apt/lists/* \
  && groupadd -r app && useradd -r -g app -d /app app
 COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages

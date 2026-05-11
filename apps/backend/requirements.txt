@@ -13,8 +13,10 @@ scikit-learn==1.5.2
 joblib==1.4.2
 pandas==2.2.3
 lightgbm==4.5.0
-# xgboost는 OpenMP 런타임(libomp) 필요 — 실제 ML 모델 도입 시점에 추가
-# macOS: brew install libomp
+# OpenMP 런타임 의존성 안내:
+# - Linux Docker (현재 환경): apps/backend/Dockerfile dev/prod stage에 `libgomp1` 포함됨 — 추가 작업 불필요.
+# - macOS 로컬 개발: `brew install libomp` 필요.
+# xgboost 도입 시도 동일 의존성으로 충족됨.
 # xgboost==2.1.1
 
 # dev/test
