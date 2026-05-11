@@ -170,3 +170,66 @@ async def test_run_cleans_up_on_cancellation(sim_loop_manager):
     assert "sid1" not in contexts
     state_store.remove.assert_called_with("sid1")
     mgr.ws_manager.drop_session.assert_awaited_with("sid1")
+
+
+# === Task 14 E그룹 (W1~W4) — ctx 주입 + 종료 broadcast + NS5 + stub 분기 ===
+
+async def test_step_passes_session_ctx_to_simulator(sim_loop_manager):
+    """predict_fn 클로저가 올바른 ctx 전달."""
+    mgr, _, _, simulator, contexts = sim_loop_manager
+    state = _make_state()
+    ctx = _make_ctx()
+    contexts["sid1"] = ctx
+    mgr._step(state)
+    simulator.predict_for_session.assert_called()
+    assert simulator.predict_for_session.call_args.args[1] is ctx
+
+
+async def test_run_broadcasts_error_on_session_terminated(sim_loop_manager, monkeypatch):
+    """SessionTerminatedError 시 WS broadcast {type: 'error'} 전송."""
+    from app.exceptions import SessionTerminatedError
+    mgr, state_store, _, _, contexts = sim_loop_manager
+    state = _make_state()
+    ctx = _make_ctx()
+    contexts["sid1"] = ctx
+    state_store.get.return_value = state
+    monkeypatch.setattr(mgr, "_step", MagicMock(side_effect=SessionTerminatedError("ml")))
+    await mgr._run("sid1")
+    assert mgr.ws_manager.broadcast.called
+    payload = mgr.ws_manager.broadcast.call_args.args[1]
+    assert payload["type"] == "error"
+
+
+async def test_run_terminates_loop_on_session_terminated(sim_loop_manager, monkeypatch):
+    """SessionTerminatedError 시 sim_loop task break."""
+    from app.exceptions import SessionTerminatedError
+    mgr, state_store, _, _, contexts = sim_loop_manager
+    state = _make_state()
+    ctx = _make_ctx()
+    contexts["sid1"] = ctx
+    state_store.get.return_value = state
+    monkeypatch.setattr(mgr, "_step", MagicMock(side_effect=SessionTerminatedError("ml")))
+    await mgr._run("sid1")
+    # finally 도달 → task 정리
+    assert "sid1" not in mgr._tasks
+
+
+async def test_run_terminates_on_missing_session_context(sim_loop_manager):
+    """NS5 — state.sid에 해당 ctx 없으면 KeyError → 즉시 종료."""
+    mgr, state_store, _, _, contexts = sim_loop_manager
+    state = _make_state()
+    contexts.clear()  # ctx 없음
+    state_store.get.return_value = state
+    await mgr._run("sid1")
+    # finally cleanup 도달
+    assert "sid1" not in contexts
+
+
+async def test_build_predict_fn_uses_direct_method_for_stub(sim_loop_manager):
+    """StubSimulator는 predict 메서드 직접 reference."""
+    mgr, _, _, _, _ = sim_loop_manager
+    stub = MagicMock(spec=["predict"])  # predict_for_session 없음
+    mgr.simulator = stub
+    ctx = _make_ctx()
+    predict_fn = mgr._build_predict_fn(ctx)
+    assert predict_fn is stub.predict

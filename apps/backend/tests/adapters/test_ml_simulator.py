@@ -381,3 +381,42 @@ def test_failure_count_reset_then_can_accumulate_again(sim, ctx_with_cached, mon
                         lambda **kw: (_ for _ in ()).throw(RuntimeError("x")))
     sim.predict_for_session(controls, ctx_with_cached)
     assert ctx_with_cached.ml_failure_count == 1
+
+
+# === Task 14 D그룹 (W1~W4) — NM12 cached short-circuit + C4 gate_reason ===
+
+def test_predict_does_not_assert_when_initial_call_completed(sim, ctx_with_cached, monkeypatch):
+    """NM12 — 초기 호출로 cached가 채워진 상태에서 게이트 close 호출 시 raise 없음."""
+    monkeypatch.setattr("app.adapters.simulator.ml.time.monotonic", lambda: 30.0)
+    from digital_twin.simulation import ControlVars
+    controls = ControlVars(syngas_flow=1500.0, igv_opening=75.0, n2_offset=200.0,
+                           n2_valve_1=50.0, syngas_srv=60.0, syngas_gcv_1=55.0,
+                           syngas_gcv_1a=55.0, syngas_gcv_2=55.0, ibh_valve=30.0, n2_flow=100.0)
+    out = sim.predict_for_session(controls, ctx_with_cached)
+    assert out is ctx_with_cached.cached_output_target
+
+
+def test_first_sim_step_after_initial_call_skips_ml(sim, ctx_with_cached, monkeypatch):
+    """NM12 — 세션 시작 직후 첫 sim_step은 60초 미경과 + input 없음 → cached 반환."""
+    monkeypatch.setattr("app.adapters.simulator.ml.time.monotonic", lambda: 0.2)
+    ctx_with_cached.last_ml_call_t = 0.0
+    from digital_twin.simulation import ControlVars
+    controls = ControlVars(syngas_flow=1500.0, igv_opening=75.0, n2_offset=200.0,
+                           n2_valve_1=50.0, syngas_srv=60.0, syngas_gcv_1=55.0,
+                           syngas_gcv_1a=55.0, syngas_gcv_2=55.0, ibh_valve=30.0, n2_flow=100.0)
+    out = sim.predict_for_session(controls, ctx_with_cached)
+    assert out is ctx_with_cached.cached_output_target
+
+
+def test_gate_reason_recorded_on_input(sim, make_ctx):
+    """C4 — input 게이트 통과 시 _last_gate_reason == 'input'."""
+    ctx = make_ctx(pending_input_flag=True, last_input_t=0.0)
+    sim._should_call_ml(1.0, ctx)
+    assert ctx._last_gate_reason == "input"
+
+
+def test_gate_reason_recorded_on_interval(sim, make_ctx):
+    """C4 — interval 게이트 통과 시 _last_gate_reason == 'interval'."""
+    ctx = make_ctx(last_ml_call_t=0.0, pending_input_flag=False)
+    sim._should_call_ml(60.0, ctx)
+    assert ctx._last_gate_reason == "interval"

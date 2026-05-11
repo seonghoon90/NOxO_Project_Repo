@@ -97,3 +97,99 @@ def test_e2e_initial_ml_call_populates_cached_output(ml_simulator_with_dummy_mod
     )
     sim.predict_for_session(controls, ctx)
     assert ctx.cached_output_target is not None
+
+
+# === Task 14 통합 그룹 (W1~W4) — trigger / fallback / terminate / long-freeze ===
+
+@pytest.mark.integration
+def test_e2e_ml_trigger_on_user_input(ml_simulator_with_dummy_models, monkeypatch):
+    """사용자 입력 후 1초 debounce 지나면 ML 호출되어 cached 갱신.
+
+    Deviation from plan: time.monotonic은 production에서 boot uptime(큰 값)이라
+    `last_ml_call_t=0.0` 대비 초기 호출이 자동 trip. test 환경도 같은 패턴 시뮬을 위해
+    fake_t[0]=100.0으로 시작 (Task 12 monkeypatch 게이트 버그 동일 패턴)."""
+    sim = ml_simulator_with_dummy_models
+    df = _fake_snapshot_df(900)
+    ctx = SessionContext.from_snapshot("sid-trigger", df)
+    fake_t = [100.0]
+    monkeypatch.setattr("app.adapters.simulator.ml.time.monotonic", lambda: fake_t[0])
+    controls = ControlVars(syngas_flow=1500.0, igv_opening=75.0, n2_offset=200.0,
+                           n2_valve_1=50.0, syngas_srv=60.0, syngas_gcv_1=55.0,
+                           syngas_gcv_1a=55.0, syngas_gcv_2=55.0, ibh_valve=30.0, n2_flow=100.0)
+    # 초기 호출 — interval gate (100.0 - 0.0 >= 60)
+    sim.predict_for_session(controls, ctx)
+    first_call_t = ctx.last_ml_call_t
+    # 입력 발생
+    ctx.pending_input_flag = True
+    ctx.last_input_t = fake_t[0]
+    fake_t[0] += 1.5  # debounce 충족
+    sim.predict_for_session(controls, ctx)
+    assert ctx.last_ml_call_t > first_call_t
+
+
+@pytest.mark.integration
+def test_e2e_ml_fallback_interval(ml_simulator_with_dummy_models, monkeypatch):
+    """60초 동안 입력 없으면 정기 ML 호출.
+
+    Deviation from plan: fake_t[0]=100.0 시작 (Task 12 게이트 버그 패턴)."""
+    sim = ml_simulator_with_dummy_models
+    df = _fake_snapshot_df(900)
+    ctx = SessionContext.from_snapshot("sid-fallback", df)
+    fake_t = [100.0]
+    monkeypatch.setattr("app.adapters.simulator.ml.time.monotonic", lambda: fake_t[0])
+    controls = ControlVars(syngas_flow=1500.0, igv_opening=75.0, n2_offset=200.0,
+                           n2_valve_1=50.0, syngas_srv=60.0, syngas_gcv_1=55.0,
+                           syngas_gcv_1a=55.0, syngas_gcv_2=55.0, ibh_valve=30.0, n2_flow=100.0)
+    sim.predict_for_session(controls, ctx)
+    first_t = ctx.last_ml_call_t
+    fake_t[0] = first_t + 60.1
+    sim.predict_for_session(controls, ctx)
+    assert ctx.last_ml_call_t > first_t + 60.0
+
+
+@pytest.mark.integration
+def test_e2e_session_terminates_on_repeated_ml_failures(ml_simulator_with_dummy_models, monkeypatch):
+    """ML이 5회 연속 실패하면 SessionTerminatedError.
+
+    Deviation from plan: monkeypatch를 초기 호출 이전에 걸어야 last_ml_call_t를
+    fake_t에 동기화 가능. plan은 초기 호출 후 monkeypatch라 실제 monotonic 값이
+    cached 시점에 박혀 이후 fake_t와 mismatch."""
+    from app.exceptions import SessionTerminatedError
+    sim = ml_simulator_with_dummy_models
+    df = _fake_snapshot_df(900)
+    ctx = SessionContext.from_snapshot("sid-fail", df)
+    # fake_t 먼저 걸어 초기 호출의 last_ml_call_t를 통제 가능하게 함
+    fake_t = [100.0]
+    monkeypatch.setattr("app.adapters.simulator.ml.time.monotonic", lambda: fake_t[0])
+    controls = ControlVars(syngas_flow=1500.0, igv_opening=75.0, n2_offset=200.0,
+                           n2_valve_1=50.0, syngas_srv=60.0, syngas_gcv_1=55.0,
+                           syngas_gcv_1a=55.0, syngas_gcv_2=55.0, ibh_valve=30.0, n2_flow=100.0)
+    # cached 미리 채움 (성공 — last_ml_call_t=100.0)
+    sim.predict_for_session(controls, ctx)
+    # dt_predict 강제 실패
+    monkeypatch.setattr("app.adapters.simulator.ml.dt_predict",
+                        lambda **kw: (_ for _ in ()).throw(RuntimeError("boom")))
+    # 4번 실패 (count 1,2,3,4) — cached 반환
+    for _ in range(4):
+        fake_t[0] += 60.1
+        sim.predict_for_session(controls, ctx)
+    # 5번째 실패 → count=5 → raise
+    fake_t[0] += 60.1
+    with pytest.raises(SessionTerminatedError):
+        sim.predict_for_session(controls, ctx)
+
+
+@pytest.mark.integration
+def test_e2e_freeze_policy_after_multiple_pushes(ml_simulator_with_dummy_models):
+    """매 push 후에도 buffer 외란 컬럼은 스냅샷 값 유지 (장기 freeze 검증)."""
+    sim = ml_simulator_with_dummy_models
+    df = _fake_snapshot_df(900)
+    ctx = SessionContext.from_snapshot("sid-freeze-long", df)
+    disturbance_keys = [c for c in RAW_FEATURES if c not in CONTROL_TAGS]
+    initial_disturbance_snapshot = {k: ctx.plant_context[k] for k in disturbance_keys}
+    # 200번 push (장기 시뮬)
+    for i in range(200):
+        ctx.push_step_row({tag: float(i) for tag in CONTROL_TAGS})
+    last_row = ctx.recent_df_buffer[-1]
+    for k, v in initial_disturbance_snapshot.items():
+        assert last_row[k] == v

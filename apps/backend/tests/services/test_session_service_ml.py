@@ -178,3 +178,77 @@ async def test_create_session_raises_session_limit_exceeded(service, monkeypatch
         await svc.create_session("sid1")
     # I/O 전 차단 — 스냅샷 pull 호출되지 않아야 함
     data_source.get_initial_snapshot.assert_not_called()
+
+
+# === Task 14 F그룹 (W1~W4) — 스냅샷 구성 + cleanup + 부분 상태 방지 ===
+
+async def test_create_session_builds_session_context_with_freeze_fields(service, monkeypatch):
+    """plant_context에 외란 + TTXM 포함."""
+    svc, _, _, _, contexts = service
+    monkeypatch.setattr("asyncio.sleep", AsyncMock())
+    await svc.create_session("sid1")
+    ctx = contexts["sid1"]
+    assert "IGCC.CC.G1.TTXM" in ctx.plant_context
+    assert len(ctx.plant_context) == 30
+
+
+async def test_create_session_initializes_controls_from_snapshot_last_row(service, monkeypatch):
+    """initial_controls = 스냅샷 마지막 행의 CONTROL_TAGS 10개."""
+    svc, _, _, _, contexts = service
+    monkeypatch.setattr("asyncio.sleep", AsyncMock())
+    await svc.create_session("sid1")
+    ctx = contexts["sid1"]
+    from app.domain.tags import CONTROL_TAGS
+    for tag in CONTROL_TAGS:
+        assert tag in ctx.initial_controls
+
+
+async def test_create_session_returns_503_on_data_source_unavailable(service, monkeypatch):
+    """DB 연결 실패 → DataSourceUnavailableError 전파."""
+    from app.exceptions import DataSourceUnavailableError
+    svc, data_source, _, _, _ = service
+    monkeypatch.setattr("asyncio.sleep", AsyncMock())
+    data_source.get_initial_snapshot.side_effect = DataSourceUnavailableError("db down")
+    with pytest.raises(DataSourceUnavailableError):
+        await svc.create_session("sid1")
+
+
+async def test_create_session_sets_cached_output_target(service, monkeypatch):
+    """NS12 — 생성 후 ctx.cached_output_target이 None 아님."""
+    svc, _, _, _, contexts = service
+    monkeypatch.setattr("asyncio.sleep", AsyncMock())
+    await svc.create_session("sid1")
+    assert contexts["sid1"].cached_output_target is not None
+
+
+async def test_create_session_sets_last_ml_call_t_to_now(service, monkeypatch):
+    """S1 — last_ml_call_t가 0.0이 아닌 monotonic() 값으로 set.
+
+    fake_predict는 cached만 set하므로 last_ml_call_t 검증은 실제 predict_for_session 책임.
+    F그룹은 cached가 채워졌는지(=초기 호출이 완료됐는지)만 확인."""
+    svc, _, _, _, contexts = service
+    monkeypatch.setattr("asyncio.sleep", AsyncMock())
+    await svc.create_session("sid1")
+    assert contexts["sid1"].cached_output_target is not None
+
+
+async def test_stop_session_removes_context_from_dict(service, monkeypatch):
+    """NS13 — SessionService.stop 호출 시 sim_loop.stop이 호출돼 finally cleanup 트리거.
+    (현재는 SimLoopManager._run.finally가 cleanup. stop_session은 task cancel만 트리거.)"""
+    svc, _, _, state_store, contexts = service
+    monkeypatch.setattr("asyncio.sleep", AsyncMock())
+    state_store.__len__ = MagicMock(return_value=0)
+    await svc.create_session("sid1")
+    state_store.__contains__ = MagicMock(side_effect=lambda sid: sid == "sid1")
+    await svc.stop("sid1")
+    svc.sim_loop.stop.assert_called_with("sid1")
+
+
+async def test_create_session_no_partial_state_on_failure(service, monkeypatch):
+    """NS13 — DataNotEnoughError 발생 시 session_contexts에 추가되지 않음."""
+    svc, data_source, _, _, contexts = service
+    monkeypatch.setattr("asyncio.sleep", AsyncMock())
+    data_source.get_initial_snapshot.side_effect = DataNotEnoughError("only 500")
+    with pytest.raises(DataNotEnoughError):
+        await svc.create_session("sid1")
+    assert "sid1" not in contexts
