@@ -11,6 +11,8 @@ numpy==1.26.4
 scipy==1.13.1
 scikit-learn==1.5.2
 joblib==1.4.2
+pandas==2.2.3
+lightgbm==4.5.0
 # xgboost는 OpenMP 런타임(libomp) 필요 — 실제 ML 모델 도입 시점에 추가
 # macOS: brew install libomp
 # xgboost==2.1.1
