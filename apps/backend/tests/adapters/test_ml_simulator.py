@@ -95,3 +95,58 @@ def test_predict_one_arg_raises_not_implemented(sim):
             n2_valve_1=50.0, syngas_srv=60.0, syngas_gcv_1=55.0,
             syngas_gcv_1a=55.0, syngas_gcv_2=55.0, ibh_valve=30.0, n2_flow=100.0,
         ))
+
+
+def test_build_current_row_merges_plant_context_and_controls(sim, make_ctx):
+    """RAW 39 + TTXM 1 = 40컬럼 단일 행 반환."""
+    from digital_twin.preprocess import RAW_FEATURES
+    from digital_twin.simulation import ControlVars
+
+    disturbance = [c for c in RAW_FEATURES if c not in __import__("app.domain.tags", fromlist=["CONTROL_TAGS"]).CONTROL_TAGS]
+    plant = {k: 1.0 for k in disturbance}
+    plant["IGCC.CC.G1.TTXM"] = 580.0
+    ctx = make_ctx(plant_context=plant)
+    controls = ControlVars(
+        syngas_flow=1500.0, igv_opening=75.0, n2_offset=200.0,
+        n2_valve_1=50.0, syngas_srv=60.0, syngas_gcv_1=55.0,
+        syngas_gcv_1a=55.0, syngas_gcv_2=55.0, ibh_valve=30.0, n2_flow=100.0,
+    )
+    df = sim._build_current_row(controls, ctx)
+    assert df.shape == (1, 40)
+
+
+def test_build_current_row_respects_feature_order(sim, make_ctx):
+    """컬럼 순서 = RAW_FEATURES + TTXM."""
+    from digital_twin.preprocess import RAW_FEATURES
+    from digital_twin.simulation import ControlVars
+
+    disturbance = [c for c in RAW_FEATURES if c not in __import__("app.domain.tags", fromlist=["CONTROL_TAGS"]).CONTROL_TAGS]
+    plant = {k: 0.0 for k in disturbance}
+    plant["IGCC.CC.G1.TTXM"] = 0.0
+    ctx = make_ctx(plant_context=plant)
+    controls = ControlVars(
+        syngas_flow=0.0, igv_opening=0.0, n2_offset=0.0,
+        n2_valve_1=0.0, syngas_srv=0.0, syngas_gcv_1=0.0,
+        syngas_gcv_1a=0.0, syngas_gcv_2=0.0, ibh_valve=0.0, n2_flow=0.0,
+    )
+    df = sim._build_current_row(controls, ctx)
+    expected = list(RAW_FEATURES) + ["IGCC.CC.G1.TTXM"]
+    assert list(df.columns) == expected
+
+
+def test_build_current_row_uses_ttxm_from_plant_context(sim, make_ctx):
+    """TTXM 값은 plant_context의 freeze 값 사용."""
+    from digital_twin.preprocess import RAW_FEATURES
+    from digital_twin.simulation import ControlVars
+
+    disturbance = [c for c in RAW_FEATURES if c not in __import__("app.domain.tags", fromlist=["CONTROL_TAGS"]).CONTROL_TAGS]
+    plant = {k: 0.0 for k in disturbance}
+    plant["IGCC.CC.G1.TTXM"] = 600.0  # freeze 값
+    ctx = make_ctx(plant_context=plant)
+    controls = ControlVars(
+        syngas_flow=1.0, igv_opening=1.0, n2_offset=1.0,
+        n2_valve_1=1.0, syngas_srv=1.0, syngas_gcv_1=1.0,
+        syngas_gcv_1a=1.0, syngas_gcv_2=1.0, ibh_valve=1.0, n2_flow=1.0,
+    )
+    df = sim._build_current_row(controls, ctx)
+    assert df["IGCC.CC.G1.TTXM"].iloc[0] == 600.0

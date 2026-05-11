@@ -50,3 +50,18 @@ class MLSimulator:
             ctx._last_gate_reason = "interval"
             return True
         return False
+
+    def _build_current_row(self, controls: ControlVars, ctx: SessionContext):
+        """RAW 39 + TTXM 1 = 40컬럼 단일 행 DataFrame.
+
+        plant_context(외란 29 + TTXM 1) ∪ controls(10) = 40 키 (disjoint).
+        예측 컬럼 순서는 RAW_FEATURES + TTXM.
+        """
+        import pandas as pd
+        from app.domain.tags import control_vars_to_tag_dict
+        from digital_twin.preprocess import RAW_FEATURES
+
+        controls_dict = control_vars_to_tag_dict(controls)
+        row = {**ctx.plant_context, **controls_dict}
+        TTXM_COL = "IGCC.CC.G1.TTXM"
+        return pd.DataFrame([{k: row[k] for k in list(RAW_FEATURES) + [TTXM_COL]}])
