@@ -74,3 +74,6 @@ digital_twin/models/*.pkl
 
 # Superpowers brainstorm sessions
 .superpowers/
+
+# Git worktrees
+.worktrees/
