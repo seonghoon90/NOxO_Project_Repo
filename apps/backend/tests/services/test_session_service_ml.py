@@ -112,3 +112,37 @@ async def test_create_session_returns_503_on_initial_ml_failure_production(servi
     simulator.predict_for_session.side_effect = RuntimeError("dead")
     with pytest.raises(PredictorUnavailableError):
         await svc.create_session("sid1")
+
+
+async def test_create_session_registers_ctx_in_session_contexts(service, monkeypatch):
+    """Gap 1: 성공 시 session_contexts[sid] = ctx 등록 검증."""
+    svc, _, _, _, contexts = service
+    monkeypatch.setattr("asyncio.sleep", AsyncMock())
+    await svc.create_session("sid1")
+    assert "sid1" in contexts
+    # ctx는 SessionContext 인스턴스이고 cached_output_target이 채워진 상태
+    from app.core.session_context import SessionContext
+    assert isinstance(contexts["sid1"], SessionContext)
+    assert contexts["sid1"].cached_output_target is not None
+
+
+async def test_create_session_commits_state_store_and_starts_sim_loop(service, monkeypatch):
+    """Gap 2: state_store.put(state) + sim_loop.start(sid) 호출 검증."""
+    svc, _, _, state_store, _ = service
+    monkeypatch.setattr("asyncio.sleep", AsyncMock())
+    state = await svc.create_session("sid1")
+    state_store.put.assert_called_once_with(state)
+    svc.sim_loop.start.assert_called_once_with("sid1")
+
+
+async def test_create_session_raises_session_limit_exceeded(service, monkeypatch):
+    """Gap 3: state_store len이 sim_max_sessions 도달 시 SessionLimitExceededError."""
+    from app.exceptions import SessionLimitExceededError
+    svc, data_source, _, state_store, _ = service
+    monkeypatch.setattr("asyncio.sleep", AsyncMock())
+    # sim_max_sessions=10 도달 상태 시뮬레이션
+    state_store.__len__ = MagicMock(return_value=10)
+    with pytest.raises(SessionLimitExceededError):
+        await svc.create_session("sid1")
+    # I/O 전 차단 — 스냅샷 pull 호출되지 않아야 함
+    data_source.get_initial_snapshot.assert_not_called()
