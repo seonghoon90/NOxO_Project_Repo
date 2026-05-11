@@ -26,7 +26,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
-from preprocess import (
+from digital_twin.preprocess import (
     load_data, split_xy, aggregate_to_1min,
     FEATURES, TARGETS,
 )

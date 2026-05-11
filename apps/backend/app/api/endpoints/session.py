@@ -1,3 +1,4 @@
+import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
@@ -43,10 +44,13 @@ async def start_session(
     body: StartSessionRequest,
     service: SessionServiceDep,
 ) -> StartSessionResponse:
-    """async — service.start 내부에서 asyncio.create_task를 호출하므로
-    엔드포인트가 event loop 위에서 실행되어야 한다."""
-    initial = body.initial_condition.to_domain() if body.initial_condition else None
-    state = service.start(initial)
+    """B안 ML 모드 / Stub 회귀 모드 분기."""
+    if service.is_ml_mode():
+        sid = str(uuid.uuid4())
+        state = await service.create_session(sid)
+    else:
+        initial = body.initial_condition.to_domain() if body.initial_condition else None
+        state = service.start(initial)
     return StartSessionResponse(sid=state.sid, snapshot=_to_snapshot(state))
 
 

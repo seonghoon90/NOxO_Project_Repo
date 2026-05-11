@@ -18,3 +18,15 @@ class InvalidControlInputError(DomainError):
 
 class PredictorUnavailableError(DomainError):
     error_code = "PREDICTOR_UNAVAILABLE"
+
+
+class DataNotEnoughError(DomainError):
+    error_code = "DATA_NOT_ENOUGH"
+
+
+class DataSourceUnavailableError(DomainError):
+    error_code = "DATA_SOURCE_UNAVAILABLE"
+
+
+class SessionTerminatedError(DomainError):
+    error_code = "SESSION_TERMINATED"

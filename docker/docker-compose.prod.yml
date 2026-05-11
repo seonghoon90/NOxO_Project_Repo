@@ -5,6 +5,10 @@ services:
   backend:
     build:
       target: prod
+    environment:
+      # 운영 fail-fast — MLSimulator 로드 실패 시 startup 차단 (silent Stub fallback 방지)
+      # 미설정 시 lifespan은 "development"로 간주해 Stub으로 회귀한다.
+      APP_ENV: ${APP_ENV:-production}
     restart: unless-stopped
 
   frontend:

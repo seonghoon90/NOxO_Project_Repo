@@ -26,7 +26,7 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 
-from preprocess import (
+from digital_twin.preprocess import (
     FEATURES, RAW_FEATURES, TARGETS,
     add_derived_features, aggregate_to_1min,
 )

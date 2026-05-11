@@ -8,6 +8,7 @@ from typing import Annotated
 
 from fastapi import Depends, Request
 
+from app.adapters.data_source import PlantDataSource
 from app.adapters.forecaster import Forecaster
 from app.adapters.simulator import Simulator
 from app.config import Settings, get_settings
@@ -47,14 +48,30 @@ def get_forecaster(request: Request) -> Forecaster:
 SettingsDep = Annotated[Settings, Depends(get_settings)]
 
 
+def get_data_source(request: Request) -> PlantDataSource | None:
+    return getattr(request.app.state, "data_source", None)
+
+
+def get_session_contexts(request: Request) -> dict:
+    return request.app.state.session_contexts
+
+
 def get_session_service(
     settings: SettingsDep,
     state_store: Annotated[StateStore, Depends(get_state_store)],
     injector: Annotated[InputInjector, Depends(get_input_injector)],
     sim_loop: Annotated[SimLoopManager, Depends(get_sim_loop)],
     ws_manager: Annotated[WebSocketManager, Depends(get_ws_manager)],
+    data_source: Annotated[PlantDataSource | None, Depends(get_data_source)],
+    simulator: Annotated[Simulator, Depends(get_simulator)],
+    session_contexts: Annotated[dict, Depends(get_session_contexts)],
 ) -> SessionService:
-    return SessionService(settings, state_store, injector, sim_loop, ws_manager)
+    return SessionService(
+        settings, state_store, injector, sim_loop, ws_manager,
+        data_source=data_source,
+        simulator=simulator,
+        session_contexts=session_contexts,
+    )
 
 
 def get_forecast_service(
