@@ -1,11 +1,11 @@
 """세션 라이프사이클 비즈니스 로직."""
 
 import logging
-import os
 import uuid
 
 from app.config import Settings
 from app.core.input_injector import InputInjector
+from app.core.ml_mode import is_ml_mode_ready
 from app.core.sim_loop import SimLoopManager
 from app.core.state_store import StateStore
 from app.core.ws_manager import WebSocketManager
@@ -45,11 +45,7 @@ class SessionService:
 
     def is_ml_mode(self) -> bool:
         """ML 모드 여부. data_source + 실제 ML simulator가 모두 준비돼야 한다."""
-        return (
-            self.data_source is not None
-            and getattr(self.simulator, "name", None) == "ml"
-            and os.getenv("SIMULATOR_FALLBACK_STUB", "").lower() != "true"
-        )
+        return is_ml_mode_ready(self.data_source, self.simulator)
 
     def start(self, initial: ControlVars | None = None) -> SimulationState:
         if len(self.state_store) >= self.settings.sim_max_sessions:
