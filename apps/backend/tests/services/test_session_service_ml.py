@@ -251,6 +251,28 @@ async def test_stop_session_removes_context_from_dict(service, monkeypatch):
     svc.sim_loop.stop.assert_called_with("sid1")
 
 
+async def test_stop_session_after_create_clears_all_state(service, monkeypatch):
+    """W5/NS13 — create → stop 후 4개 cleanup hook 모두 호출됨.
+
+    SessionService.stop는 sim_loop.stop → injector.discard → state_store.remove →
+    ws_manager.drop_session 4단계를 수행. F그룹의 기존 stop 테스트는 sim_loop.stop만
+    확인하므로, 본 테스트는 4개 전부의 호출 시그니처를 검증해 W5 spec §4.4 명시적 종료
+    경로 invariant를 잠근다."""
+    svc, _, _, state_store, contexts = service
+    monkeypatch.setattr("asyncio.sleep", AsyncMock())
+    # create
+    await svc.create_session("sid1")
+    assert "sid1" in contexts
+    # state_store mock — sid1이 존재한다고 응답 (R-A1 — dunder는 MagicMock 인스턴스 필수)
+    state_store.__contains__ = MagicMock(side_effect=lambda sid: sid == "sid1")
+    # stop
+    await svc.stop("sid1")
+    svc.sim_loop.stop.assert_called_with("sid1")
+    svc.injector.discard.assert_called_with("sid1")
+    state_store.remove.assert_called_with("sid1")
+    svc.ws_manager.drop_session.assert_awaited_with("sid1")
+
+
 async def test_create_session_no_partial_state_on_failure(service, monkeypatch):
     """NS13 — DataNotEnoughError 발생 시 session_contexts에 추가되지 않음."""
     svc, data_source, _, _, contexts = service
