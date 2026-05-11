@@ -9,6 +9,7 @@ import warnings
 from pathlib import Path
 
 from digital_twin.simulation import ControlVars, OutputVars
+from digital_twin.predict import predict as dt_predict
 from app.core.session_context import SessionContext
 from app.exceptions import PredictorUnavailableError, SessionTerminatedError
 
@@ -35,6 +36,42 @@ class MLSimulator:
     def predict(self, controls: ControlVars) -> OutputVars:
         """Simulator Protocol 준수 (1-인자). SimLoopManager 클로저 사용 강제."""
         raise NotImplementedError("Use predict_for_session() via SimLoopManager closure")
+
+    def predict_for_session(
+        self, controls: ControlVars, session_ctx: SessionContext
+    ) -> OutputVars:
+        """실제 추론 본체. SimLoopManager가 `lambda c: ml.predict_for_session(c, ctx)`로 호출."""
+        now = time.monotonic()
+
+        # [1] 호출 게이트 (P4 — conditional raise)
+        if not self._should_call_ml(now, session_ctx):
+            if session_ctx.cached_output_target is None:
+                raise SessionTerminatedError(
+                    "cache_invariant_violation: SessionService가 초기 ML 호출로 cache를 채워야 함"
+                )
+            return session_ctx.cached_output_target
+
+        # [2] RAW 39 + TTXM 단일 행 + [3] dt_predict 호출
+        try:
+            current_row = self._build_current_row(controls, session_ctx)
+            result = dt_predict(
+                model=(self.lgb, self.ridge),
+                inputs=current_row,
+                recent_df=session_ctx.buffer_to_df(),
+            )
+            session_ctx.ml_failure_count = 0
+        except Exception as e:
+            # [4] 실패 처리 — Task 7에서 보강
+            raise
+
+        # [5] 결과 매핑 + ctx 갱신
+        output_target = self._result_to_outputvars(result)
+        session_ctx.cached_output_target = output_target
+        session_ctx.last_ml_call_t = now
+        # C4 — input 게이트일 때만 pending reset
+        if session_ctx._last_gate_reason == "input":
+            session_ctx.pending_input_flag = False
+        return output_target
 
     def _should_call_ml(self, now: float, ctx: SessionContext) -> bool:
         """게이트 판정 + _last_gate_reason set.

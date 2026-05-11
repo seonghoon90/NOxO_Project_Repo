@@ -175,3 +175,108 @@ def test_result_to_outputvars_sets_lambda_efficiency_zero(sim):
     out = sim._result_to_outputvars(result)
     assert out.lambda_ == 0.0
     assert out.efficiency == 0.0
+
+
+@pytest.fixture
+def ctx_with_cached(make_ctx):
+    """게이트 close 케이스용 — cached_output_target 미리 채움 (P6)."""
+    out = OutputVars(nox=20.0, exhaust_temp=580.0, power=248.6,
+                     lambda_=1.1, efficiency=0.89)
+    return make_ctx(cached_output_target=out, last_ml_call_t=0.0)
+
+
+def test_predict_returns_cached_when_gate_closed(sim, ctx_with_cached, monkeypatch):
+    """게이트 close (60초 미경과, input 없음) → cached 반환."""
+    monkeypatch.setattr("app.adapters.simulator.ml.time.monotonic", lambda: 30.0)
+    from digital_twin.simulation import ControlVars
+    controls = ControlVars(syngas_flow=1500.0, igv_opening=75.0, n2_offset=200.0,
+                           n2_valve_1=50.0, syngas_srv=60.0, syngas_gcv_1=55.0,
+                           syngas_gcv_1a=55.0, syngas_gcv_2=55.0, ibh_valve=30.0, n2_flow=100.0)
+    out = sim.predict_for_session(controls, ctx_with_cached)
+    assert out.nox == 20.0
+
+
+def test_predict_raises_when_cache_invariant_violated(sim, make_ctx, monkeypatch):
+    """cached_output_target=None인데 게이트 close → SessionTerminatedError (P4)."""
+    monkeypatch.setattr("app.adapters.simulator.ml.time.monotonic", lambda: 30.0)
+    ctx = make_ctx(last_ml_call_t=0.0, cached_output_target=None)
+    from digital_twin.simulation import ControlVars
+    controls = ControlVars(syngas_flow=1500.0, igv_opening=75.0, n2_offset=200.0,
+                           n2_valve_1=50.0, syngas_srv=60.0, syngas_gcv_1=55.0,
+                           syngas_gcv_1a=55.0, syngas_gcv_2=55.0, ibh_valve=30.0, n2_flow=100.0)
+    with pytest.raises(SessionTerminatedError, match="cache_invariant_violation"):
+        sim.predict_for_session(controls, ctx)
+
+
+def test_predict_calls_dt_predict_after_interval(sim, ctx_with_cached, monkeypatch):
+    """60초 경과 → dt_predict 호출, cached 갱신."""
+    monkeypatch.setattr("app.adapters.simulator.ml.time.monotonic", lambda: 60.1)
+    # plant_context를 RAW 외란 + TTXM으로 채워야 _build_current_row 동작
+    from digital_twin.preprocess import RAW_FEATURES
+    disturbance = [c for c in RAW_FEATURES if c not in __import__("app.domain.tags", fromlist=["CONTROL_TAGS"]).CONTROL_TAGS]
+    ctx_with_cached.plant_context = {k: 1.0 for k in disturbance}
+    ctx_with_cached.plant_context["IGCC.CC.G1.TTXM"] = 580.0
+    # buffer에 60행 이상
+    from app.domain.tags import CONTROL_TAGS
+    for _ in range(100):
+        ctx_with_cached.push_step_row({tag: 1.0 for tag in CONTROL_TAGS})
+    fake_result = {
+        "IGCC.DeNOX.AT_H1_901_PV": 30.0,
+        "IGCC.CC.G1.DWATT": 260.0,
+        "IGCC.CC.G1.TTXM": 590.0,
+    }
+    monkeypatch.setattr(
+        "app.adapters.simulator.ml.dt_predict",
+        lambda model, inputs, recent_df: fake_result,
+    )
+    from digital_twin.simulation import ControlVars
+    controls = ControlVars(syngas_flow=1500.0, igv_opening=75.0, n2_offset=200.0,
+                           n2_valve_1=50.0, syngas_srv=60.0, syngas_gcv_1=55.0,
+                           syngas_gcv_1a=55.0, syngas_gcv_2=55.0, ibh_valve=30.0, n2_flow=100.0)
+    out = sim.predict_for_session(controls, ctx_with_cached)
+    assert out.nox == 30.0
+    assert ctx_with_cached.cached_output_target.nox == 30.0
+
+
+def test_predict_updates_last_ml_call_t_on_success(sim, ctx_with_cached, monkeypatch):
+    """성공 호출 후 last_ml_call_t = now."""
+    monkeypatch.setattr("app.adapters.simulator.ml.time.monotonic", lambda: 60.1)
+    from digital_twin.preprocess import RAW_FEATURES
+    disturbance = [c for c in RAW_FEATURES if c not in __import__("app.domain.tags", fromlist=["CONTROL_TAGS"]).CONTROL_TAGS]
+    ctx_with_cached.plant_context = {k: 1.0 for k in disturbance}
+    ctx_with_cached.plant_context["IGCC.CC.G1.TTXM"] = 580.0
+    monkeypatch.setattr(
+        "app.adapters.simulator.ml.dt_predict",
+        lambda model, inputs, recent_df: {
+            "IGCC.DeNOX.AT_H1_901_PV": 30.0, "IGCC.CC.G1.DWATT": 260.0, "IGCC.CC.G1.TTXM": 590.0,
+        },
+    )
+    from digital_twin.simulation import ControlVars
+    controls = ControlVars(syngas_flow=1500.0, igv_opening=75.0, n2_offset=200.0,
+                           n2_valve_1=50.0, syngas_srv=60.0, syngas_gcv_1=55.0,
+                           syngas_gcv_1a=55.0, syngas_gcv_2=55.0, ibh_valve=30.0, n2_flow=100.0)
+    sim.predict_for_session(controls, ctx_with_cached)
+    assert ctx_with_cached.last_ml_call_t == 60.1
+
+
+def test_predict_resets_pending_flag_only_on_input_gate(sim, ctx_with_cached, monkeypatch):
+    """C4 — interval 게이트로 호출됐을 때 pending 유지."""
+    monkeypatch.setattr("app.adapters.simulator.ml.time.monotonic", lambda: 60.1)
+    ctx_with_cached.pending_input_flag = True
+    ctx_with_cached.last_input_t = 60.0  # debounce 0.1s 미충족
+    from digital_twin.preprocess import RAW_FEATURES
+    disturbance = [c for c in RAW_FEATURES if c not in __import__("app.domain.tags", fromlist=["CONTROL_TAGS"]).CONTROL_TAGS]
+    ctx_with_cached.plant_context = {k: 1.0 for k in disturbance}
+    ctx_with_cached.plant_context["IGCC.CC.G1.TTXM"] = 580.0
+    monkeypatch.setattr(
+        "app.adapters.simulator.ml.dt_predict",
+        lambda model, inputs, recent_df: {
+            "IGCC.DeNOX.AT_H1_901_PV": 30.0, "IGCC.CC.G1.DWATT": 260.0, "IGCC.CC.G1.TTXM": 590.0,
+        },
+    )
+    from digital_twin.simulation import ControlVars
+    controls = ControlVars(syngas_flow=1500.0, igv_opening=75.0, n2_offset=200.0,
+                           n2_valve_1=50.0, syngas_srv=60.0, syngas_gcv_1=55.0,
+                           syngas_gcv_1a=55.0, syngas_gcv_2=55.0, ibh_valve=30.0, n2_flow=100.0)
+    sim.predict_for_session(controls, ctx_with_cached)
+    assert ctx_with_cached.pending_input_flag is True  # interval gate라 유지
