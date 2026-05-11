@@ -12,10 +12,12 @@ step 흐름:
 
 import asyncio
 import logging
+import time
 
 from app.adapters.simulator import Simulator
 from app.config import Settings
 from app.core.input_injector import InputInjector
+from app.core.session_context import SessionContext
 from app.core.state_store import StateStore
 from app.core.ws_manager import WebSocketManager
 from app.schemas.stream import StreamMessage
@@ -67,6 +69,7 @@ class SimLoopManager:
         ws_manager: WebSocketManager,
         simulator: Simulator,
         dt_config: DTConfig = DEFAULT_CONFIG,
+        session_contexts: dict[str, SessionContext] | None = None,  # R4 — 끝에 추가
     ) -> None:
         self.settings = settings
         self.state_store = state_store
@@ -74,7 +77,23 @@ class SimLoopManager:
         self.ws_manager = ws_manager
         self.simulator = simulator
         self.dt_config = dt_config
+        self.session_contexts: dict[str, SessionContext] = (
+            session_contexts if session_contexts is not None else {}
+        )
         self._tasks: dict[str, asyncio.Task] = {}
+
+    def _build_predict_fn(self, ctx: SessionContext | None):
+        """Simulator 타입별 PredictFn 생성 (NS2 클로저 패턴).
+
+        N-A2 (4차 보강) — 회귀 모드(`ctx is None`)에서는 simulator가 Stub(`.predict` 1-인자)이거나
+        ML이라 해도 ctx 없이 호출 불가. 회귀 모드는 Stub만 허용한다는 invariant를 lifespan에서 보장.
+        """
+        if ctx is None:
+            # 회귀 모드 — Stub.predict 사용
+            return self.simulator.predict
+        if hasattr(self.simulator, "predict_for_session"):
+            return lambda c: self.simulator.predict_for_session(c, ctx)
+        return self.simulator.predict
 
     def start(self, sid: str) -> None:
         if sid in self._tasks:
@@ -117,15 +136,29 @@ class SimLoopManager:
             self._tasks.pop(sid, None)
 
     def _step(self, state: SimulationState) -> None:
-        # 1. 신규 사용자 입력 반영 (가이드 §6 내부 처리 순서 1번)
+        from app.domain.tags import control_vars_to_tag_dict
+
+        # N-A2 (4차 보강) — 회귀 모드에서는 session_contexts에 entry가 없을 수 있다.
+        # KeyError 대신 .get()으로 안전 조회하고, ctx=None인 경로는 Stub 호출만 수행.
+        ctx = self.session_contexts.get(state.sid)
+
+        # [1] 사용자 입력 consume (가이드 §6 내부 처리 순서 1번)
         new_target = self.injector.consume(state.sid)
         if new_target is not None:
             state.target = new_target
+            if ctx is not None:
+                ctx.pending_input_flag = True
+                ctx.last_input_t = time.monotonic()
 
-        # 2. DT 코어에 위임 (Step 2~8: lag, ML 추론, Zeldovich, warning 갱신 모두 DT가 수행)
-        sim_step(state, self.simulator.predict, self.dt_config)
+        # [2] DT sim_step — 클로저로 ctx 바인딩 (ctx=None이면 Stub.predict 사용)
+        predict_fn = self._build_predict_fn(ctx)
+        sim_step(state, predict_fn, self.dt_config)
 
-        # 3. efficiency 후처리 — `DT_ARCHITECTURE.md §10` / `BACKEND_PRD.md §11`
+        # [3] recent_df ring-buffer 갱신 (제어 10개만 push) — ML 모드에서만
+        if ctx is not None:
+            ctx.push_step_row(control_vars_to_tag_dict(state.current))
+
+        # [4] efficiency 후처리 — `DT_ARCHITECTURE.md §10` / `BACKEND_PRD.md §11`
         # 발전 효율은 백엔드 sim_loop에서 power/(syngas_flow × LHV)로 계산하여
         # WS 메시지 `efficiency` 필드에 포함. LHV 단위 환산은 `[조사 필요]` —
         # 가안 상수로 진행 (실측 데이터 확보 후 재산정).
