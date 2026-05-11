@@ -43,6 +43,7 @@ def sim_loop_manager():
     injector.consume.return_value = None
     ws_manager = MagicMock()
     ws_manager.broadcast = AsyncMock()
+    ws_manager.drop_session = AsyncMock()
     simulator = MagicMock()
     simulator.predict_for_session = MagicMock(
         return_value=OutputVars(nox=25.0, exhaust_temp=580.0, power=248.6, lambda_=1.1, efficiency=0.89)
@@ -130,6 +131,7 @@ async def test_run_calls_state_store_remove_on_cleanup(sim_loop_manager):
     state_store.get.return_value = None
     await mgr._run("sid1")
     state_store.remove.assert_called_with("sid1")
+    mgr.ws_manager.drop_session.assert_awaited_with("sid1")
 
 
 async def test_stop_all_clears_all_session_contexts(sim_loop_manager):
@@ -140,3 +142,31 @@ async def test_stop_all_clears_all_session_contexts(sim_loop_manager):
     mgr._tasks = {}  # 시뮬: 실제 task 없는 상태
     await mgr.stop_all()
     assert len(contexts) == 0
+
+
+async def test_run_cleans_up_on_cancellation(sim_loop_manager):
+    """task.cancel() 시에도 finally cleanup 전부 실행 (A2 invariant).
+
+    `_tasks.pop`이 finally 맨 앞에서 동기적으로 실행되어야, await가 CancelledError로
+    중단돼도 dead task가 누적되지 않는다.
+    """
+    mgr, state_store, injector, simulator, contexts = sim_loop_manager
+    state = _make_state()
+    ctx = _make_ctx()
+    contexts["sid1"] = ctx
+    state_store.get.return_value = state  # 무한 루프 진입 가능 상태
+
+    task = asyncio.create_task(mgr._run("sid1"))
+    mgr._tasks["sid1"] = task
+    # 한 틱 양보해서 루프가 _step 호출까지 진행되도록 함
+    await asyncio.sleep(0)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    # A2: _tasks.pop 가장 먼저 → 취소 후에도 누수 없음
+    assert "sid1" not in mgr._tasks
+    # Q1 / U1: 나머지 cleanup도 finally에서 모두 실행
+    assert "sid1" not in contexts
+    state_store.remove.assert_called_with("sid1")
+    mgr.ws_manager.drop_session.assert_awaited_with("sid1")
