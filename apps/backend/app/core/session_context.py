@@ -30,6 +30,40 @@ class SessionContext:
         row = {**self.plant_context, **controls_dict}
         self.recent_df_buffer.append(row)
 
+    @classmethod
+    def from_snapshot(cls, sid: str, snapshot_df: pd.DataFrame) -> "SessionContext":
+        """스냅샷 DataFrame(43컬럼) → SessionContext.
+
+        변환:
+          - buffer 행: RAW 39 + TTXM 1 = 40 키 (measured_at/NOx/DWATT drop)
+          - plant_context: 마지막 행에서 (RAW - CONTROL_TAGS) + TTXM = 30 키
+          - initial_controls: 마지막 행의 CONTROL_TAGS 10 키
+        """
+        from app.domain.tags import CONTROL_TAGS
+        from digital_twin.preprocess import RAW_FEATURES
+
+        TTXM_COL = "IGCC.CC.G1.TTXM"
+        BUFFER_COLS = list(RAW_FEATURES) + [TTXM_COL]            # 40
+        PLANT_KEYS = [c for c in RAW_FEATURES if c not in CONTROL_TAGS] + [TTXM_COL]  # 30
+        last = snapshot_df.iloc[-1]
+
+        plant_context = {k: float(last[k]) for k in PLANT_KEYS}
+        initial_controls = {k: float(last[k]) for k in CONTROL_TAGS}
+
+        buffer = deque(
+            (
+                {k: float(row[k]) for k in BUFFER_COLS}
+                for _, row in snapshot_df.iterrows()
+            ),
+            maxlen=900,
+        )
+        return cls(
+            sid=sid,
+            plant_context=plant_context,
+            recent_df_buffer=buffer,
+            initial_controls=initial_controls,
+        )
+
     def buffer_to_df(self) -> pd.DataFrame:
         """deque → DataFrame 변환."""
         return pd.DataFrame(list(self.recent_df_buffer))
