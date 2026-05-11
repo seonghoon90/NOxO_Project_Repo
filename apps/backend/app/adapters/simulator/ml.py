@@ -54,15 +54,26 @@ class MLSimulator:
         # [2] RAW 39 + TTXM 단일 행 + [3] dt_predict 호출
         try:
             current_row = self._build_current_row(controls, session_ctx)
-            result = dt_predict(
-                model=(self.lgb, self.ridge),
-                inputs=current_row,
-                recent_df=session_ctx.buffer_to_df(),
-            )
-            session_ctx.ml_failure_count = 0
+            with warnings.catch_warnings():
+                # T9 — warm-up UserWarning suppression (세션당 1회만 로그)
+                warnings.simplefilter("ignore", UserWarning)
+                result = dt_predict(
+                    model=(self.lgb, self.ridge),
+                    inputs=current_row,
+                    recent_df=session_ctx.buffer_to_df(),
+                )
         except Exception as e:
-            # [4] 실패 처리 — Task 7에서 보강
-            raise
+            session_ctx.ml_failure_count += 1
+            if session_ctx.ml_failure_count >= ML_MAX_FAILURES:
+                raise SessionTerminatedError(f"ml_failure_threshold_exceeded: {e}") from e
+            # C5 — cached invariant guard
+            if session_ctx.cached_output_target is None:
+                raise SessionTerminatedError(
+                    "ml_failed_with_no_cache: invariant violation"
+                ) from e
+            return session_ctx.cached_output_target
+
+        session_ctx.ml_failure_count = 0
 
         # [5] 결과 매핑 + ctx 갱신
         output_target = self._result_to_outputvars(result)

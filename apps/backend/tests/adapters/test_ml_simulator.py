@@ -280,3 +280,104 @@ def test_predict_resets_pending_flag_only_on_input_gate(sim, ctx_with_cached, mo
                            syngas_gcv_1a=55.0, syngas_gcv_2=55.0, ibh_valve=30.0, n2_flow=100.0)
     sim.predict_for_session(controls, ctx_with_cached)
     assert ctx_with_cached.pending_input_flag is True  # interval gate라 유지
+
+
+def test_predict_increments_failure_count_on_exception(sim, ctx_with_cached, monkeypatch):
+    """dt_predict raise → ml_failure_count += 1."""
+    monkeypatch.setattr("app.adapters.simulator.ml.time.monotonic", lambda: 60.1)
+    from digital_twin.preprocess import RAW_FEATURES
+    disturbance = [c for c in RAW_FEATURES if c not in __import__("app.domain.tags", fromlist=["CONTROL_TAGS"]).CONTROL_TAGS]
+    ctx_with_cached.plant_context = {k: 1.0 for k in disturbance}
+    ctx_with_cached.plant_context["IGCC.CC.G1.TTXM"] = 580.0
+
+    def boom(**kwargs):
+        raise RuntimeError("transient")
+    monkeypatch.setattr("app.adapters.simulator.ml.dt_predict", boom)
+    from digital_twin.simulation import ControlVars
+    controls = ControlVars(syngas_flow=1500.0, igv_opening=75.0, n2_offset=200.0,
+                           n2_valve_1=50.0, syngas_srv=60.0, syngas_gcv_1=55.0,
+                           syngas_gcv_1a=55.0, syngas_gcv_2=55.0, ibh_valve=30.0, n2_flow=100.0)
+    sim.predict_for_session(controls, ctx_with_cached)
+    assert ctx_with_cached.ml_failure_count == 1
+
+
+def test_predict_returns_cached_on_single_failure(sim, ctx_with_cached, monkeypatch):
+    """1~4회 실패는 cached 반환."""
+    monkeypatch.setattr("app.adapters.simulator.ml.time.monotonic", lambda: 60.1)
+    from digital_twin.preprocess import RAW_FEATURES
+    disturbance = [c for c in RAW_FEATURES if c not in __import__("app.domain.tags", fromlist=["CONTROL_TAGS"]).CONTROL_TAGS]
+    ctx_with_cached.plant_context = {k: 1.0 for k in disturbance}
+    ctx_with_cached.plant_context["IGCC.CC.G1.TTXM"] = 580.0
+    monkeypatch.setattr("app.adapters.simulator.ml.dt_predict",
+                        lambda **kw: (_ for _ in ()).throw(RuntimeError("x")))
+    from digital_twin.simulation import ControlVars
+    controls = ControlVars(syngas_flow=1500.0, igv_opening=75.0, n2_offset=200.0,
+                           n2_valve_1=50.0, syngas_srv=60.0, syngas_gcv_1=55.0,
+                           syngas_gcv_1a=55.0, syngas_gcv_2=55.0, ibh_valve=30.0, n2_flow=100.0)
+    out = sim.predict_for_session(controls, ctx_with_cached)
+    assert out.nox == 20.0  # cached value
+
+
+def test_predict_raises_session_terminated_after_5_failures(sim, ctx_with_cached, monkeypatch):
+    """5회 연속 실패 → SessionTerminatedError."""
+    monkeypatch.setattr("app.adapters.simulator.ml.time.monotonic", lambda: 60.1)
+    from digital_twin.preprocess import RAW_FEATURES
+    disturbance = [c for c in RAW_FEATURES if c not in __import__("app.domain.tags", fromlist=["CONTROL_TAGS"]).CONTROL_TAGS]
+    ctx_with_cached.plant_context = {k: 1.0 for k in disturbance}
+    ctx_with_cached.plant_context["IGCC.CC.G1.TTXM"] = 580.0
+    ctx_with_cached.ml_failure_count = 4
+    monkeypatch.setattr("app.adapters.simulator.ml.dt_predict",
+                        lambda **kw: (_ for _ in ()).throw(RuntimeError("x")))
+    from digital_twin.simulation import ControlVars
+    controls = ControlVars(syngas_flow=1500.0, igv_opening=75.0, n2_offset=200.0,
+                           n2_valve_1=50.0, syngas_srv=60.0, syngas_gcv_1=55.0,
+                           syngas_gcv_1a=55.0, syngas_gcv_2=55.0, ibh_valve=30.0, n2_flow=100.0)
+    with pytest.raises(SessionTerminatedError):
+        sim.predict_for_session(controls, ctx_with_cached)
+
+
+def test_predict_resets_failure_count_on_success(sim, ctx_with_cached, monkeypatch):
+    """성공 호출 후 ml_failure_count = 0."""
+    monkeypatch.setattr("app.adapters.simulator.ml.time.monotonic", lambda: 60.1)
+    from digital_twin.preprocess import RAW_FEATURES
+    disturbance = [c for c in RAW_FEATURES if c not in __import__("app.domain.tags", fromlist=["CONTROL_TAGS"]).CONTROL_TAGS]
+    ctx_with_cached.plant_context = {k: 1.0 for k in disturbance}
+    ctx_with_cached.plant_context["IGCC.CC.G1.TTXM"] = 580.0
+    ctx_with_cached.ml_failure_count = 3
+    monkeypatch.setattr(
+        "app.adapters.simulator.ml.dt_predict",
+        lambda **kw: {"IGCC.DeNOX.AT_H1_901_PV": 30.0, "IGCC.CC.G1.DWATT": 260.0, "IGCC.CC.G1.TTXM": 590.0},
+    )
+    from digital_twin.simulation import ControlVars
+    controls = ControlVars(syngas_flow=1500.0, igv_opening=75.0, n2_offset=200.0,
+                           n2_valve_1=50.0, syngas_srv=60.0, syngas_gcv_1=55.0,
+                           syngas_gcv_1a=55.0, syngas_gcv_2=55.0, ibh_valve=30.0, n2_flow=100.0)
+    sim.predict_for_session(controls, ctx_with_cached)
+    assert ctx_with_cached.ml_failure_count == 0
+
+
+def test_failure_count_reset_then_can_accumulate_again(sim, ctx_with_cached, monkeypatch):
+    """4회 실패 → 1회 성공(0 리셋) → 다시 5회 누적 가능."""
+    fake_times = iter([60.1, 120.2, 120.2, 120.2])
+    monkeypatch.setattr("app.adapters.simulator.ml.time.monotonic", lambda: next(fake_times))
+    from digital_twin.preprocess import RAW_FEATURES
+    disturbance = [c for c in RAW_FEATURES if c not in __import__("app.domain.tags", fromlist=["CONTROL_TAGS"]).CONTROL_TAGS]
+    ctx_with_cached.plant_context = {k: 1.0 for k in disturbance}
+    ctx_with_cached.plant_context["IGCC.CC.G1.TTXM"] = 580.0
+    ctx_with_cached.ml_failure_count = 4
+    # 1번째: 성공
+    monkeypatch.setattr(
+        "app.adapters.simulator.ml.dt_predict",
+        lambda **kw: {"IGCC.DeNOX.AT_H1_901_PV": 30.0, "IGCC.CC.G1.DWATT": 260.0, "IGCC.CC.G1.TTXM": 590.0},
+    )
+    from digital_twin.simulation import ControlVars
+    controls = ControlVars(syngas_flow=1500.0, igv_opening=75.0, n2_offset=200.0,
+                           n2_valve_1=50.0, syngas_srv=60.0, syngas_gcv_1=55.0,
+                           syngas_gcv_1a=55.0, syngas_gcv_2=55.0, ibh_valve=30.0, n2_flow=100.0)
+    sim.predict_for_session(controls, ctx_with_cached)
+    assert ctx_with_cached.ml_failure_count == 0
+    # 이후 실패 → 1회로 누적 (5에서 raise 아님)
+    monkeypatch.setattr("app.adapters.simulator.ml.dt_predict",
+                        lambda **kw: (_ for _ in ()).throw(RuntimeError("x")))
+    sim.predict_for_session(controls, ctx_with_cached)
+    assert ctx_with_cached.ml_failure_count == 1
