@@ -24,7 +24,7 @@ from app.core.sim_loop import SimLoopManager
 from app.core.state_store import InMemoryStateStore
 from app.core.ws_manager import WebSocketManager
 from app.db.session import DbContext
-from app.exceptions import PredictorUnavailableError
+from app.exceptions import DataSourceUnavailableError, PredictorUnavailableError
 from app.repositories.sensor_repo import SensorRepository
 
 logger = logging.getLogger(__name__)
@@ -58,7 +58,17 @@ async def lifespan(app: FastAPI):
     session_contexts: dict[str, SessionContext] = {}
     data_source = None
     if DbContext.is_available():
-        sensor_repo = SensorRepository(db_session_factory=DbContext.session_factory)
+        if (
+            settings.sensor_column_mapping is None
+            and os.getenv("APP_ENV", "development").lower() == "production"
+        ):
+            raise DataSourceUnavailableError(
+                "SENSOR_COLUMN_MAPPING is required for production ML snapshot mode"
+            )
+        sensor_repo = SensorRepository(
+            db_session_factory=DbContext.session_factory,
+            tag_to_db_column=settings.sensor_column_mapping,
+        )
         data_source = SnapshotDataSource(sensor_repo)
     else:
         logger.warning("DB not configured — B안 ML 모드 비활성 (StubSimulator 회귀)")

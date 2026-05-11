@@ -20,6 +20,10 @@ class Settings(BaseSettings):
 
     # DB (Phase 1: 연결만 준비, 실제 쿼리는 inmemory repository)
     database_url: str | None = Field(default=None, alias="DATABASE_URL")
+    sensor_column_mapping: dict[str, str] | None = Field(
+        default=None,
+        alias="SENSOR_COLUMN_MAPPING",
+    )
 
     # 시뮬 루프 — 백엔드 전용 설정 (세션 수 제한)
     # τ / dt / 임계치는 digital_twin.simulation.DEFAULT_CONFIG가 단일 진실원.

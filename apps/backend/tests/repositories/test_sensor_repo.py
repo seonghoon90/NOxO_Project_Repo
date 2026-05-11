@@ -2,7 +2,8 @@ from unittest.mock import MagicMock
 import pandas as pd
 import pytest
 
-from app.repositories.sensor_repo import SensorRepository, TAG_TO_DB_COLUMN
+from app.exceptions import DataSourceUnavailableError
+from app.repositories.sensor_repo import REQUIRED_TAGS, SensorRepository, TAG_TO_DB_COLUMN
 from digital_twin.preprocess import RAW_FEATURES, TARGETS
 
 
@@ -54,6 +55,34 @@ async def test_fetch_recent_window_renames_db_columns_to_tags(mock_session_facto
     df = await repo.fetch_recent_window(seconds=900)
     for tag in RAW_FEATURES:
         assert tag in df.columns
+
+
+async def test_fetch_recent_window_uses_injected_db_column_mapping(mock_session_factory):
+    """운영 DB 컬럼명은 주입된 mapping만 사용한다."""
+    factory, session = mock_session_factory
+    mapping = {tag: f"db_{idx}" for idx, tag in enumerate(REQUIRED_TAGS)}
+    _set_rows(
+        session,
+        [
+            {
+                "measured_at": pd.Timestamp("2026-05-11"),
+                **{col: 1.0 for col in mapping.values()},
+            }
+        ],
+    )
+    repo = SensorRepository(factory, tag_to_db_column=mapping)
+
+    df = await repo.fetch_recent_window(seconds=900)
+
+    sql_arg, _ = session.execute.call_args.args
+    assert '"db_0"' in str(sql_arg)
+    assert set(REQUIRED_TAGS).issubset(df.columns)
+
+
+def test_sensor_repository_rejects_incomplete_mapping(mock_session_factory):
+    factory, _ = mock_session_factory
+    with pytest.raises(DataSourceUnavailableError, match="missing tags"):
+        SensorRepository(factory, tag_to_db_column={})
 
 
 async def test_fetch_recent_window_respects_seconds_param(mock_session_factory):

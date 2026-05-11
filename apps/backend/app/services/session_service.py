@@ -44,9 +44,10 @@ class SessionService:
         self.session_contexts = session_contexts if session_contexts is not None else {}
 
     def is_ml_mode(self) -> bool:
-        """ML 모드 여부. data_source 설정 + SIMULATOR_FALLBACK_STUB 비활성."""
+        """ML 모드 여부. data_source + 실제 ML simulator가 모두 준비돼야 한다."""
         return (
             self.data_source is not None
+            and getattr(self.simulator, "name", None) == "ml"
             and os.getenv("SIMULATOR_FALLBACK_STUB", "").lower() != "true"
         )
 
@@ -129,8 +130,6 @@ class SessionService:
             predict_fn=lambda controls: cached,
             config=self.sim_loop.dt_config,
         )
-        state.output_target = cached
-        state.output = cached
 
         # [7] commit — session_contexts + state_store 동시 등록 + sim_loop start
         self.session_contexts[sid] = ctx

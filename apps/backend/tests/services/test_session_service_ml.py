@@ -83,6 +83,38 @@ async def test_create_session_calls_ml_once_on_creation(service, monkeypatch):
     assert simulator.predict_for_session.call_count == 1
 
 
+def test_is_ml_mode_requires_actual_ml_simulator(service, monkeypatch):
+    svc, _, _, _, _ = service
+    monkeypatch.delenv("SIMULATOR_FALLBACK_STUB", raising=False)
+
+    svc.simulator = type("StubLike", (), {"name": "stub"})()
+    assert svc.is_ml_mode() is False
+
+    svc.simulator = type("MLLike", (), {"name": "ml"})()
+    assert svc.is_ml_mode() is True
+
+
+async def test_create_session_keeps_initial_derived_output_fields(service, monkeypatch):
+    """ML dummy lambda/efficiency는 create_initial_state 계산값으로 보정되어야 한다."""
+    svc, _, simulator, _, _ = service
+    monkeypatch.setattr("asyncio.sleep", AsyncMock())
+    from digital_twin.simulation import OutputVars
+
+    dummy_output = OutputVars(
+        nox=25.0, exhaust_temp=580.0, power=248.6, lambda_=0.0, efficiency=0.0
+    )
+
+    def fake_predict(controls, ctx):
+        ctx.cached_output_target = dummy_output
+        return dummy_output
+
+    simulator.predict_for_session.side_effect = fake_predict
+    state = await svc.create_session("sid1")
+
+    assert state.output.lambda_ != 0.0
+    assert state.output.efficiency != 0.0
+
+
 async def test_create_session_retries_initial_ml_once_on_failure(service, monkeypatch):
     """U3 + §6.1 — 첫 호출 실패 → 0.5초 backoff → 두 번째 성공."""
     svc, _, simulator, _, _ = service

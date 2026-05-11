@@ -5,6 +5,8 @@ from fastapi.responses import JSONResponse
 
 from app.exceptions import (
     DomainError,
+    DataNotEnoughError,
+    DataSourceUnavailableError,
     InvalidControlInputError,
     PredictorUnavailableError,
     SessionLimitExceededError,
@@ -17,6 +19,8 @@ _STATUS_MAP: dict[type[DomainError], int] = {
     SessionLimitExceededError: 429,
     InvalidControlInputError: 422,
     PredictorUnavailableError: 503,
+    DataNotEnoughError: 503,
+    DataSourceUnavailableError: 503,
 }
 
 
