@@ -48,7 +48,9 @@ function createParticle(intensity: number): Particle {
 export function SmokeCanvas({ intensity }: SmokeCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const intensityRef = useRef(intensity)
-  intensityRef.current = intensity
+  useEffect(() => {
+    intensityRef.current = intensity
+  }, [intensity])
 
   useEffect(() => {
     const canvas = canvasRef.current

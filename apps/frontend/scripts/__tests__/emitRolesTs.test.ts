@@ -13,7 +13,7 @@ describe('emitRolesTs', () => {
       viewBox: { width: 1316, height: 540 },
     })
     expect(out).toContain('// AUTO-GENERATED. DO NOT EDIT.')
-    expect(out).toContain('/* eslint-disable */')
+    expect(out).not.toContain('/* eslint-disable */')
   })
 
   it('ROLES export — kpi-value-remove kind 제외, 16 entries만 emit (소스 ROLE_MAP 기준)', () => {

@@ -49,7 +49,9 @@ export function useCascadeAnimation(
   rootRef: RefObject<HTMLElement | null>,
 ): void {
   const triggerRef = useRef<CascadeTrigger | null>(null)
-  if (triggerRef.current == null) {
+
+  useEffect(() => {
+    if (triggerRef.current != null) return
     triggerRef.current = createCascadeTrigger({
       thresholdRatio: 0.05,
       debounceMs: 800,
@@ -68,7 +70,7 @@ export function useCascadeAnimation(
         }
       },
     })
-  }
+  }, [rootRef])
 
   useEffect(() => {
     triggerRef.current?.notify(n2Flow, performance.now())

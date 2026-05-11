@@ -48,8 +48,8 @@ function bboxFromPathD(d: string): BBox | null {
   // 명령 + 공백/콤마 + 숫자(부호/소수 허용) 토큰화
   const tokens = d.match(/[a-zA-Z]|-?\d+(?:\.\d+)?(?:e[-+]?\d+)?/gi)
   if (!tokens) return null
-  let xs: number[] = []
-  let ys: number[] = []
+  const xs: number[] = []
+  const ys: number[] = []
   let cmd: string | null = null
   let isRelative = false
   let cx = 0
@@ -268,7 +268,7 @@ function walk(
     childBoxes.push(...boxes)
   }
   // 본인 bbox: leaf면 attrs 기반, group이면 자식 union
-  let bbox: BBox | null = null
+  let bbox: BBox | null
   if (tag === 'g' || tag === 'svg' || tag === 'defs' || tag === 'mask' || tag === 'clipPath') {
     bbox = unionBBox(childBoxes)
   } else {

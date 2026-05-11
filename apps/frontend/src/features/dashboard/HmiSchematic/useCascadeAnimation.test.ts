@@ -63,6 +63,7 @@ describe('useCascadeAnimation', () => {
 
   beforeEach(() => {
     animateMock = vi.fn(
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       (_kf: Keyframe[], _opts?: KeyframeAnimationOptions | number) =>
         ({
           cancel: () => {},
