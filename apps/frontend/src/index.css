@@ -317,13 +317,13 @@ a {
 
 .kpi-row {
   display: grid;
-  grid-template-columns: 220px 220px repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
 }
 
 .kpi-row-secondary {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 10px;
 }
 

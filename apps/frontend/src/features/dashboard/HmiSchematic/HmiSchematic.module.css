@@ -10,7 +10,7 @@
     linear-gradient(to right, rgba(140, 170, 200, 0.18) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(140, 170, 200, 0.14) 1px, transparent 1px) !important;
   background-size: 28px 28px !important;
-  background-position: 12px 0 !important;
+  background-position: 16px -4px !important;
   background: #0E141B;
   color: #E8F1F8;
 }

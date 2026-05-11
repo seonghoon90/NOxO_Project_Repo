@@ -3,8 +3,6 @@ import { useOutletContext } from 'react-router-dom'
 import { HmiSchematic } from '../features/dashboard/HmiSchematic/HmiSchematic'
 import {
   CONTROL_VARIABLE_KEYS,
-  PRIMARY_VARIABLE_KEYS,
-  SECONDARY_VARIABLE_KEYS,
   type ConsoleMetrics,
   type MetricPoint,
   type VariableConfigUpdate,
@@ -16,8 +14,6 @@ import { useThresholds, type Thresholds } from '../features/dashboard/useThresho
 import type { AppOutletContext } from '../app/App'
 
 const controlVariableOrder: VariableKey[] = CONTROL_VARIABLE_KEYS
-const overviewVariableOrder: VariableKey[] = PRIMARY_VARIABLE_KEYS
-const secondaryVariableOrder: VariableKey[] = SECONDARY_VARIABLE_KEYS
 // 정격값(rated) — `digital_twin/simulation/config.py`의 InitialOutput / FeatureConfig 기준.
 // 운영 임계(caution/danger)는 useThresholds로 백엔드에서 받아온다.
 const NOX_RATED = 20
@@ -50,8 +46,7 @@ export function ServicePage() {
   const displayedNox = mode === 'sim' ? state.metrics.nox : state.metrics.predictedNox
   const streamLabel = streamStatusLabel(status)
   const noxStatus = displayedNox > thresholds.noxLimit ? '위험' : streamLabel.text
-  const controlCards = overviewVariableOrder.map((key) => state.variables[key])
-  const secondaryCards = secondaryVariableOrder.map((key) => state.variables[key])
+  const controlCards = controlVariableOrder.map((key) => state.variables[key])
   const noxValues = state.history.length > 0 ? state.history.map((point) => point.nox) : [displayedNox]
   // 효율은 정격 이상이면 항상 정상. 미만일 때만 caution/danger 임계로 색 판정.
   const efficiency = state.metrics.efficiency
@@ -99,6 +94,15 @@ export function ServicePage() {
               emphatic
             />
             <KpiCard
+              title="배기온도 (TTXM)"
+              value={state.metrics.exhaust}
+              unit="°C"
+              subtitle="IGCC.CC.G1.TTXM"
+              status={exhaustStatus(state.metrics.exhaust, thresholds)}
+              digits={1}
+              emphatic
+            />
+            <KpiCard
               title="발전 효율"
               value={efficiency * 100}
               unit="%"
@@ -107,21 +111,19 @@ export function ServicePage() {
               digits={1}
               emphatic
             />
-            {controlCards.map((variable) => (
-              <KpiCard
-                key={variable.key}
-                title={variable.label}
-                value={variable.value}
-                unit={variable.unit}
-                status="제어"
-                digits={variable.digits}
-                subtitle={variable.rawName}
-              />
-            ))}
+            <KpiCard
+              title="공기비 (λ)"
+              value={state.metrics.lambda}
+              unit=""
+              subtitle="O₂·N₂ → Zeldovich 입력"
+              status={lambdaStatus(state.metrics.lambda, thresholds)}
+              digits={2}
+              emphatic
+            />
           </div>
 
           <div className="kpi-row kpi-row-secondary">
-            {secondaryCards.map((variable) => (
+            {controlCards.map((variable) => (
               <KpiCardMini
                 key={variable.key}
                 title={variable.shortLabel}
@@ -167,12 +169,12 @@ export function ServicePage() {
             <section className="panel chart-card">
               <header className="chart-header">
                 <div>
-                  <div className="chart-title">공기비 (λ) / 배기온도</div>
+                  <div className="chart-title">배기온도 / 공기비 (λ)</div>
                   <div className="chart-subtitle">정규화 · 최근 60s</div>
                 </div>
                 <div className="chart-legend mono">
-                  <span className="legend-lambda">공기비</span>
                   <span className="legend-exhaust">배기온도</span>
+                  <span className="legend-lambda">공기비</span>
                 </div>
               </header>
               <div className="chart-body">
@@ -835,22 +837,13 @@ function buildOutputTableRows(args: {
       status: displayedNox > thresholds.noxLimit ? '위험' : '정상',
     },
     {
-      name: '배기온도',
+      name: '배기온도 (TTXM)',
       unit: '°C',
       currentText: metrics.exhaust.toFixed(1),
       ratedText: EXHAUST_RATED.toFixed(1),
       ...formatDeviation(metrics.exhaust - EXHAUST_RATED, 1, 15, 30),
       rangeText: `${exhaustRange.min.toFixed(1)} ~ ${exhaustRange.max.toFixed(1)}`,
       status: exhaustStatus(metrics.exhaust, thresholds),
-    },
-    {
-      name: '공기비 (λ)',
-      unit: '',
-      currentText: metrics.lambda.toFixed(2),
-      ratedText: LAMBDA_RATED.toFixed(2),
-      ...formatDeviation(metrics.lambda - LAMBDA_RATED, 2, 0.05, 0.1),
-      rangeText: `${lambdaRange.min.toFixed(2)} ~ ${lambdaRange.max.toFixed(2)}`,
-      status: lambdaStatus(metrics.lambda, thresholds),
     },
     {
       name: '발전 효율 (η)',
@@ -860,6 +853,15 @@ function buildOutputTableRows(args: {
       ...formatDeviation((metrics.efficiency - EFFICIENCY_RATED) * 100, 1, 2, 5),
       rangeText: `${efficiencyRangePct.min.toFixed(1)} ~ ${efficiencyRangePct.max.toFixed(1)}`,
       status: efficiencyTableStatus(metrics.efficiency, thresholds),
+    },
+    {
+      name: '공기비 (λ)',
+      unit: '',
+      currentText: metrics.lambda.toFixed(2),
+      ratedText: LAMBDA_RATED.toFixed(2),
+      ...formatDeviation(metrics.lambda - LAMBDA_RATED, 2, 0.05, 0.1),
+      rangeText: `${lambdaRange.min.toFixed(2)} ~ ${lambdaRange.max.toFixed(2)}`,
+      status: lambdaStatus(metrics.lambda, thresholds),
     },
   ]
 }
