@@ -10,6 +10,7 @@ pipeline {
         COMPOSE_PROJECT_NAME = 'noxo_ci'
         COMPOSE_FRONT_BACK = 'docker/docker-compose.yml'
         COMPOSE_DATA = 'docker/docker-compose.data.yml'
+        COMPOSE_AIRFLOW_EC2 = 'docker/docker-compose.airflow.ec2.yml'
         CI_ENV_FILE = 'docker/.env.ci'
         DEPLOY_HOST = '15.165.247.216'
         DEPLOY_USER = 'ubuntu'
@@ -27,6 +28,7 @@ POSTGRES_PASSWORD=postgres
 POSTGRES_DB=igcc_db
 LOG_LEVEL=info
 AIRFLOW_PORT=8080
+ETL_CHUNK_SIZE=50000
 SLACK_WEBHOOK_URL=
 '''
                 )
@@ -37,6 +39,7 @@ SLACK_WEBHOOK_URL=
             steps {
                 sh 'docker compose --env-file ${CI_ENV_FILE} -f ${COMPOSE_DATA} config --quiet'
                 sh 'docker compose --env-file ${CI_ENV_FILE} -f ${COMPOSE_FRONT_BACK} config --quiet'
+                sh 'docker compose --profile local-db --env-file ${CI_ENV_FILE} -f ${COMPOSE_FRONT_BACK} -f docker/docker-compose.prod.yml -f docker/docker-compose.ec2.yml -f ${COMPOSE_AIRFLOW_EC2} config --quiet'
             }
         }
 
@@ -77,11 +80,13 @@ SLACK_WEBHOOK_URL=
                                 -f docker/docker-compose.yml \
                                 -f docker/docker-compose.prod.yml \
                                 -f docker/docker-compose.ec2.yml \
+                                -f docker/docker-compose.airflow.ec2.yml \
                                 up -d --build
                             docker compose --profile local-db --env-file .env \
                                 -f docker/docker-compose.yml \
                                 -f docker/docker-compose.prod.yml \
                                 -f docker/docker-compose.ec2.yml \
+                                -f docker/docker-compose.airflow.ec2.yml \
                                 ps
                             curl -fsS --retry 10 --retry-delay 3 --retry-connrefused http://localhost/api/health
                         "
