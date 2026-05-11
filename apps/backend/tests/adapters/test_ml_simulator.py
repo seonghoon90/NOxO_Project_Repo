@@ -150,3 +150,28 @@ def test_build_current_row_uses_ttxm_from_plant_context(sim, make_ctx):
     )
     df = sim._build_current_row(controls, ctx)
     assert df["IGCC.CC.G1.TTXM"].iloc[0] == 600.0
+
+
+def test_result_to_outputvars_maps_targets_correctly(sim):
+    """dt_predict dict의 3 타깃 → OutputVars 매핑."""
+    result = {
+        "IGCC.DeNOX.AT_H1_901_PV": 25.0,
+        "IGCC.CC.G1.DWATT": 250.0,
+        "IGCC.CC.G1.TTXM": 580.0,
+    }
+    out = sim._result_to_outputvars(result)
+    assert out.nox == 25.0
+    assert out.power == 250.0
+    assert out.exhaust_temp == 580.0
+
+
+def test_result_to_outputvars_sets_lambda_efficiency_zero(sim):
+    """lambda_, efficiency는 0.0 (engine/sim_loop 후처리)."""
+    result = {
+        "IGCC.DeNOX.AT_H1_901_PV": 25.0,
+        "IGCC.CC.G1.DWATT": 250.0,
+        "IGCC.CC.G1.TTXM": 580.0,
+    }
+    out = sim._result_to_outputvars(result)
+    assert out.lambda_ == 0.0
+    assert out.efficiency == 0.0
