@@ -119,3 +119,18 @@ docker compose --profile local-db --env-file .env \
   -f docker/docker-compose.ec2.yml \
   up -d --build
 ```
+
+## GitHub Webhook 자동 실행
+
+Poll SCM은 Jenkins가 일정 주기로 GitHub를 확인하는 방식이고, GitHub Webhook은 `dev` 브랜치에 push 또는 PR merge가 발생했을 때 GitHub가 Jenkins에 바로 알려주는 방식입니다.
+
+GitHub 저장소의 `Settings` → `Webhooks`에서 아래 값을 등록합니다.
+
+| 항목 | 값 |
+| --- | --- |
+| Payload URL | `http://15.164.221.172:8081/github-webhook/` |
+| Content type | `application/json` |
+| Trigger event | `Just the push event` |
+
+Jenkins job에서는 `Build Triggers`의 `GitHub hook trigger for GITScm polling`을 체크합니다.
+Webhook 방식만 사용할 때는 `Poll SCM`을 끄고, Jenkins 빌드 로그 첫 줄이 `Started by GitHub push` 또는 `Started by GitHub webhook` 형태로 표시되는지 확인합니다.
