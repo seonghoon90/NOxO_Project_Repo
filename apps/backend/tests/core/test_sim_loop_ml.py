@@ -214,14 +214,17 @@ async def test_run_terminates_loop_on_session_terminated(sim_loop_manager, monke
     assert "sid1" not in mgr._tasks
 
 
-async def test_run_terminates_on_missing_session_context(sim_loop_manager):
-    """NS5 — state.sid에 해당 ctx 없으면 KeyError → 즉시 종료."""
-    mgr, state_store, _, _, contexts = sim_loop_manager
+async def test_run_cleans_up_when_ml_context_is_missing(sim_loop_manager):
+    """NS5 — ML 세션 ctx 누락 시 fallback처럼 진행하지 않고 cleanup."""
+    mgr, state_store, _, simulator, contexts = sim_loop_manager
     state = _make_state()
     contexts.clear()  # ctx 없음
     state_store.get.return_value = state
+    simulator.name = "ml"
+    simulator.predict.side_effect = NotImplementedError("ctx required")
     await mgr._run("sid1")
-    # finally cleanup 도달
+    simulator.predict.assert_called_once()
+    mgr.ws_manager.broadcast.assert_not_awaited()
     assert "sid1" not in contexts
 
 

@@ -221,15 +221,22 @@ async def test_create_session_sets_cached_output_target(service, monkeypatch):
     assert contexts["sid1"].cached_output_target is not None
 
 
-async def test_create_session_sets_last_ml_call_t_to_now(service, monkeypatch):
-    """S1 — last_ml_call_t가 0.0이 아닌 monotonic() 값으로 set.
-
-    fake_predict는 cached만 set하므로 last_ml_call_t 검증은 실제 predict_for_session 책임.
-    F그룹은 cached가 채워졌는지(=초기 호출이 완료됐는지)만 확인."""
-    svc, _, _, _, contexts = service
+async def test_create_session_preserves_initial_ml_call_timestamp(service, monkeypatch):
+    """S1 — 초기 ML 호출이 기록한 last_ml_call_t를 유지."""
+    svc, _, simulator, _, contexts = service
     monkeypatch.setattr("asyncio.sleep", AsyncMock())
+    from digital_twin.simulation import OutputVars
+    cached_output = OutputVars(nox=25.0, exhaust_temp=580.0, power=248.6,
+                               lambda_=1.1, efficiency=0.89)
+
+    def fake_predict(controls, ctx):
+        ctx.cached_output_target = cached_output
+        ctx.last_ml_call_t = 123.0
+        return cached_output
+
+    simulator.predict_for_session.side_effect = fake_predict
     await svc.create_session("sid1")
-    assert contexts["sid1"].cached_output_target is not None
+    assert contexts["sid1"].last_ml_call_t == 123.0
 
 
 async def test_stop_session_removes_context_from_dict(service, monkeypatch):
