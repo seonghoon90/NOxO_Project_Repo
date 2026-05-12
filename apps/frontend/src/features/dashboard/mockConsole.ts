@@ -1,4 +1,4 @@
-export type Mode = 'sim' | 'pred'
+export type Mode = 'sim' | 'realtime'
 export type VariableKey =
   | 'syngasFlow'
   | 'igvOpening'
@@ -418,7 +418,7 @@ export function deriveMetrics(
     0,
     1,
   )
-  const predictedNox = nox + 6 + (mode === 'pred' ? 4 : 0)
+  const predictedNox = nox + 6 + (mode === 'realtime' ? 4 : 0)
 
   return {
     nox: round(nox, 1),
@@ -495,4 +495,59 @@ function pickSnapshotValue(
   }
 
   return fallback
+}
+
+export type RealtimeStreamPayload = {
+  v: 1
+  sid: string
+  tick: number
+  ts: string
+  mode: Mode
+  override_active: boolean
+  current: {
+    controls: {
+      syngas_flow: number
+      igv_opening: number
+      n2_offset: number
+      n2_valve_1: number
+      syngas_srv: number
+      syngas_gcv_1: number
+      syngas_gcv_1a: number
+      syngas_gcv_2: number
+      ibh_valve: number
+      n2_flow: number
+    }
+    outputs: {
+      nox: number
+      exhaust_temp: number
+      power: number
+      lambda_: number
+      efficiency: number
+    }
+  }
+  kafka_latest: {
+    controls: RealtimeStreamPayload['current']['controls']
+    ts: string
+  } | null
+  forecast: {
+    predicted_nox: number
+    target_time: string
+    threshold_value: number
+    threshold_exceeded: boolean
+  } | null
+  warning: string | null
+}
+
+// VariableKey(camelCase) → backend payload.current.controls 키(snake_case) 매핑
+export const VARIABLE_KEY_TO_DOMAIN: Record<VariableKey, string> = {
+  syngasFlow: 'syngas_flow',
+  igvOpening: 'igv_opening',
+  n2Offset: 'n2_offset',
+  n2Valve1: 'n2_valve_1',
+  syngasSrv: 'syngas_srv',
+  syngasGcv1: 'syngas_gcv_1',
+  syngasGcv1a: 'syngas_gcv_1a',
+  syngasGcv2: 'syngas_gcv_2',
+  ibhValve: 'ibh_valve',
+  n2Flow: 'n2_flow',
 }
