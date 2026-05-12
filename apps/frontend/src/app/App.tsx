@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import type { StreamStatus } from '../features/dashboard/useConsoleState'
 
-type AppMode = 'sim' | 'pred'
+type AppMode = 'sim' | 'realtime'
 
 export type AppOutletContext = {
   mode: AppMode
@@ -93,8 +93,8 @@ export function App() {
               </button>
               <button
                 type="button"
-                className={mode === 'pred' ? 'mode-opt active' : 'mode-opt'}
-                onClick={() => setMode('pred')}
+                className={mode === 'realtime' ? 'mode-opt active' : 'mode-opt'}
+                onClick={() => setMode('realtime')}
               >
                 실시간 예측
               </button>
