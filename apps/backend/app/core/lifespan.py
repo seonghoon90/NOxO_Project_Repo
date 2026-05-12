@@ -1,9 +1,9 @@
-"""애플리케이션 startup / shutdown 훅.
+"""애플리케이션 startup / shutdown.
 
-- 모든 singleton 컴포넌트(StateStore, InputInjector, WSManager, SimLoop, Predictor)를
-  app.state에 attach.
-- DB engine 초기화/dispose.
-- shutdown 시 sim loop 전체 취소.
+- SensorBuffer (전역 deque, bootstrap 로드)
+- KafkaSensorStream (메시지 → buffer.append)
+- RealtimeEngine (1초 tick + 세션 순회)
+- Simulator / Forecaster DI (실패 시 Stub 폴백)
 """
 
 import logging
@@ -12,21 +12,20 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.adapters.data_source import SnapshotDataSource
 from app.adapters.forecaster import StubForecaster
+from app.adapters.forecaster.ml import MLForecaster
 from app.adapters.simulator import StubSimulator
 from app.adapters.simulator.ml import MLSimulator
 from app.config import get_settings
-from app.core.input_injector import InputInjector
 from app.core.kafka_stream import KafkaSensorStream
 from app.core.logging import configure_logging
-from app.core.session_context import SessionContext
-from app.core.sim_loop import SimLoopManager
-from app.core.state_store import InMemoryStateStore
+from app.core.realtime_engine import RealtimeEngine
+from app.core.sensor_buffer import SensorBuffer
+from app.core.session import Session
 from app.core.ws_manager import WebSocketManager
 from app.db.session import DbContext
-from app.exceptions import DataSourceUnavailableError, PredictorUnavailableError
-from app.repositories.sensor_repo import SensorRepository
+from app.domain.tags import normalize_raw_message
+from app.exceptions import PredictorUnavailableError
 from app.repositories.simulation_log_repo import SimulationLogRepository
 
 logger = logging.getLogger(__name__)
@@ -39,82 +38,83 @@ async def lifespan(app: FastAPI):
 
     DbContext.init(settings.database_url)
 
-    state_store = InMemoryStateStore()
-    injector = InputInjector()
-    ws_manager = WebSocketManager()
-    # 두 어댑터 별도 DI 슬롯 — `BACKEND_ARCHITECTURE.md §10`
-    # === Simulator DI — B5 환경 변수 + ML 우선 ===
+    # === Simulator DI ===
     if os.getenv("SIMULATOR_FALLBACK_STUB", "").lower() == "true":
         simulator = StubSimulator()
     else:
         try:
             simulator = MLSimulator()
-        except PredictorUnavailableError as e:
-            logger.error("ml_model_unavailable err=%s", e)
+        except PredictorUnavailableError as exc:
+            logger.error("ml_simulator_unavailable err=%s", exc)
             if os.getenv("APP_ENV", "development") == "production":
                 raise
             simulator = StubSimulator()
-    forecaster = StubForecaster()
-    kafka_sensor_stream = KafkaSensorStream(settings)
 
-    # === session_contexts + DataSource (B안 ML 모드) ===
-    session_contexts: dict[str, SessionContext] = {}
-    data_source = None
-    simulation_log_repo = None
+    # === Forecaster DI ===
+    try:
+        forecaster = MLForecaster()
+    except PredictorUnavailableError as exc:
+        logger.warning("ml_forecaster_unavailable err=%s — Stub fallback", exc)
+        forecaster = StubForecaster()
+
+    # === SimulationLogRepo (best-effort) ===
+    simulation_log_repo: SimulationLogRepository | None = None
     if DbContext.is_available():
-        if (
-            settings.sensor_column_mapping is None
-            and os.getenv("APP_ENV", "development").lower() == "production"
-        ):
-            raise DataSourceUnavailableError(
-                "SENSOR_COLUMN_MAPPING is required for production ML snapshot mode"
-            )
-        sensor_repo = SensorRepository(
-            db_session_factory=DbContext.session_factory,
-            tag_to_db_column=settings.sensor_column_mapping,
-        )
-        data_source = SnapshotDataSource(sensor_repo)
         try:
             simulation_log_repo = SimulationLogRepository(DbContext.session_factory)
             simulation_log_repo.ensure_tables()
         except Exception as exc:
             logger.warning("simulation_log_repo_unavailable err=%s", exc)
-            simulation_log_repo = None
-    else:
-        logger.warning("DB not configured — B안 ML 모드 비활성 (StubSimulator 회귀)")
 
-    # === A1 (5차 보강) — 회귀 모드 invariant ===
-    if data_source is None and not isinstance(simulator, StubSimulator):
-        logger.warning(
-            "ml_simulator_without_datasource — forcing StubSimulator (data_source=None invariant)"
-        )
-        simulator = StubSimulator()
-    sim_loop = SimLoopManager(
+    # === SensorBuffer + KafkaSensorStream ===
+    sensor_buffer = SensorBuffer(maxlen=900)
+    kafka_sensor_stream = KafkaSensorStream(settings)
+
+    # bootstrap 동기 로드 + 도메인 변환 적재
+    kafka_sensor_stream.ensure_bootstrap_loaded()
+    normalized_bootstrap = [
+        normalize_raw_message(row["values"])
+        for row in kafka_sensor_stream.bootstrap_rows
+        if row.get("values")
+    ]
+    if normalized_bootstrap:
+        sensor_buffer.load_bootstrap(normalized_bootstrap)
+        logger.info("SensorBuffer bootstrap loaded rows=%d", len(normalized_bootstrap))
+    else:
+        logger.warning("SensorBuffer bootstrap empty — DT will use ffill fallback")
+
+    kafka_sensor_stream.attach_buffer(sensor_buffer)
+
+    # === Sessions + WS Manager ===
+    sessions: dict[str, Session] = {}
+    ws_manager = WebSocketManager()
+
+    # === RealtimeEngine ===
+    realtime_engine = RealtimeEngine(
         settings=settings,
-        state_store=state_store,
-        injector=injector,
-        ws_manager=ws_manager,
+        sensor_buffer=sensor_buffer,
         simulator=simulator,
-        session_contexts=session_contexts,
+        forecaster=forecaster,
+        ws_manager=ws_manager,
+        sessions=sessions,
     )
 
     app.state.settings = settings
-    app.state.state_store = state_store
-    app.state.input_injector = injector
+    app.state.sensor_buffer = sensor_buffer
+    app.state.sessions = sessions
     app.state.ws_manager = ws_manager
     app.state.simulator = simulator
     app.state.forecaster = forecaster
     app.state.kafka_sensor_stream = kafka_sensor_stream
     app.state.simulation_log_repo = simulation_log_repo
-    app.state.sim_loop = sim_loop
-    app.state.data_source = data_source
-    app.state.session_contexts = session_contexts
+    app.state.realtime_engine = realtime_engine
 
     await kafka_sensor_stream.start()
+    await realtime_engine.start()
 
     try:
         yield
     finally:
+        await realtime_engine.stop()
         await kafka_sensor_stream.stop()
-        await sim_loop.stop_all()
         DbContext.dispose()

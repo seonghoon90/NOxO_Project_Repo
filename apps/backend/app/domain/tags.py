@@ -113,6 +113,34 @@ def normalize_raw_message(values: dict[str, float]) -> dict[str, float]:
 
 
 # ============================================================
+# 도메인 → 원천 태그 역매핑 (SessionContext 재구성용)
+# ============================================================
+DOMAIN_TO_RAW_TAG: Final[dict[str, str]] = {
+    v: k for k, v in ALL_TAGS_TO_DOMAIN.items()
+}
+
+
+def denormalize_to_raw_tags(domain_dict: dict[str, float]) -> dict[str, float]:
+    """도메인 snake_case dict → 원천 태그 dict (SessionContext 호환용)."""
+    return {
+        DOMAIN_TO_RAW_TAG[k]: v
+        for k, v in domain_dict.items()
+        if k in DOMAIN_TO_RAW_TAG
+    }
+
+
+def control_payload_to_controlvars(payload) -> ControlVars:
+    """ControlPayload → ControlVars (도메인 객체로 변환)."""
+    return ControlVars(
+        syngas_flow=payload.syngas_flow, igv_opening=payload.igv_opening,
+        n2_offset=payload.n2_offset, n2_valve_1=payload.n2_valve_1,
+        syngas_srv=payload.syngas_srv, syngas_gcv_1=payload.syngas_gcv_1,
+        syngas_gcv_1a=payload.syngas_gcv_1a, syngas_gcv_2=payload.syngas_gcv_2,
+        ibh_valve=payload.ibh_valve, n2_flow=payload.n2_flow,
+    )
+
+
+# ============================================================
 # ControlVars ↔ 태그 dict 매핑
 # DT의 ControlVars는 IGCC 태그 체계를 모르므로 매핑은 본 모듈이 책임진다.
 # ============================================================

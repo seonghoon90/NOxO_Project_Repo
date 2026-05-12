@@ -10,6 +10,7 @@ from app.exceptions import (
     InvalidControlInputError,
     PredictorUnavailableError,
     SessionLimitExceededError,
+    SessionModeConflictError,
     SessionNotFoundError,
 )
 
@@ -21,6 +22,7 @@ _STATUS_MAP: dict[type[DomainError], int] = {
     PredictorUnavailableError: 503,
     DataNotEnoughError: 503,
     DataSourceUnavailableError: 503,
+    SessionModeConflictError: 409,
 }
 
 

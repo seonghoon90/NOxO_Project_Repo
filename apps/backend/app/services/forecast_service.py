@@ -11,7 +11,6 @@
 from datetime import datetime, timedelta, timezone
 
 from app.adapters.forecaster import Forecaster, ForecastInput
-from app.core.state_store import StateStore
 from app.repositories.simulation_log_repo import SimulationLogRepository
 from app.schemas.prediction import PredictionResponse
 from digital_twin.simulation import DEFAULT_CONFIG, ControlVars, DTConfig
@@ -23,12 +22,12 @@ FORECAST_HORIZON_MINUTES: int = 5
 class ForecastService:
     def __init__(
         self,
-        state_store: StateStore,
+        sessions: dict,
         forecaster: Forecaster,
         dt_config: DTConfig = DEFAULT_CONFIG,
         simulation_log_repo: SimulationLogRepository | None = None,
     ) -> None:
-        self.state_store = state_store
+        self.sessions = sessions
         self.forecaster = forecaster
         self.dt_config = dt_config
         self.simulation_log_repo = simulation_log_repo
@@ -50,10 +49,10 @@ class ForecastService:
         return response
 
     def _resolve_controls(self, sid: str | None) -> ControlVars:
-        if sid and sid in self.state_store:
-            state = self.state_store.get(sid)
-            assert state is not None
-            return state.target
+        if sid and sid in self.sessions:
+            session = self.sessions[sid]
+            if session.control_override is not None:
+                return session.control_override
         op = self.dt_config.operating_point
         return ControlVars(
             syngas_flow=op.syngas_flow,

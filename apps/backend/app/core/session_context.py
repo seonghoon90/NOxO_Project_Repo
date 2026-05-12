@@ -32,12 +32,14 @@ class SessionContext:
 
     @classmethod
     def from_snapshot(cls, sid: str, snapshot_df: pd.DataFrame) -> "SessionContext":
-        """스냅샷 DataFrame(43컬럼) → SessionContext.
+        """스냅샷 DataFrame → SessionContext.
 
         변환:
           - buffer 행: RAW 39 + TTXM 1 = 40 키 (measured_at/NOx/DWATT drop)
           - plant_context: 마지막 행에서 (RAW - CONTROL_TAGS) + TTXM = 30 키
           - initial_controls: 마지막 행의 CONTROL_TAGS 10 키
+
+        외란 매핑 미완 단계에서 누락된 컬럼은 0.0으로 폴백 (DT가 ffill 처리).
         """
         from app.domain.tags import CONTROL_TAGS
         from digital_twin.preprocess import RAW_FEATURES
@@ -45,15 +47,20 @@ class SessionContext:
         TTXM_COL = "IGCC.CC.G1.TTXM"
         BUFFER_COLS = list(RAW_FEATURES) + [TTXM_COL]            # 40
         PLANT_KEYS = [c for c in RAW_FEATURES if c not in CONTROL_TAGS] + [TTXM_COL]  # 30
-        last = snapshot_df.iloc[-1]
 
+        df = snapshot_df.copy()
+        for col in BUFFER_COLS:
+            if col not in df.columns:
+                df[col] = 0.0
+
+        last = df.iloc[-1]
         plant_context = {k: float(last[k]) for k in PLANT_KEYS}
         initial_controls = {k: float(last[k]) for k in CONTROL_TAGS}
 
         buffer = deque(
             (
                 {k: float(row[k]) for k in BUFFER_COLS}
-                for _, row in snapshot_df.iterrows()
+                for _, row in df.iterrows()
             ),
             maxlen=900,
         )
@@ -63,6 +70,22 @@ class SessionContext:
             recent_df_buffer=buffer,
             initial_controls=initial_controls,
         )
+
+    @classmethod
+    def from_sensor_buffer(cls, sid: str, sensor_buffer) -> "SessionContext":
+        """SensorBuffer (도메인 snake_case) → SessionContext (원천 태그)."""
+        from app.domain.tags import denormalize_to_raw_tags
+
+        df = sensor_buffer.to_dataframe()
+        if df.empty:
+            raise ValueError("SensorBuffer is empty — bootstrap failed")
+
+        raw_rows = [
+            denormalize_to_raw_tags(row.to_dict())
+            for _, row in df.iterrows()
+        ]
+        raw_df = pd.DataFrame(raw_rows)
+        return cls.from_snapshot(sid, raw_df)
 
     def buffer_to_df(self) -> pd.DataFrame:
         """deque → DataFrame 변환."""

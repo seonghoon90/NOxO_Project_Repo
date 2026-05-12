@@ -25,6 +25,20 @@ def app():
 @pytest.fixture
 def client(app):
     with TestClient(app) as c:
+        # 테스트 환경에서는 bootstrap CSV가 부재할 수 있어 SensorBuffer가
+        # 빈 상태로 lifespan을 마칠 수 있다. SessionContext.from_sensor_buffer가
+        # ValueError를 던지지 않도록 최소 1행 더미를 주입한다.
+        buf = getattr(app.state, "sensor_buffer", None)
+        if buf is not None and len(buf) == 0:
+            buf.load_bootstrap([
+                {
+                    "syngas_flow": 1500.0, "igv_opening": 75.0,
+                    "n2_offset": 200.0, "n2_valve_1": 50.0,
+                    "syngas_srv": 60.0, "syngas_gcv_1": 55.0,
+                    "syngas_gcv_1a": 55.0, "syngas_gcv_2": 55.0,
+                    "ibh_valve": 30.0, "n2_flow": 100.0,
+                }
+            ])
         yield c
 
 
