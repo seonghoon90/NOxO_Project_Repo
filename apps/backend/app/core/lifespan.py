@@ -27,6 +27,7 @@ from app.core.ws_manager import WebSocketManager
 from app.db.session import DbContext
 from app.exceptions import DataSourceUnavailableError, PredictorUnavailableError
 from app.repositories.sensor_repo import SensorRepository
+from app.repositories.simulation_log_repo import SimulationLogRepository
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +60,7 @@ async def lifespan(app: FastAPI):
     # === session_contexts + DataSource (B안 ML 모드) ===
     session_contexts: dict[str, SessionContext] = {}
     data_source = None
+    simulation_log_repo = None
     if DbContext.is_available():
         if (
             settings.sensor_column_mapping is None
@@ -72,6 +74,12 @@ async def lifespan(app: FastAPI):
             tag_to_db_column=settings.sensor_column_mapping,
         )
         data_source = SnapshotDataSource(sensor_repo)
+        try:
+            simulation_log_repo = SimulationLogRepository(DbContext.session_factory)
+            simulation_log_repo.ensure_tables()
+        except Exception as exc:
+            logger.warning("simulation_log_repo_unavailable err=%s", exc)
+            simulation_log_repo = None
     else:
         logger.warning("DB not configured — B안 ML 모드 비활성 (StubSimulator 회귀)")
 
@@ -97,6 +105,7 @@ async def lifespan(app: FastAPI):
     app.state.simulator = simulator
     app.state.forecaster = forecaster
     app.state.kafka_sensor_stream = kafka_sensor_stream
+    app.state.simulation_log_repo = simulation_log_repo
     app.state.sim_loop = sim_loop
     app.state.data_source = data_source
     app.state.session_contexts = session_contexts

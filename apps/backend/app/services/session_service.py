@@ -2,6 +2,7 @@
 
 import logging
 import uuid
+from datetime import datetime, timezone
 
 from app.config import Settings
 from app.core.input_injector import InputInjector
@@ -32,6 +33,7 @@ class SessionService:
         data_source=None,
         simulator=None,
         session_contexts: dict | None = None,
+        simulation_log_repo=None,
     ) -> None:
         self.settings = settings
         self.state_store = state_store
@@ -42,6 +44,7 @@ class SessionService:
         self.data_source = data_source
         self.simulator = simulator
         self.session_contexts = session_contexts if session_contexts is not None else {}
+        self.simulation_log_repo = simulation_log_repo
 
     def is_ml_mode(self) -> bool:
         """ML 모드 여부. data_source + 실제 ML simulator가 모두 준비돼야 한다."""
@@ -65,6 +68,8 @@ class SessionService:
             state.current = initial
         self.state_store.put(state)
         self.sim_loop.start(sid)
+        self._create_session_log(sid)
+        self._create_input_log(sid, state.target)
         return state
 
     def get(self, sid: str) -> SimulationState:
@@ -80,6 +85,7 @@ class SessionService:
         if errors:
             raise InvalidControlInputError("; ".join(errors))
         self.injector.submit(sid, controls)
+        self._create_input_log(sid, controls)
 
     async def create_session(self, sid: str) -> SimulationState:
         """B안 ML 모드 세션 생성. snapshot pull + ctx + 초기 ML 호출 + 재시도."""
@@ -131,14 +137,51 @@ class SessionService:
         self.session_contexts[sid] = ctx
         self.state_store.put(state)
         self.sim_loop.start(sid)
+        self._create_session_log(sid)
+        self._create_input_log(sid, state.target)
         return state
 
     async def stop(self, sid: str) -> None:
         if sid not in self.state_store:
             # 이미 정리된 세션이어도 남은 task/ws/input이 있을 수 있어 cleanup은 끝까지 수행한다.
             logger.debug("stop on missing sid=%s; continuing best-effort cleanup", sid)
+        self._finish_session_log(sid)
         await self.sim_loop.stop(sid)
         self.injector.discard(sid)
         self.session_contexts.pop(sid, None)
         self.state_store.remove(sid)
         await self.ws_manager.drop_session(sid)
+
+    def _create_session_log(self, sid: str) -> None:
+        if self.simulation_log_repo is None:
+            return
+        try:
+            self.simulation_log_repo.create_session_log(
+                sid,
+                started_at=datetime.now(timezone.utc).replace(tzinfo=None),
+            )
+        except Exception as exc:
+            logger.warning("simulation_session_log_failed sid=%s err=%s", sid, exc)
+
+    def _create_input_log(self, sid: str, controls: ControlVars) -> None:
+        if self.simulation_log_repo is None:
+            return
+        try:
+            self.simulation_log_repo.create_input_log(
+                sid,
+                controls,
+                created_at=datetime.now(timezone.utc).replace(tzinfo=None),
+            )
+        except Exception as exc:
+            logger.warning("simulation_input_log_failed sid=%s err=%s", sid, exc)
+
+    def _finish_session_log(self, sid: str) -> None:
+        if self.simulation_log_repo is None:
+            return
+        try:
+            self.simulation_log_repo.finish_session_log(
+                sid,
+                ended_at=datetime.now(timezone.utc).replace(tzinfo=None),
+            )
+        except Exception as exc:
+            logger.warning("simulation_session_finish_failed sid=%s err=%s", sid, exc)

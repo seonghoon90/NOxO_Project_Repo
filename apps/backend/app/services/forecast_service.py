@@ -12,6 +12,7 @@ from datetime import datetime, timedelta, timezone
 
 from app.adapters.forecaster import Forecaster, ForecastInput
 from app.core.state_store import StateStore
+from app.repositories.simulation_log_repo import SimulationLogRepository
 from app.schemas.prediction import PredictionResponse
 from digital_twin.simulation import DEFAULT_CONFIG, ControlVars, DTConfig
 
@@ -25,10 +26,12 @@ class ForecastService:
         state_store: StateStore,
         forecaster: Forecaster,
         dt_config: DTConfig = DEFAULT_CONFIG,
+        simulation_log_repo: SimulationLogRepository | None = None,
     ) -> None:
         self.state_store = state_store
         self.forecaster = forecaster
         self.dt_config = dt_config
+        self.simulation_log_repo = simulation_log_repo
 
     def predict(self, sid: str | None = None) -> PredictionResponse:
         controls = self._resolve_controls(sid)
@@ -37,12 +40,14 @@ class ForecastService:
         predicted_nox = self.forecaster.predict(ForecastInput(features=features))
         target_time = datetime.now(timezone.utc) + timedelta(minutes=FORECAST_HORIZON_MINUTES)
         threshold = self.dt_config.thresholds.nox_warning_ppm
-        return PredictionResponse(
+        response = PredictionResponse(
             predicted_nox=round(predicted_nox, 3),
             target_time=target_time,
             threshold_exceeded=predicted_nox > threshold,
             threshold_value=threshold,
         )
+        self._create_forecast_log(response, sid)
+        return response
 
     def _resolve_controls(self, sid: str | None) -> ControlVars:
         if sid and sid in self.state_store:
@@ -62,6 +67,18 @@ class ForecastService:
             ibh_valve=op.ibh_valve,
             n2_flow=op.n2_flow,
         )
+
+    def _create_forecast_log(
+        self,
+        response: PredictionResponse,
+        sid: str | None,
+    ) -> None:
+        if self.simulation_log_repo is None:
+            return
+        try:
+            self.simulation_log_repo.create_forecast_log(response, sid=sid)
+        except Exception:
+            pass
 
 
 def _controls_to_features(controls: ControlVars) -> dict[str, float]:
