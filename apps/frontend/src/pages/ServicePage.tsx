@@ -130,7 +130,7 @@ export function ServicePage() {
             {controlCards.map((variable) => (
               <KpiCardMini
                 key={variable.key}
-                title={variable.shortLabel}
+                title={variable.label}
                 value={variable.value}
                 unit={variable.unit}
                 digits={variable.digits}
@@ -240,7 +240,7 @@ export function ServicePage() {
                 >
                   {controlVariableOrder.map((key) => (
                     <option key={key} value={key}>
-                      {state.variables[key].shortLabel}
+                      {state.variables[key].label}
                     </option>
                   ))}
                 </select>
@@ -373,7 +373,7 @@ export function ServicePage() {
                         setDraftConfig(null)
                       }}
                     >
-                      {state.variables[key].shortLabel}
+                      {state.variables[key].label}
                     </button>
                   ))}
                 </div>
