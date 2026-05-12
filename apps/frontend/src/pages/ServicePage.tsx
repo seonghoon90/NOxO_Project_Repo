@@ -459,6 +459,7 @@ function SourceLabel({
   mode: Mode
   overrideActive: boolean
 }) {
+  // 시뮬레이션 모드(override 없음)에서는 표시 안 함 — 실시간 데이터/예측과 무관한 상태이므로.
   if (mode === 'realtime') {
     return <span className="src-indicator src-realtime">● 실시간 예측 모드</span>
   }
@@ -469,7 +470,7 @@ function SourceLabel({
       </span>
     )
   }
-  return <span className="src-indicator src-kafka">● 실시간 추종 중</span>
+  return null
 }
 
 function SettingField({
