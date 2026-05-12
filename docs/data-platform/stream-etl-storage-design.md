@@ -199,8 +199,19 @@ Important environment variables:
 - `KAFKA_BOOTSTRAP_FILE`
 - `KAFKA_BOOTSTRAP_MINUTES`
 - `STREAM_ETL_BOOTSTRAP_ENABLED`
+- `KAFKA_ETL_AUTO_OFFSET_RESET`
 - `KAFKA_ETL_CONSUMER_TIMEOUT_MS`
 - `STREAM_ETL_RETRY_DELAY_SECONDS`
+
+Recommended default:
+
+- `KAFKA_ETL_AUTO_OFFSET_RESET=latest`
+
+Reason:
+
+- bootstrap already fills the initial replay window into `sensor_data_stream`
+- the live consumer should wait for new Kafka messages after startup
+- using `earliest` can replay old topic history and overwrite bootstrap rows with `ingest_mode='stream'`
 
 ## Compose service
 

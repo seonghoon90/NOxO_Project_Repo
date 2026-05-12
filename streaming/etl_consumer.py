@@ -28,6 +28,7 @@ BOOTSTRAP_MINUTES = int(os.getenv("KAFKA_BOOTSTRAP_MINUTES", "15"))
 BOOTSTRAP_ENABLED = os.getenv("STREAM_ETL_BOOTSTRAP_ENABLED", "true").lower() == "true"
 POLL_TIMEOUT_MS = int(os.getenv("KAFKA_ETL_CONSUMER_TIMEOUT_MS", "1000"))
 RETRY_DELAY_SECONDS = int(os.getenv("STREAM_ETL_RETRY_DELAY_SECONDS", "5"))
+AUTO_OFFSET_RESET = os.getenv("KAFKA_ETL_AUTO_OFFSET_RESET", "latest")
 
 RAW_TO_DB_MAPPING = {
     "IGCC.CC.G1.ca_fqsg_cl": "syngas_flow",
@@ -214,7 +215,7 @@ def build_consumer() -> KafkaConsumer:
         TOPIC,
         bootstrap_servers=BOOTSTRAP_SERVERS,
         group_id=GROUP_ID,
-        auto_offset_reset="earliest",
+        auto_offset_reset=AUTO_OFFSET_RESET,
         enable_auto_commit=True,
         value_deserializer=lambda raw: json.loads(raw.decode("utf-8")),
         key_deserializer=lambda raw: raw.decode("utf-8") if raw else None,
@@ -243,10 +244,11 @@ def run_consumer() -> None:
         try:
             consumer = build_consumer()
             logger.info(
-                "stream_etl_consumer_started topic=%s bootstrap=%s group=%s",
+                "stream_etl_consumer_started topic=%s bootstrap=%s group=%s auto_offset_reset=%s",
                 TOPIC,
                 BOOTSTRAP_SERVERS,
                 GROUP_ID,
+                AUTO_OFFSET_RESET,
             )
             for record in consumer:
                 row = transform_message_to_row(
