@@ -28,7 +28,9 @@ CSV test data -> Producer -> Kafka topic -> Consumer -> Backend/Frontend
 - Message format: JSON
 - Default interval: 1 second per row
 
-Backend consumer는 `KAFKA_STREAM_ENABLED=true`일 때 `noxo.sensor.raw`를 읽고 최신 메시지를 메모리에 보관한다. Frontend 실시간 렌더링 연결은 다음 단계에서 붙인다.
+Backend consumer는 `KAFKA_STREAM_ENABLED=true`일 때 `noxo.sensor.raw`를 읽고 최신 메시지를 메모리에 보관한다.
+
+또한 백엔드는 `NOx_test_20250825.csv`의 초기 15분 구간을 preload data로 읽어 `GET /api/streaming/bootstrap`으로 제공할 수 있다. Producer는 같은 15분 구간을 건너뛰고 그 다음 시점부터 Kafka로 발행해 초기 화면과 실시간 구간이 겹치지 않도록 맞춘다.
 
 ## Message Shape
 
@@ -109,6 +111,12 @@ Check the latest consumed message:
 curl http://localhost:8000/api/streaming/latest
 ```
 
+Check the preload bootstrap window:
+
+```bash
+curl http://localhost:8000/api/streaming/bootstrap
+```
+
 ## Next Step
 
-After the Producer and backend consumer are verified, connect the latest streaming state to frontend rendering. The likely path is to add a small real-time endpoint or reuse the existing WebSocket layer after the UI contract is agreed.
+After the preload window and backend consumer are verified, connect the bootstrap payload plus latest streaming state to frontend rendering. The likely path is bootstrap first, then polling or WebSocket for live updates.

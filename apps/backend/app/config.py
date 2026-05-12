@@ -45,6 +45,11 @@ class Settings(BaseSettings):
         default="noxo-backend-stream",
         alias="KAFKA_CONSUMER_GROUP_ID",
     )
+    kafka_bootstrap_minutes: int = Field(default=15, alias="KAFKA_BOOTSTRAP_MINUTES")
+    kafka_bootstrap_file: str | None = Field(
+        default=None,
+        alias="KAFKA_BOOTSTRAP_FILE",
+    )
 
     # CORS (개발 시 별도 호스트에서 접근 허용)
     cors_origins: list[str] = [

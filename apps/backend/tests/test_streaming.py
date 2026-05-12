@@ -1,3 +1,20 @@
+from pathlib import Path
+
+from fastapi.testclient import TestClient
+
+from app.core.sensor_csv import iter_sensor_rows_after_bootstrap
+from app.config import get_settings
+from app.main import create_app
+
+
+def _write_stream_csv(path: Path, total_rows: int = 10) -> None:
+    lines = ["TagName,Column1,IGCC.CC.G1.csgv"]
+    for second in range(total_rows):
+        timestamp = f"2025-08-25 00:00:{second:02d}"
+        lines.append(f"{timestamp},,{70 + second}")
+    path.write_text("\n".join(lines), encoding="utf-8")
+
+
 def test_streaming_latest_disabled_by_default(client):
     res = client.get("/api/streaming/latest")
 
@@ -8,3 +25,44 @@ def test_streaming_latest_disabled_by_default(client):
         "latest": None,
         "last_error": None,
     }
+
+
+def test_streaming_bootstrap_returns_preloaded_rows(monkeypatch, tmp_path):
+    bootstrap_file = tmp_path / "stream.csv"
+    _write_stream_csv(bootstrap_file)
+
+    monkeypatch.setenv("KAFKA_BOOTSTRAP_FILE", str(bootstrap_file))
+    monkeypatch.setenv("KAFKA_BOOTSTRAP_MINUTES", "1")
+    get_settings.cache_clear()
+
+    app = create_app()
+    with TestClient(app) as client:
+        res = client.get("/api/streaming/bootstrap")
+
+    get_settings.cache_clear()
+
+    assert res.status_code == 200
+    body = res.json()
+    assert body["enabled"] is False
+    assert body["minutes"] == 1
+    assert body["source"] == "stream.csv"
+    assert body["count"] == 6
+    assert len(body["rows"]) == 6
+    assert body["rows"][0]["measured_at"] == "2025-08-25 00:00:04"
+    assert body["rows"][-1]["measured_at"] == "2025-08-25 00:00:09"
+    assert body["error"] is None
+
+
+def test_iter_sensor_rows_after_bootstrap_skips_preload_window(tmp_path):
+    bootstrap_file = tmp_path / "stream.csv"
+    lines = ["TagName,Column1,IGCC.CC.G1.csgv"]
+    for second in range(70):
+        minute = second // 60
+        sec = second % 60
+        lines.append(f"2025-08-25 00:{minute:02d}:{sec:02d},,{70 + second}")
+    bootstrap_file.write_text("\n".join(lines), encoding="utf-8")
+
+    rows = list(iter_sensor_rows_after_bootstrap(bootstrap_file, minutes=1))
+
+    assert rows
+    assert rows[0]["measured_at"] == "2025-08-25 00:01:04"

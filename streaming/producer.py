@@ -1,53 +1,22 @@
-import csv
 import json
 import os
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Iterator
 
 from kafka import KafkaProducer
 
-
-PROJECT_ROOT = Path(os.getenv("NOXO_PROJECT_ROOT", Path(__file__).resolve().parents[1]))
-DEFAULT_INPUT_FILE = PROJECT_ROOT / "data" / "raw" / "250811-250825" / "NOx_test_20250825.csv"
+from streaming.sensor_csv import (
+    DEFAULT_INPUT_FILE,
+    iter_sensor_rows_after_bootstrap,
+)
 
 BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:19092")
 TOPIC = os.getenv("KAFKA_SENSOR_TOPIC", "noxo.sensor.raw")
 INPUT_FILE = Path(os.getenv("KAFKA_INPUT_FILE", str(DEFAULT_INPUT_FILE)))
 INTERVAL_SECONDS = float(os.getenv("KAFKA_PRODUCE_INTERVAL_SECONDS", "1"))
 MAX_MESSAGES = int(os.getenv("KAFKA_MAX_MESSAGES", "0"))
-
-
-def parse_value(value: str) -> str | float | None:
-    if value == "":
-        return None
-
-    try:
-        return float(value)
-    except ValueError:
-        return value
-
-
-def iter_sensor_rows(input_file: Path) -> Iterator[dict]:
-    with input_file.open(newline="", encoding="utf-8-sig") as csv_file:
-        reader = csv.DictReader(csv_file)
-        for row_index, row in enumerate(reader):
-            if row_index < 4:
-                continue
-
-            measured_at = row["TagName"]
-            values = {
-                key: parse_value(value)
-                for key, value in row.items()
-                if key and key not in {"TagName", "Column1"}
-            }
-            yield {
-                "source": input_file.name,
-                "measured_at": measured_at,
-                "published_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
-                "values": values,
-            }
+BOOTSTRAP_MINUTES = int(os.getenv("KAFKA_BOOTSTRAP_MINUTES", "15"))
 
 
 def build_producer() -> KafkaProducer:
@@ -64,13 +33,18 @@ def main() -> None:
 
     print(
         "[Kafka Producer] start "
-        f"topic={TOPIC}, bootstrap={BOOTSTRAP_SERVERS}, input={INPUT_FILE}"
+        f"topic={TOPIC}, bootstrap={BOOTSTRAP_SERVERS}, input={INPUT_FILE}, "
+        f"skip_bootstrap_minutes={BOOTSTRAP_MINUTES}"
     )
 
     sent_count = 0
     producer = build_producer()
     try:
-        for message in iter_sensor_rows(INPUT_FILE):
+        for message in iter_sensor_rows_after_bootstrap(
+            INPUT_FILE,
+            minutes=BOOTSTRAP_MINUTES,
+        ):
+            message["published_at"] = datetime.utcnow().isoformat(timespec="seconds") + "Z"
             producer.send(
                 TOPIC,
                 key=message["measured_at"],

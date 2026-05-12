@@ -11,9 +11,11 @@ import json
 import logging
 from contextlib import suppress
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 from app.config import Settings
+from app.core.sensor_csv import load_bootstrap_rows
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +27,9 @@ class KafkaSensorStream:
         self._task: asyncio.Task[None] | None = None
         self._stop_event: asyncio.Event | None = None
         self._last_error: str | None = None
+        self._bootstrap_rows: list[dict[str, Any]] = []
+        self._bootstrap_error: str | None = None
+        self._bootstrap_loaded = False
 
     @property
     def enabled(self) -> bool:
@@ -42,7 +47,29 @@ class KafkaSensorStream:
     def last_error(self) -> str | None:
         return self._last_error
 
+    @property
+    def bootstrap_rows(self) -> list[dict[str, Any]]:
+        return self._bootstrap_rows
+
+    @property
+    def bootstrap_error(self) -> str | None:
+        return self._bootstrap_error
+
+    @property
+    def bootstrap_minutes(self) -> int:
+        return self._settings.kafka_bootstrap_minutes
+
+    @property
+    def bootstrap_source(self) -> str:
+        input_file = self._settings.kafka_bootstrap_file
+        if input_file:
+            return Path(input_file).name
+        return "NOx_test_20250825.csv"
+
     async def start(self) -> None:
+        if not self._bootstrap_loaded:
+            self._load_bootstrap_rows()
+
         if not self.enabled or self._task is not None:
             return
 
@@ -108,3 +135,21 @@ class KafkaSensorStream:
                         break
         finally:
             consumer.close()
+
+    def _load_bootstrap_rows(self) -> None:
+        try:
+            self._bootstrap_rows = load_bootstrap_rows(
+                self._settings.kafka_bootstrap_file,
+                minutes=self._settings.kafka_bootstrap_minutes,
+            )
+            self._bootstrap_error = None
+        except FileNotFoundError as exc:
+            self._bootstrap_rows = []
+            self._bootstrap_error = str(exc)
+            logger.warning("Kafka bootstrap rows unavailable: %s", exc)
+        except Exception as exc:  # pragma: no cover - defensive parse path
+            self._bootstrap_rows = []
+            self._bootstrap_error = str(exc)
+            logger.warning("Kafka bootstrap load failed: %s", exc)
+        finally:
+            self._bootstrap_loaded = True
