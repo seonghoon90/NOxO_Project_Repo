@@ -1,2 +1,5 @@
 kafka-python==2.0.2
+python-dotenv==1.0.1
+sqlalchemy==2.0.35
+psycopg[binary]==3.2.3
 

@@ -45,6 +45,30 @@ services:
       - ../streaming:/app/streaming:ro
     networks: [noxo-net]
 
+  kafka-etl-consumer:
+    build:
+      context: ..
+      dockerfile: streaming/Dockerfile
+    profiles: ["streaming"]
+    depends_on:
+      - redpanda
+    command: ["python", "-m", "streaming.etl_consumer"]
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://postgres:changeme@host.docker.internal:5432/igcc_db}
+      KAFKA_BOOTSTRAP_SERVERS: redpanda:9092
+      KAFKA_SENSOR_TOPIC: ${KAFKA_SENSOR_TOPIC:-noxo.sensor.raw}
+      KAFKA_ETL_CONSUMER_GROUP_ID: ${KAFKA_ETL_CONSUMER_GROUP_ID:-noxo-stream-etl}
+      KAFKA_BOOTSTRAP_FILE: /app/data/raw/250811-250825/NOx_test_20250825.csv
+      KAFKA_BOOTSTRAP_MINUTES: ${KAFKA_BOOTSTRAP_MINUTES:-15}
+      STREAM_ETL_BOOTSTRAP_ENABLED: ${STREAM_ETL_BOOTSTRAP_ENABLED:-true}
+      KAFKA_ETL_CONSUMER_TIMEOUT_MS: ${KAFKA_ETL_CONSUMER_TIMEOUT_MS:-1000}
+      STREAM_ETL_RETRY_DELAY_SECONDS: ${STREAM_ETL_RETRY_DELAY_SECONDS:-5}
+    volumes:
+      - ../data:/app/data:ro
+      - ../streaming:/app/streaming:ro
+      - ../database:/app/database:ro
+    networks: [noxo-net]
+
 volumes:
   redpanda_data:
 
