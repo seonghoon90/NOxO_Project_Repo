@@ -5,10 +5,12 @@ import {
   CONTROL_VARIABLE_KEYS,
   type ConsoleMetrics,
   type MetricPoint,
+  type Mode,
   type VariableConfigUpdate,
   type VariableKey,
   variableSeed,
 } from '../features/dashboard/mockConsole'
+import { ForecastPanel } from '../features/dashboard/components/ForecastPanel'
 import { useConsoleState, type StreamStatus } from '../features/dashboard/useConsoleState'
 import { useThresholds, type Thresholds } from '../features/dashboard/useThresholds'
 import type { AppOutletContext } from '../app/App'
@@ -29,13 +31,15 @@ export function ServicePage() {
     setActiveVar,
     stepActiveVar,
     resetControls,
+    resetOverride,
+    setMode: notifyBackendMode,
     updateActiveVariableConfig,
     restoreActiveVariableDefaults,
   } = useConsoleState(mode)
   const thresholds = useThresholds()
   const [draftConfig, setDraftConfig] = useState<VariableConfigUpdate | null>(null)
-  // 예측 모드는 실시간 운전 데이터 기반 NOx 예측 표시 전용 — 제어 조작은 잠근다.
-  const isPredictionMode = mode === 'pred'
+  // realtime 모드는 Kafka 기반 5분 NOx 예측 표시 — 제어 조작은 잠근다.
+  const isRealtimeMode = mode === 'realtime'
 
   const activeVariable = state.variables[state.activeVar]
   const resolvedDraftConfig = draftConfig ?? {
@@ -68,6 +72,11 @@ export function ServicePage() {
   useEffect(() => {
     reportStreamStatus(status)
   }, [reportStreamStatus, status])
+
+  // App.tsx의 mode 토글이 변경되면 backend에 알린다 — 첫 마운트 sim 호출은 idempotent.
+  useEffect(() => {
+    notifyBackendMode(mode)
+  }, [mode, notifyBackendMode])
 
   useEffect(() => {
     if (!settingsOpen) return
@@ -219,19 +228,21 @@ export function ServicePage() {
           </section>
         </div>
 
-        <aside className={isPredictionMode ? 'sidebar sidebar-locked' : 'sidebar'}>
-          {isPredictionMode ? (
+        <aside className={isRealtimeMode ? 'sidebar sidebar-locked' : 'sidebar'}>
+          <SourceLabel mode={mode} overrideActive={state.overrideActive} />
+          {isRealtimeMode ? (
             <div className="sidebar-lock-banner mono" role="status">
-              예측 모드 — 제어 잠금 (실시간 데이터 기반 5분 후 NOx 예측)
+              실시간 예측 모드 — 제어 잠금 (Kafka 추종 기반 5분 후 NOx 예측)
             </div>
           ) : null}
+          <ForecastPanel mode={mode} forecast={state.forecast} />
           <div className="sidebar-section">
             <div className="sidebar-title">제어 변수 선택</div>
             <select
               className="control-select mono"
               value={state.activeVar}
               onChange={(event) => setActiveVar(event.target.value as VariableKey)}
-              disabled={isPredictionMode}
+              disabled={isRealtimeMode}
             >
               {controlVariableOrder.map((key) => (
                 <option key={key} value={key}>
@@ -261,7 +272,7 @@ export function ServicePage() {
                   type="button"
                   className="step-button"
                   onClick={() => stepActiveVar(-1)}
-                  disabled={isPredictionMode || activeVariable.value <= activeVariable.min}
+                  disabled={isRealtimeMode || activeVariable.value <= activeVariable.min}
                   aria-label="감소"
                 >
                   <ArrowDownIcon />
@@ -271,7 +282,7 @@ export function ServicePage() {
                   type="button"
                   className="step-button"
                   onClick={() => stepActiveVar(1)}
-                  disabled={isPredictionMode || activeVariable.value >= activeVariable.max}
+                  disabled={isRealtimeMode || activeVariable.value >= activeVariable.max}
                   aria-label="증가"
                 >
                   <ArrowUpIcon />
@@ -280,8 +291,11 @@ export function ServicePage() {
               <button
                 type="button"
                 className="icon-button"
-                onClick={resetControls}
-                disabled={isPredictionMode}
+                onClick={() => {
+                  resetOverride()
+                  resetControls()
+                }}
+                disabled={isRealtimeMode}
                 aria-label="초기화"
               >
                 <ResetIcon />
@@ -436,6 +450,26 @@ export function ServicePage() {
       ) : null}
     </main>
   )
+}
+
+function SourceLabel({
+  mode,
+  overrideActive,
+}: {
+  mode: Mode
+  overrideActive: boolean
+}) {
+  if (mode === 'realtime') {
+    return <span className="src-indicator src-realtime">● 실시간 예측 모드</span>
+  }
+  if (overrideActive) {
+    return (
+      <span className="src-indicator src-override">
+        ⏸ 사용자 고정 (Kafka 추종 정지)
+      </span>
+    )
+  }
+  return <span className="src-indicator src-kafka">● 실시간 추종 중</span>
 }
 
 function SettingField({

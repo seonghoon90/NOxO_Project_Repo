@@ -49,6 +49,9 @@ export type ConsoleState = {
   variables: Record<VariableKey, VariableConfig>
   metrics: ConsoleMetrics
   history: MetricPoint[]
+  forecast: RealtimeStreamPayload['forecast']
+  overrideActive: boolean
+  kafkaLatest: RealtimeStreamPayload['kafka_latest']
 }
 
 export type VariableConfigUpdate = Pick<VariableConfig, 'min' | 'max' | 'step'>
@@ -259,6 +262,9 @@ export function createInitialConsoleState(seedHistory = false): ConsoleState {
     variables,
     metrics,
     history,
+    forecast: null,
+    overrideActive: false,
+    kafkaLatest: null,
   }
 }
 
@@ -360,6 +366,9 @@ export function createStateFromSnapshot(
     variables,
     metrics,
     history: previous?.history ?? [],
+    forecast: previous?.forecast ?? null,
+    overrideActive: previous?.overrideActive ?? false,
+    kafkaLatest: previous?.kafkaLatest ?? null,
   }
 }
 
@@ -585,7 +594,14 @@ export function createStateFromPayload(
     efficiency: outputs.efficiency,
     predictedNox: payload.forecast?.predicted_nox ?? outputs.nox,
   }
-  return { ...current, variables, metrics }
+  return {
+    ...current,
+    variables,
+    metrics,
+    forecast: payload.forecast,
+    overrideActive: payload.override_active,
+    kafkaLatest: payload.kafka_latest,
+  }
 }
 
 function roundForDigits(value: number, digits: number) {
