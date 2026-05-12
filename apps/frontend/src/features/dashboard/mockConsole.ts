@@ -551,3 +551,44 @@ export const VARIABLE_KEY_TO_DOMAIN: Record<VariableKey, string> = {
   ibhValve: 'ibh_valve',
   n2Flow: 'n2_flow',
 }
+
+export function safeParseRealtimePayload(raw: string): RealtimeStreamPayload | null {
+  try {
+    const parsed = JSON.parse(raw) as RealtimeStreamPayload
+    if (parsed.v !== 1) return null
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+export function createStateFromPayload(
+  payload: RealtimeStreamPayload,
+  current: ConsoleState,
+): ConsoleState {
+  const controls = payload.current.controls as unknown as Record<string, number>
+  const outputs = payload.current.outputs
+  const variables = { ...current.variables }
+  for (const key of CONTROL_VARIABLE_KEYS) {
+    const domainKey = VARIABLE_KEY_TO_DOMAIN[key]
+    const value = controls[domainKey] ?? variables[key].value
+    variables[key] = {
+      ...variables[key],
+      value: roundForDigits(value, variables[key].digits),
+    }
+  }
+  const metrics: ConsoleMetrics = {
+    nox: outputs.nox,
+    exhaust: outputs.exhaust_temp,
+    lambda: outputs.lambda_,
+    power: outputs.power,
+    efficiency: outputs.efficiency,
+    predictedNox: payload.forecast?.predicted_nox ?? outputs.nox,
+  }
+  return { ...current, variables, metrics }
+}
+
+function roundForDigits(value: number, digits: number) {
+  const factor = 10 ** digits
+  return Math.round(value * factor) / factor
+}
