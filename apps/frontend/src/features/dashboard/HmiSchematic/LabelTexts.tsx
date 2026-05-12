@@ -1,10 +1,30 @@
 import { KPI_ANCHORS } from './schematic-roles'
 import styles from './HmiSchematic.module.css'
 
-// KPI_ANCHORS의 좌표는 숫자값 텍스트 위치 — 라벨은 그 위쪽으로 약간 띄운다.
-const LABEL_Y_OFFSET = -20
+// 박스 path 중심 x 좌표 — schematic.svg의 각 BOX/target 그룹 외곽 path에서 추출.
+// 라벨은 박스 중앙에 정렬돼야 자연스러워, KPI_ANCHORS의 숫자값 x(좌측 정렬용)는 무시하고 별도 dict 사용.
+const BOX_CENTER_X: Record<keyof typeof KPI_ANCHORS, number> = {
+  syngas: 92.5,
+  csgv: 453.5,
+  nqkr3: 92.5,
+  nicvs1: 269.5,
+  fsagr: 260.5,
+  fsag11: 514.5,
+  fsag11a: 630.5,
+  fsag12: 746.5,
+  csbhx: 277.5,
+  nqj: 479.5,
+  nox: 1194.5,
+  ttxm: 1194.5,
+  dwatt: 1194.5,
+  lambda: 1194.5,
+  'legend-fuel': 0,
+  'legend-n2': 0,
+  'legend-air': 0,
+}
 
-type Anchor = (typeof KPI_ANCHORS)[keyof typeof KPI_ANCHORS]
+// KPI_ANCHORS의 숫자값 y에서 라벨 위치는 -20px 위쪽
+const LABEL_Y_OFFSET = -20
 
 const LABELS: ReadonlyArray<{ key: keyof typeof KPI_ANCHORS; text: string }> = [
   { key: 'syngas', text: '합성가스 유량' },
@@ -27,13 +47,14 @@ export function LabelTexts() {
   return (
     <g data-role="label-texts" className={styles.labelTexts}>
       {LABELS.map(({ key, text }) => {
-        const anchor: Anchor = KPI_ANCHORS[key]
+        const anchor = KPI_ANCHORS[key]
+        const cx = BOX_CENTER_X[key]
         return (
           <text
             key={key}
-            x={anchor.x}
+            x={cx}
             y={anchor.y + LABEL_Y_OFFSET}
-            textAnchor={anchor.textAnchor}
+            textAnchor="middle"
             data-role={`label-${key}`}
           >
             {text}
