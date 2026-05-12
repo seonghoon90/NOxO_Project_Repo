@@ -70,7 +70,3 @@ class RealtimeStreamPayload(BaseModel):
     kafka_latest: StreamKafkaLatest | None = None
     forecast: StreamForecast | None = None
     warning: str | None = None
-
-
-# 임시 호환 stub — Task 9에서 sim_loop.py / endpoints/stream.py 사용처 제거 후 삭제.
-StreamMessage = RealtimeStreamPayload  # noqa: F841

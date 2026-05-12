@@ -1,6 +1,6 @@
 """ML 기반 Simulator — Ridge·LGB 앙상블.
 
-Simulator Protocol(외부): predict(controls) — NotImplementedError. SimLoopManager가 클로저로 ctx 바인딩.
+Simulator Protocol(외부): predict(controls) — NotImplementedError. RealtimeEngine이 클로저로 ctx 바인딩.
 실제 추론 본체: predict_for_session(controls, session_ctx).
 """
 
@@ -34,13 +34,13 @@ class MLSimulator:
             raise PredictorUnavailableError(f"model load failed: {e}") from e
 
     def predict(self, controls: ControlVars) -> OutputVars:
-        """Simulator Protocol 준수 (1-인자). SimLoopManager 클로저 사용 강제."""
-        raise NotImplementedError("Use predict_for_session() via SimLoopManager closure")
+        """Simulator Protocol 준수 (1-인자). RealtimeEngine이 ctx-bound 호출 사용."""
+        raise NotImplementedError("Use predict_for_session() via RealtimeEngine closure")
 
     def predict_for_session(
         self, controls: ControlVars, session_ctx: SessionContext
     ) -> OutputVars:
-        """실제 추론 본체. SimLoopManager가 `lambda c: ml.predict_for_session(c, ctx)`로 호출."""
+        """실제 추론 본체. RealtimeEngine이 `simulator.predict_for_session(c, ctx)`로 호출."""
         now = time.monotonic()
 
         # [1] 호출 게이트 (P4 — conditional raise)
