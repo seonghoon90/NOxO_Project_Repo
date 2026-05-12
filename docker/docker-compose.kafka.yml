@@ -1,0 +1,53 @@
+services:
+  redpanda:
+    image: redpandadata/redpanda:v24.3.7
+    container_name: noxo_redpanda
+    command:
+      - redpanda
+      - start
+      - --overprovisioned
+      - --smp
+      - "1"
+      - --memory
+      - 512M
+      - --reserve-memory
+      - 0M
+      - --node-id
+      - "0"
+      - --check=false
+      - --kafka-addr
+      - internal://0.0.0.0:9092,external://0.0.0.0:19092
+      - --advertise-kafka-addr
+      - internal://redpanda:9092,external://localhost:19092
+    ports:
+      - "${KAFKA_PORT:-19092}:19092"
+    volumes:
+      - redpanda_data:/var/lib/redpanda/data
+    networks: [noxo-net]
+
+  kafka-producer:
+    build:
+      context: ..
+      dockerfile: streaming/Dockerfile
+    profiles: ["streaming"]
+    depends_on:
+      - redpanda
+    environment:
+      NOXO_PROJECT_ROOT: /app
+      KAFKA_BOOTSTRAP_SERVERS: redpanda:9092
+      KAFKA_SENSOR_TOPIC: ${KAFKA_SENSOR_TOPIC:-noxo.sensor.raw}
+      KAFKA_INPUT_FILE: /app/data/raw/250811-250825/NOx_test_20250825.csv
+      KAFKA_PRODUCE_INTERVAL_SECONDS: ${KAFKA_PRODUCE_INTERVAL_SECONDS:-1}
+      KAFKA_MAX_MESSAGES: ${KAFKA_MAX_MESSAGES:-0}
+    volumes:
+      - ../data:/app/data:ro
+      - ../streaming:/app/streaming:ro
+    networks: [noxo-net]
+
+volumes:
+  redpanda_data:
+
+networks:
+  noxo-net:
+    driver: bridge
+

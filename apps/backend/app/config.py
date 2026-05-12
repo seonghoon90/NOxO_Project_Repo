@@ -34,6 +34,18 @@ class Settings(BaseSettings):
     # 가안: 합성가스 LHV ≈ 11 MJ/Nm³. 실측 평균값 확보 후 재산정 필요.
     syngas_lhv: float = 11.0
 
+    # Kafka-compatible streaming simulation
+    kafka_stream_enabled: bool = Field(default=False, alias="KAFKA_STREAM_ENABLED")
+    kafka_bootstrap_servers: str = Field(
+        default="localhost:19092",
+        alias="KAFKA_BOOTSTRAP_SERVERS",
+    )
+    kafka_sensor_topic: str = Field(default="noxo.sensor.raw", alias="KAFKA_SENSOR_TOPIC")
+    kafka_consumer_group_id: str = Field(
+        default="noxo-backend-stream",
+        alias="KAFKA_CONSUMER_GROUP_ID",
+    )
+
     # CORS (개발 시 별도 호스트에서 접근 허용)
     cors_origins: list[str] = [
         "http://localhost:5173",

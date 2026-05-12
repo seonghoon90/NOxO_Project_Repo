@@ -10,6 +10,7 @@ from app.api.endpoints import (
     prediction,
     session,
     stream,
+    streaming,
     threshold,
 )
 
@@ -17,5 +18,6 @@ api_router = APIRouter(prefix="/api")
 api_router.include_router(health.router)
 api_router.include_router(session.router)
 api_router.include_router(stream.router)
+api_router.include_router(streaming.router)
 api_router.include_router(prediction.router)
 api_router.include_router(threshold.router)

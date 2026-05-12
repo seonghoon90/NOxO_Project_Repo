@@ -18,6 +18,7 @@ from app.adapters.simulator import StubSimulator
 from app.adapters.simulator.ml import MLSimulator
 from app.config import get_settings
 from app.core.input_injector import InputInjector
+from app.core.kafka_stream import KafkaSensorStream
 from app.core.logging import configure_logging
 from app.core.session_context import SessionContext
 from app.core.sim_loop import SimLoopManager
@@ -53,6 +54,7 @@ async def lifespan(app: FastAPI):
                 raise
             simulator = StubSimulator()
     forecaster = StubForecaster()
+    kafka_sensor_stream = KafkaSensorStream(settings)
 
     # === session_contexts + DataSource (B안 ML 모드) ===
     session_contexts: dict[str, SessionContext] = {}
@@ -79,7 +81,6 @@ async def lifespan(app: FastAPI):
             "ml_simulator_without_datasource — forcing StubSimulator (data_source=None invariant)"
         )
         simulator = StubSimulator()
-
     sim_loop = SimLoopManager(
         settings=settings,
         state_store=state_store,
@@ -95,12 +96,16 @@ async def lifespan(app: FastAPI):
     app.state.ws_manager = ws_manager
     app.state.simulator = simulator
     app.state.forecaster = forecaster
+    app.state.kafka_sensor_stream = kafka_sensor_stream
     app.state.sim_loop = sim_loop
     app.state.data_source = data_source
     app.state.session_contexts = session_contexts
 
+    await kafka_sensor_stream.start()
+
     try:
         yield
     finally:
+        await kafka_sensor_stream.stop()
         await sim_loop.stop_all()
         DbContext.dispose()

@@ -27,6 +27,10 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-changeme}@host.docker.internal:5432/${POSTGRES_DB:-igcc_db}
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      KAFKA_STREAM_ENABLED: ${KAFKA_STREAM_ENABLED:-false}
+      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-redpanda:9092}
+      KAFKA_SENSOR_TOPIC: ${KAFKA_SENSOR_TOPIC:-noxo.sensor.raw}
+      KAFKA_CONSUMER_GROUP_ID: ${KAFKA_CONSUMER_GROUP_ID:-noxo-backend-stream}
       TZ: Asia/Seoul
     volumes:
       - ../data:/app/data:ro

@@ -13,6 +13,7 @@ from app.adapters.forecaster import Forecaster
 from app.adapters.simulator import Simulator
 from app.config import Settings, get_settings
 from app.core.input_injector import InputInjector
+from app.core.kafka_stream import KafkaSensorStream
 from app.core.sim_loop import SimLoopManager
 from app.core.state_store import StateStore
 from app.core.ws_manager import WebSocketManager
@@ -43,6 +44,10 @@ def get_simulator(request: Request) -> Simulator:
 
 def get_forecaster(request: Request) -> Forecaster:
     return request.app.state.forecaster
+
+
+def get_kafka_sensor_stream(request: Request) -> KafkaSensorStream:
+    return request.app.state.kafka_sensor_stream
 
 
 SettingsDep = Annotated[Settings, Depends(get_settings)]
