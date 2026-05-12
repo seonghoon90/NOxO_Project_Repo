@@ -17,6 +17,7 @@ from app.core.kafka_stream import KafkaSensorStream
 from app.core.sim_loop import SimLoopManager
 from app.core.state_store import StateStore
 from app.core.ws_manager import WebSocketManager
+from app.repositories.simulation_log_repo import SimulationLogRepository
 from app.services.forecast_service import ForecastService
 from app.services.session_service import SessionService
 from app.services.threshold_service import ThresholdService
@@ -50,6 +51,10 @@ def get_kafka_sensor_stream(request: Request) -> KafkaSensorStream:
     return request.app.state.kafka_sensor_stream
 
 
+def get_simulation_log_repo(request: Request) -> SimulationLogRepository | None:
+    return getattr(request.app.state, "simulation_log_repo", None)
+
+
 SettingsDep = Annotated[Settings, Depends(get_settings)]
 
 
@@ -70,20 +75,31 @@ def get_session_service(
     data_source: Annotated[PlantDataSource | None, Depends(get_data_source)],
     simulator: Annotated[Simulator, Depends(get_simulator)],
     session_contexts: Annotated[dict, Depends(get_session_contexts)],
+    simulation_log_repo: Annotated[
+        SimulationLogRepository | None, Depends(get_simulation_log_repo)
+    ],
 ) -> SessionService:
     return SessionService(
         settings, state_store, injector, sim_loop, ws_manager,
         data_source=data_source,
         simulator=simulator,
         session_contexts=session_contexts,
+        simulation_log_repo=simulation_log_repo,
     )
 
 
 def get_forecast_service(
     state_store: Annotated[StateStore, Depends(get_state_store)],
     forecaster: Annotated[Forecaster, Depends(get_forecaster)],
+    simulation_log_repo: Annotated[
+        SimulationLogRepository | None, Depends(get_simulation_log_repo)
+    ],
 ) -> ForecastService:
-    return ForecastService(state_store, forecaster)
+    return ForecastService(
+        state_store,
+        forecaster,
+        simulation_log_repo=simulation_log_repo,
+    )
 
 
 def get_threshold_service() -> ThresholdService:
