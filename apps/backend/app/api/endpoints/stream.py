@@ -1,65 +1,42 @@
-"""WebSocket 스트림 엔드포인트.
+"""WebSocket 실시간 스트림 endpoint.
 
-연결 시 sid 유효성을 확인하고, 즉시 현재 snapshot 1회 push 후 broadcast 채널에
-구독자로 등록한다. 클라이언트는 sim loop가 매 step 후 push하는 메시지를 수신한다.
+연결 시 sid 유효성 확인. 이후 RealtimeEngine이 broadcast하는 envelope v1 payload를 push.
+spec §2.2 L215: 연결 직후 1회 즉시 snapshot push (재연결 시 화면 복원).
 """
 
-from datetime import datetime, timezone
+import logging
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from app.schemas.stream import StreamMessage
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["stream"])
 
 
 @router.websocket("/session/{sid}/stream")
-async def session_stream(
-    websocket: WebSocket,
-    sid: str,
-) -> None:
-    """WebSocket은 Request 기반 Depends가 동작하지 않으므로
-    websocket.app.state에서 직접 컴포넌트를 꺼낸다."""
-    state_store = websocket.app.state.state_store
+async def session_stream(websocket: WebSocket, sid: str) -> None:
+    sessions = websocket.app.state.sessions
     ws_manager = websocket.app.state.ws_manager
+    realtime_engine = websocket.app.state.realtime_engine
 
-    if sid not in state_store:
-        # accept 후 close해야 클라이언트가 사유를 받을 수 있음
+    if sid not in sessions:
         await websocket.accept()
         await websocket.close(code=4404, reason="session not found")
         return
 
     await ws_manager.connect(sid, websocket)
 
-    # 초기 snapshot 1회 push (재연결 직후 즉시 화면 복원용)
-    state = state_store.get(sid)
-    if state is not None:
-        snapshot = StreamMessage(
-            sid=state.sid,
-            t=round(state.t, 3),
-            syngas_flow=state.current.syngas_flow,
-            igv_opening=state.current.igv_opening,
-            n2_offset=state.current.n2_offset,
-            n2_valve_1=state.current.n2_valve_1,
-            syngas_srv=state.current.syngas_srv,
-            syngas_gcv_1=state.current.syngas_gcv_1,
-            syngas_gcv_1a=state.current.syngas_gcv_1a,
-            syngas_gcv_2=state.current.syngas_gcv_2,
-            ibh_valve=state.current.ibh_valve,
-            n2_flow=state.current.n2_flow,
-            nox=state.output.nox,
-            exhaust_temp=state.output.exhaust_temp,
-            lambda_=state.output.lambda_,
-            power=state.output.power,
-            efficiency=state.output.efficiency,
-            warning=state.warning,
-            ts=state.last_updated or datetime.now(timezone.utc),
-        )
-        await websocket.send_json(snapshot.model_dump(by_alias=True, mode="json"))
+    # spec §2.2 L215 — 캐시된 마지막 payload가 있으면 즉시 push
+    snapshot = realtime_engine.last_payload(sid)
+    if snapshot is not None:
+        try:
+            await websocket.send_json(snapshot)
+        except Exception as exc:
+            logger.warning("ws_initial_snapshot_failed sid=%s err=%s", sid, exc)
 
     try:
         while True:
-            # 클라이언트 → 서버 메시지는 현재 사용 안 함. 연결 유지 목적으로 receive.
+            # 클라이언트 → 서버 메시지는 keepalive 용도로만 사용
             await websocket.receive_text()
     except WebSocketDisconnect:
         pass

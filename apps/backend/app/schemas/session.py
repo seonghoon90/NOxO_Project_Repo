@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -51,6 +52,16 @@ class ControlPayload(BaseModel):
             n2_flow=self.n2_flow,
         )
 
+    @classmethod
+    def from_controlvars(cls, cv: ControlVars) -> "ControlPayload":
+        return cls(
+            syngas_flow=cv.syngas_flow, igv_opening=cv.igv_opening,
+            n2_offset=cv.n2_offset, n2_valve_1=cv.n2_valve_1,
+            syngas_srv=cv.syngas_srv, syngas_gcv_1=cv.syngas_gcv_1,
+            syngas_gcv_1a=cv.syngas_gcv_1a, syngas_gcv_2=cv.syngas_gcv_2,
+            ibh_valve=cv.ibh_valve, n2_flow=cv.n2_flow,
+        )
+
 
 class StartSessionRequest(BaseModel):
     initial_condition: ControlPayload | None = None
@@ -59,7 +70,8 @@ class StartSessionRequest(BaseModel):
 class OutputPayload(BaseModel):
     """SnapshotResponse의 출력 변수 묶음.
 
-    `co`는 학습 타겟에서 제외, `efficiency`는 백엔드 sim_loop 후처리값.
+    `co`는 학습 타겟에서 제외, `efficiency`는 RealtimeEngine 후처리값
+    (power/(syngas_flow×syngas_lhv)).
     """
 
     nox: float
@@ -84,3 +96,38 @@ class SnapshotResponse(BaseModel):
 class StartSessionResponse(BaseModel):
     sid: str
     snapshot: SnapshotResponse
+
+
+# === envelope v1 / 모드 전환 응답 (spec §2.1) ===
+
+
+class SessionStartResponse(BaseModel):
+    sid: str
+    mode: Literal["sim", "realtime"]
+    control_override: ControlPayload | None = None
+    created_at: datetime
+
+
+class SessionModeRequest(BaseModel):
+    mode: Literal["sim", "realtime"]
+
+
+class SessionModeResponse(BaseModel):
+    sid: str
+    mode: Literal["sim", "realtime"]
+    control_override: ControlPayload | None = None
+    changed_at: datetime
+
+
+class SessionResetResponse(BaseModel):
+    sid: str
+    control_override: ControlPayload | None = None
+    reset_at: datetime
+
+
+class SessionInfoResponse(BaseModel):
+    sid: str
+    mode: Literal["sim", "realtime"]
+    control_override: ControlPayload | None = None
+    created_at: datetime
+    last_active_at: datetime

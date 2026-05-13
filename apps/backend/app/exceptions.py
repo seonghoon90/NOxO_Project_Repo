@@ -30,3 +30,9 @@ class DataSourceUnavailableError(DomainError):
 
 class SessionTerminatedError(DomainError):
     error_code = "SESSION_TERMINATED"
+
+
+class SessionModeConflictError(DomainError):
+    """sim 모드 전용 동작을 realtime 모드에서 시도했을 때."""
+
+    error_code = "SESSION_MODE_CONFLICT"

@@ -52,6 +52,95 @@ TAG_POWER: Final[str] = "IGCC.CC.G1.DWATT"  # 발전량 (MW)
 
 
 # ============================================================
+# 출력/관측 태그 — ERD sensor_data 출력 컬럼
+# 도메인 키 = OutputVars 필드명 (DB ERD 컬럼명과 별개)
+#   ERD nox_ppm/power_mw → 도메인 nox/power
+# ============================================================
+TAG_NOX_PPM: Final[str] = "IGCC.DeNOX.AT_H1_901_PV"   # TODO: 실제 NOx 측정 태그 확인 (가안)
+TAG_EXHAUST_TEMP: Final[str] = "IGCC.CC.G1.TTXM"
+# TAG_NPR_PRIMARY: TODO — IGCC.CC.G1.NQJ는 이미 TAG_N2_FLOW(=n2_flow)에 할당됨.
+#                  실제 NPR primary 측정 태그를 확인 후 추가할 것.
+# TAG_POWER는 기존 정의(L51) 사용 → "IGCC.CC.G1.DWATT"
+
+
+# ============================================================
+# 외란 29개 — TODO: 모델링 팀과 매핑 검토 (후속 작업)
+# 외란 매핑이 미완이어도 시스템은 동작 (DT 모델이 ffill 폴백 경로로 작동)
+# ============================================================
+DISTURBANCE_TAGS: Final[dict[str, str]] = {
+    # 예시 (실제 매핑은 후속 작업):
+    # "IGCC.CC.G1.PCD": "compressor_discharge_pressure",
+    # 추후 digital_twin/preprocess.RAW_FEATURES 39개에서
+    # CONTROL_TAGS 10개 + 출력 5개를 뺀 24개에 임의 도메인명 부여
+}
+
+
+# ============================================================
+# 통합 매핑 — Kafka 메시지 정규화용
+# ============================================================
+ALL_TAGS_TO_DOMAIN: Final[dict[str, str]] = {
+    # 제어 10개
+    TAG_SYNGAS_FLOW: "syngas_flow",
+    TAG_IGV_OPENING: "igv_opening",
+    TAG_N2_OFFSET: "n2_offset",
+    TAG_N2_VALVE_1: "n2_valve_1",
+    TAG_SYNGAS_SRV: "syngas_srv",
+    TAG_SYNGAS_GCV_1: "syngas_gcv_1",
+    TAG_SYNGAS_GCV_1A: "syngas_gcv_1a",
+    TAG_SYNGAS_GCV_2: "syngas_gcv_2",
+    TAG_IBH_VALVE: "ibh_valve",
+    TAG_N2_FLOW: "n2_flow",
+    # 출력 3개 (npr_primary는 NQJ 충돌로 보류, TODO 참조)
+    TAG_NOX_PPM: "nox",
+    TAG_EXHAUST_TEMP: "exhaust_temp",
+    TAG_POWER: "power",
+    # 외란
+    **DISTURBANCE_TAGS,
+}
+
+
+def normalize_raw_message(values: dict[str, float]) -> dict[str, float]:
+    """Kafka 메시지의 values dict (원천 태그명) → 도메인 snake_case dict.
+
+    매핑 외 키는 dropped. 외란 매핑 미완 단계에서는 ERD 13개(제어 10 + 출력 3)만
+    반환된다 (npr_primary는 NQJ 키 충돌로 추후 추가 예정).
+    """
+    return {
+        ALL_TAGS_TO_DOMAIN[k]: v
+        for k, v in values.items()
+        if k in ALL_TAGS_TO_DOMAIN
+    }
+
+
+# ============================================================
+# 도메인 → 원천 태그 역매핑 (SessionContext 재구성용)
+# ============================================================
+DOMAIN_TO_RAW_TAG: Final[dict[str, str]] = {
+    v: k for k, v in ALL_TAGS_TO_DOMAIN.items()
+}
+
+
+def denormalize_to_raw_tags(domain_dict: dict[str, float]) -> dict[str, float]:
+    """도메인 snake_case dict → 원천 태그 dict (SessionContext 호환용)."""
+    return {
+        DOMAIN_TO_RAW_TAG[k]: v
+        for k, v in domain_dict.items()
+        if k in DOMAIN_TO_RAW_TAG
+    }
+
+
+def control_payload_to_controlvars(payload) -> ControlVars:
+    """ControlPayload → ControlVars (도메인 객체로 변환)."""
+    return ControlVars(
+        syngas_flow=payload.syngas_flow, igv_opening=payload.igv_opening,
+        n2_offset=payload.n2_offset, n2_valve_1=payload.n2_valve_1,
+        syngas_srv=payload.syngas_srv, syngas_gcv_1=payload.syngas_gcv_1,
+        syngas_gcv_1a=payload.syngas_gcv_1a, syngas_gcv_2=payload.syngas_gcv_2,
+        ibh_valve=payload.ibh_valve, n2_flow=payload.n2_flow,
+    )
+
+
+# ============================================================
 # ControlVars ↔ 태그 dict 매핑
 # DT의 ControlVars는 IGCC 태그 체계를 모르므로 매핑은 본 모듈이 책임진다.
 # ============================================================

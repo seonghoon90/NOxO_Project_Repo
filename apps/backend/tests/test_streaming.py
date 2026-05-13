@@ -1,7 +1,9 @@
 from pathlib import Path
+from unittest.mock import MagicMock
 
 from fastapi.testclient import TestClient
 
+from app.core.sensor_buffer import SensorBuffer
 from app.core.sensor_csv import iter_sensor_rows_after_bootstrap
 from app.config import get_settings
 from app.main import create_app
@@ -66,3 +68,60 @@ def test_iter_sensor_rows_after_bootstrap_skips_preload_window(tmp_path):
 
     assert rows
     assert rows[0]["measured_at"] == "2025-08-25 00:01:04"
+
+
+def test_ensure_bootstrap_loaded_idempotent(settings_with_csv, tmp_path):
+    """ensure_bootstrap_loaded는 여러 번 호출해도 1회만 로드한다."""
+    from app.core.kafka_stream import KafkaSensorStream
+
+    bootstrap_file = tmp_path / "stream.csv"
+    lines = ["TagName,Column1,IGCC.CC.G1.csgv"]
+    for second in range(120):
+        minute = second // 60
+        sec = second % 60
+        lines.append(f"2025-08-25 00:{minute:02d}:{sec:02d},,{70 + second}")
+    bootstrap_file.write_text("\n".join(lines), encoding="utf-8")
+    settings_with_csv.kafka_bootstrap_file = str(bootstrap_file)
+    settings_with_csv.kafka_bootstrap_minutes = 1
+
+    stream = KafkaSensorStream(settings_with_csv)
+    stream.ensure_bootstrap_loaded()
+    first = list(stream.bootstrap_rows)
+    stream.ensure_bootstrap_loaded()
+    second_load = list(stream.bootstrap_rows)
+    assert first == second_load
+    assert len(first) > 0
+
+
+def test_attach_buffer_routes_messages(settings_with_csv):
+    """attach_buffer 후 normalize → buffer.append 경로가 활성화된다."""
+    from app.core.kafka_stream import KafkaSensorStream
+
+    stream = KafkaSensorStream(settings_with_csv)
+    buffer = SensorBuffer(maxlen=10)
+    stream.attach_buffer(buffer)
+
+    fake_record = MagicMock()
+    fake_record.value = {
+        "source": "test",
+        "measured_at": "2025-08-25 00:00:00",
+        "values": {"IGCC.CC.G1.ca_fqsg_cl": 100.5},
+    }
+    stream._route_record(fake_record)
+
+    assert len(buffer) == 1
+    # spec §2.2 L274 — naive `%Y-%m-%d %H:%M:%S`는 UTC ISO 8601 + Z로 정규화 후 적재.
+    assert buffer.latest_row() == {
+        "syngas_flow": 100.5,
+        "measured_at": "2025-08-25T00:00:00.000Z",
+    }
+
+
+def test_route_record_without_buffer_does_nothing(settings_with_csv):
+    """attach_buffer 안 한 상태에서는 buffer 없이도 안전하게 동작."""
+    from app.core.kafka_stream import KafkaSensorStream
+
+    stream = KafkaSensorStream(settings_with_csv)
+    fake_record = MagicMock()
+    fake_record.value = {"source": "x", "measured_at": "t", "values": {}}
+    stream._route_record(fake_record)

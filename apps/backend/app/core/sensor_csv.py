@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import csv
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Iterator
 
@@ -34,6 +34,31 @@ def parse_value(value: str) -> str | float | None:
 
 def parse_measured_at(value: str) -> datetime:
     return datetime.strptime(value, TIMESTAMP_FORMAT)
+
+
+def normalize_measured_at(value: str | None) -> str | None:
+    """measured_at을 UTC ISO 8601 + Z로 정규화 (spec §2.2 L274).
+
+    이미 ISO 8601 + Z 또는 +00:00이면 그대로 통과, naive `"%Y-%m-%d %H:%M:%S"`는
+    UTC로 간주해 변환. 파싱 실패 시 None 반환(envelope에서 wall-clock 폴백).
+    """
+    if not value:
+        return None
+    try:
+        # ISO 8601(Z 포함) 우선
+        if value.endswith("Z"):
+            dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        elif "T" in value or "+" in value:
+            dt = datetime.fromisoformat(value)
+        else:
+            dt = datetime.strptime(value, TIMESTAMP_FORMAT).replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    else:
+        dt = dt.astimezone(timezone.utc)
+    return dt.isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 
 def iter_sensor_rows(input_file: str | Path | None = None) -> Iterator[dict]:

@@ -1,20 +1,16 @@
+"""WebSocket 실시간 스트림 payload schema (envelope v1).
+
+spec: docs/superpowers/specs/2026-05-12-realtime-prediction-design.md §2.2
+"""
+
 from datetime import datetime
+from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
-class StreamMessage(BaseModel):
-    """WebSocket으로 push되는 시뮬 상태 메시지.
-
-    프론트엔드 ring buffer / Trend Plot 입력 포맷.
-    `DT_ARCHITECTURE.md §10` — 평면 구조 (제어 10 + 출력 + meta).
-    `co`는 학습 타겟에서 제외, `efficiency`는 백엔드 sim_loop 후처리.
-    """
-
-    sid: str
-    t: float
-
-    # 제어 변수 (현재값) — 10개
+class StreamControls(BaseModel):
+    """제어 10개 변수 (도메인 snake_case)."""
     syngas_flow: float
     igv_opening: float
     n2_offset: float
@@ -26,14 +22,51 @@ class StreamMessage(BaseModel):
     ibh_valve: float
     n2_flow: float
 
-    # 출력 변수 — `co` 제외, `efficiency` 추가 (백엔드 후처리값)
+
+class StreamOutputs(BaseModel):
+    """DT current 추론 결과 5개.
+
+    단위: nox(ppm), exhaust_temp(°C), power(MW), lambda_(무차원), efficiency([0,1])
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
     nox: float
     exhaust_temp: float
-    lambda_: float = Field(alias="lambda")
-    power: float  # MW — IGCC.CC.G1.DWATT
+    power: float
+    lambda_: float = Field(alias="lambda_")
     efficiency: float
 
-    warning: bool
+
+class StreamCurrent(BaseModel):
+    controls: StreamControls
+    outputs: StreamOutputs
+
+
+class StreamKafkaLatest(BaseModel):
+    controls: StreamControls
     ts: datetime
 
-    model_config = {"populate_by_name": True}
+
+class StreamForecast(BaseModel):
+    predicted_nox: float
+    target_time: datetime
+    threshold_value: float
+    threshold_exceeded: bool
+
+
+class RealtimeStreamPayload(BaseModel):
+    """WS /api/session/{sid}/stream 메시지 envelope.
+
+    spec §2.2. v=1 고정. mode/override 조합별 필드 채움 규칙은 spec 참조.
+    """
+
+    v: Literal[1] = 1
+    sid: str
+    tick: int
+    ts: datetime
+    mode: Literal["sim", "realtime"]
+    override_active: bool
+    current: StreamCurrent
+    kafka_latest: StreamKafkaLatest | None = None
+    forecast: StreamForecast | None = None
+    warning: str | None = None

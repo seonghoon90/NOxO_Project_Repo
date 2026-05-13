@@ -1,23 +1,16 @@
+"""SessionService → simulation_log_repo 호출 흐름 검증.
+
+spec §3.5: 세션 시작 시 initial input_log는 더 이상 적재하지 않는다
+(모든 세션이 동일 운전점에서 시작 → 의미 없음). submit_control 호출 시만 적재.
+"""
+
 import asyncio
+from unittest.mock import AsyncMock
 
 from app.config import Settings
-from app.core.input_injector import InputInjector
-from app.core.state_store import InMemoryStateStore
-from app.core.ws_manager import WebSocketManager
+from app.core.sensor_buffer import SensorBuffer
 from app.services.session_service import SessionService
 from digital_twin.simulation import ControlVars
-
-
-class _FakeSimLoopManager:
-    def __init__(self) -> None:
-        self.started: list[str] = []
-        self.stopped: list[str] = []
-
-    def start(self, sid: str) -> None:
-        self.started.append(sid)
-
-    async def stop(self, sid: str) -> None:
-        self.stopped.append(sid)
 
 
 class _FakeSimulationLogRepo:
@@ -38,67 +31,62 @@ class _FakeSimulationLogRepo:
 
 def _controls() -> ControlVars:
     return ControlVars(
-        syngas_flow=1500.0,
-        igv_opening=75.0,
-        n2_offset=200.0,
-        n2_valve_1=50.0,
-        syngas_srv=60.0,
-        syngas_gcv_1=55.0,
-        syngas_gcv_1a=55.0,
-        syngas_gcv_2=55.0,
-        ibh_valve=30.0,
-        n2_flow=100.0,
+        syngas_flow=1500.0, igv_opening=75.0, n2_offset=200.0, n2_valve_1=50.0,
+        syngas_srv=60.0, syngas_gcv_1=55.0, syngas_gcv_1a=55.0, syngas_gcv_2=55.0,
+        ibh_valve=30.0, n2_flow=100.0,
     )
 
 
-def test_start_logs_session_and_initial_input():
-    repo = _FakeSimulationLogRepo()
-    service = SessionService(
+def _make_buffer() -> SensorBuffer:
+    buf = SensorBuffer(maxlen=900)
+    buf.load_bootstrap([
+        {
+            "syngas_flow": 1500.0, "igv_opening": 75.0,
+            "n2_offset": 200.0, "n2_valve_1": 50.0,
+            "syngas_srv": 60.0, "syngas_gcv_1": 55.0,
+            "syngas_gcv_1a": 55.0, "syngas_gcv_2": 55.0,
+            "ibh_valve": 30.0, "n2_flow": 100.0,
+        }
+    ])
+    return buf
+
+
+def _make_service(repo: _FakeSimulationLogRepo) -> SessionService:
+    return SessionService(
         settings=Settings(),
-        state_store=InMemoryStateStore(),
-        injector=InputInjector(),
-        sim_loop=_FakeSimLoopManager(),
-        ws_manager=WebSocketManager(),
+        sessions={},
+        sensor_buffer=_make_buffer(),
+        ws_manager=AsyncMock(),
         simulation_log_repo=repo,
     )
 
-    state = service.start(_controls())
 
-    assert repo.session_started == [state.sid]
-    assert len(repo.inputs) == 1
-    assert repo.inputs[0][0] == state.sid
+def test_start_logs_session_only_not_initial_input():
+    repo = _FakeSimulationLogRepo()
+    service = _make_service(repo)
+
+    session = service.start()
+
+    assert repo.session_started == [session.sid]
+    assert repo.inputs == []  # 초기 input은 적재하지 않음 (spec §3.5)
 
 
 def test_submit_control_logs_input():
     repo = _FakeSimulationLogRepo()
-    service = SessionService(
-        settings=Settings(),
-        state_store=InMemoryStateStore(),
-        injector=InputInjector(),
-        sim_loop=_FakeSimLoopManager(),
-        ws_manager=WebSocketManager(),
-        simulation_log_repo=repo,
-    )
-    state = service.start()
+    service = _make_service(repo)
+    session = service.start()
     controls = _controls()
 
-    service.submit_control(state.sid, controls)
+    service.submit_control(session.sid, controls)
 
-    assert repo.inputs[-1] == (state.sid, controls)
+    assert repo.inputs[-1] == (session.sid, controls)
 
 
 def test_stop_logs_session_finish():
     repo = _FakeSimulationLogRepo()
-    service = SessionService(
-        settings=Settings(),
-        state_store=InMemoryStateStore(),
-        injector=InputInjector(),
-        sim_loop=_FakeSimLoopManager(),
-        ws_manager=WebSocketManager(),
-        simulation_log_repo=repo,
-    )
-    state = service.start()
+    service = _make_service(repo)
+    session = service.start()
 
-    asyncio.run(service.stop(state.sid))
+    asyncio.run(service.stop(session.sid))
 
-    assert repo.session_finished == [state.sid]
+    assert repo.session_finished == [session.sid]

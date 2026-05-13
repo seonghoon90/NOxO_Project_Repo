@@ -1,7 +1,6 @@
 from datetime import datetime, timezone
 
 from app.adapters.forecaster import StubForecaster
-from app.core.state_store import InMemoryStateStore
 from app.services.forecast_service import ForecastService
 
 
@@ -16,7 +15,7 @@ class _FakeSimulationLogRepo:
 def test_predict_logs_forecast():
     repo = _FakeSimulationLogRepo()
     service = ForecastService(
-        state_store=InMemoryStateStore(),
+        sessions={},
         forecaster=StubForecaster(),
         simulation_log_repo=repo,
     )
