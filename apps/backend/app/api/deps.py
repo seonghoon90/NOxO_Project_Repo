@@ -81,6 +81,7 @@ def get_session_service(
 def get_forecast_service(
     sessions: Annotated[dict, Depends(get_sessions)],
     forecaster: Annotated[Forecaster, Depends(get_forecaster)],
+    sensor_buffer: Annotated[SensorBuffer, Depends(get_sensor_buffer)],
     simulation_log_repo: Annotated[
         SimulationLogRepository | None, Depends(get_simulation_log_repo)
     ],
@@ -88,6 +89,7 @@ def get_forecast_service(
     return ForecastService(
         sessions,
         forecaster,
+        sensor_buffer=sensor_buffer,
         simulation_log_repo=simulation_log_repo,
     )
 

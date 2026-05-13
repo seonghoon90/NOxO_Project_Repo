@@ -2,25 +2,28 @@
 
 `DT_ARCHITECTURE.md §7-1` / `BACKEND_ARCHITECTURE.md §7` 정의.
 horizon은 5분 고정, request body에는 horizon 필드 없음.
-입력 피처 구성은 `[추후 결정]` (피처 엔지니어링 후 확정).
 
 Sim Loop와 완전 분리 — 활성 세션 상태 참조 X.
+
+ForecastInput에는 두 가지 입력 경로가 공존한다:
+- features: 단발 dict — Stub용 (운영 ControlVars 10개 평탄화).
+- recent_df: 1초 raw 시계열 DataFrame — ML 모델용 (SensorBuffer snapshot
+  900행을 IGCC 태그명 컬럼으로 펼친 형태). digital_twin.forecaster.predict가 요구.
+어느 한쪽만 채워서 호출하면 어댑터가 자신이 쓰는 필드로 분기한다.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Protocol
+from typing import Any, Protocol
 
 
 @dataclass(frozen=True)
 class ForecastInput:
-    """예측 모델 입력 — 현재 센서값 + 운전 조건.
+    """예측 모델 입력."""
 
-    `features` dict의 키 구성은 [추후 결정].
-    후보: 제어 10개 + 외란/파생 변수 일부 (피처 엔지니어링 결과 따름).
-    """
-
-    features: dict[str, float]
+    features: dict[str, float] = field(default_factory=dict)
+    # pd.DataFrame을 frozen dataclass에 보유하기 위해 Any로 선언 (런타임은 DataFrame).
+    recent_df: Any | None = None
 
 
 @dataclass(frozen=True)
