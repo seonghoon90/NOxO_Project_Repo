@@ -61,6 +61,8 @@ def get_session_service(
     sessions: Annotated[dict, Depends(get_sessions)],
     sensor_buffer: Annotated[SensorBuffer, Depends(get_sensor_buffer)],
     ws_manager: Annotated[WebSocketManager, Depends(get_ws_manager)],
+    simulator: Annotated[Simulator, Depends(get_simulator)],
+    realtime_engine: Annotated[object, Depends(get_realtime_engine)],
     simulation_log_repo: Annotated[
         SimulationLogRepository | None, Depends(get_simulation_log_repo)
     ],
@@ -70,6 +72,8 @@ def get_session_service(
         sessions=sessions,
         sensor_buffer=sensor_buffer,
         ws_manager=ws_manager,
+        simulator=simulator,
+        realtime_engine=realtime_engine,
         simulation_log_repo=simulation_log_repo,
     )
 

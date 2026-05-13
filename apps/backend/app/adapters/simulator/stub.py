@@ -52,7 +52,7 @@ class StubSimulator:
         nox = self._nox(controls, exhaust_temp, lambda_)
         power = self._power(controls)
         # efficiency는 features 근사식 + IBH bleed 페널티.
-        # 백엔드 sim_loop가 power/(syngas_flow×LHV)로 덮어쓰므로 placeholder.
+        # RealtimeEngine이 power/(syngas_flow×LHV)로 덮어쓰므로 placeholder.
         base_eff = compute_efficiency(controls.syngas_flow, exhaust_temp)
         ibh_penalty = max(0.0, controls.ibh_valve - self.REF_IBH_VALVE) * 0.001
         efficiency = max(0.0, min(1.0, base_eff - ibh_penalty))
@@ -63,6 +63,10 @@ class StubSimulator:
             lambda_=lambda_,
             efficiency=efficiency,
         )
+
+    def predict_for_session(self, controls: ControlVars, session_ctx) -> OutputVars:
+        """Simulator Protocol(predict_for_session) 호환 — Stub은 ctx 무시 + predict 위임."""
+        return self.predict(controls)
 
     # ----- 내부 함수 -----
     def _exhaust_temp(self, c: ControlVars) -> float:

@@ -70,18 +70,46 @@ async def lifespan(app: FastAPI):
     sensor_buffer = SensorBuffer(maxlen=900)
     kafka_sensor_stream = KafkaSensorStream(settings)
 
-    # bootstrap 동기 로드 + 도메인 변환 적재
+    # bootstrap 동기 로드 + 도메인 변환 적재 (measured_at 보존)
     kafka_sensor_stream.ensure_bootstrap_loaded()
-    normalized_bootstrap = [
-        normalize_raw_message(row["values"])
-        for row in kafka_sensor_stream.bootstrap_rows
-        if row.get("values")
-    ]
+    normalized_bootstrap = []
+    for row in kafka_sensor_stream.bootstrap_rows:
+        values = row.get("values")
+        if not values:
+            continue
+        normalized = normalize_raw_message(values)
+        if not normalized:
+            continue
+        measured_at = row.get("measured_at")
+        if measured_at is not None:
+            normalized = {**normalized, "measured_at": measured_at}
+        normalized_bootstrap.append(normalized)
     if normalized_bootstrap:
         sensor_buffer.load_bootstrap(normalized_bootstrap)
         logger.info("SensorBuffer bootstrap loaded rows=%d", len(normalized_bootstrap))
     else:
-        logger.warning("SensorBuffer bootstrap empty — DT will use ffill fallback")
+        # bootstrap 실패 시 dt_config.operating_point로 기본 row 1개 주입.
+        # SessionContext.from_sensor_buffer가 ValueError를 던지지 않도록 보장
+        # (실시간 데이터 들어오면 자연 덮어쓰기 — H5 가드).
+        from digital_twin.simulation import DEFAULT_CONFIG
+        op = DEFAULT_CONFIG.operating_point
+        fallback_row = {
+            "syngas_flow": op.syngas_flow,
+            "igv_opening": op.igv_opening,
+            "n2_offset": op.n2_offset,
+            "n2_valve_1": op.n2_valve_1,
+            "syngas_srv": op.syngas_srv,
+            "syngas_gcv_1": op.syngas_gcv_1,
+            "syngas_gcv_1a": op.syngas_gcv_1a,
+            "syngas_gcv_2": op.syngas_gcv_2,
+            "ibh_valve": op.ibh_valve,
+            "n2_flow": op.n2_flow,
+            "exhaust_temp": op.exhaust_temp,
+        }
+        sensor_buffer.load_bootstrap([fallback_row])
+        logger.warning(
+            "SensorBuffer bootstrap empty — injected operating_point fallback row"
+        )
 
     kafka_sensor_stream.attach_buffer(sensor_buffer)
 

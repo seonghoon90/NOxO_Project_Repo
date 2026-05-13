@@ -115,7 +115,8 @@ def test_control_validation_range(client):
     sid = client.post("/api/session/start", json={}).json()["sid"]
     bad = {**_initial_payload(), CONTROL_TAGS["igv"]: 999.0}
     res = client.post(f"/api/session/{sid}/control", json=bad)
-    assert res.status_code == 422
+    # spec §2.1 — 값 범위 초과는 400 (Pydantic schema 오류와 구분)
+    assert res.status_code == 400
 
 
 def test_stop_unknown_sid_returns_ok(client):

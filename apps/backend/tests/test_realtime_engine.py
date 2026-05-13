@@ -9,6 +9,13 @@ from app.core.session import Session
 from digital_twin.simulation import ControlVars, OutputVars
 
 
+def _make_settings() -> MagicMock:
+    """syngas_lhv 등 실제 후처리에 쓰이는 필드를 실수로 지정한 settings mock."""
+    s = MagicMock()
+    s.syngas_lhv = 11.0
+    return s
+
+
 def _make_buffer() -> SensorBuffer:
     buf = SensorBuffer(maxlen=10)
     buf.load_bootstrap([
@@ -54,7 +61,7 @@ async def test_sim_mode_no_override_emits_payload():
     ws = AsyncMock()
 
     engine = RealtimeEngine(
-        settings=MagicMock(),
+        settings=_make_settings(),
         sensor_buffer=buf, simulator=sim, forecaster=fc,
         ws_manager=ws, sessions=sessions,
     )
@@ -84,7 +91,7 @@ async def test_sim_mode_with_override_emits_kafka_latest():
     ws = AsyncMock()
 
     engine = RealtimeEngine(
-        settings=MagicMock(),
+        settings=_make_settings(),
         sensor_buffer=buf, simulator=_make_simulator(),
         forecaster=_make_forecaster(), ws_manager=ws, sessions=sessions,
     )
@@ -106,7 +113,7 @@ async def test_realtime_mode_emits_forecast():
     ws = AsyncMock()
 
     engine = RealtimeEngine(
-        settings=MagicMock(),
+        settings=_make_settings(),
         sensor_buffer=buf, simulator=_make_simulator(),
         forecaster=fc, ws_manager=ws, sessions=sessions,
     )
@@ -129,7 +136,7 @@ async def test_forecaster_failure_yields_null_forecast():
     ws = AsyncMock()
 
     engine = RealtimeEngine(
-        settings=MagicMock(),
+        settings=_make_settings(),
         sensor_buffer=buf, simulator=_make_simulator(),
         forecaster=fc, ws_manager=ws, sessions=sessions,
     )
@@ -141,19 +148,44 @@ async def test_forecaster_failure_yields_null_forecast():
 
 
 @pytest.mark.asyncio
-async def test_empty_buffer_skips_broadcast():
+async def test_empty_buffer_sim_mode_still_broadcasts():
+    """spec §2.3 — buffer 빈 상태에서도 sim 모드는 operating_point 폴백으로 broadcast."""
     buf = SensorBuffer(maxlen=10)  # 비어있음
-    sessions = {"s1": _make_session()}
+    sessions = {"s1": _make_session(mode="sim")}
     ws = AsyncMock()
 
     engine = RealtimeEngine(
-        settings=MagicMock(),
+        settings=_make_settings(),
         sensor_buffer=buf, simulator=_make_simulator(),
         forecaster=_make_forecaster(), ws_manager=ws, sessions=sessions,
     )
     await engine._tick()
 
-    ws.broadcast.assert_not_called()
+    ws.broadcast.assert_called_once()
+    payload = ws.broadcast.call_args[0][1]
+    assert payload["mode"] == "sim"
+    assert payload["warning"] is None  # sim 모드는 stale warning 미발신
+
+
+@pytest.mark.asyncio
+async def test_empty_buffer_realtime_mode_emits_stale_warning():
+    """spec §2.3 — buffer 빈 상태에서 realtime 모드는 warning='kafka stream stale'."""
+    buf = SensorBuffer(maxlen=10)
+    sessions = {"s1": _make_session(mode="realtime")}
+    ws = AsyncMock()
+
+    engine = RealtimeEngine(
+        settings=_make_settings(),
+        sensor_buffer=buf, simulator=_make_simulator(),
+        forecaster=_make_forecaster(), ws_manager=ws, sessions=sessions,
+    )
+    await engine._tick()
+
+    ws.broadcast.assert_called_once()
+    payload = ws.broadcast.call_args[0][1]
+    assert payload["mode"] == "realtime"
+    assert payload["warning"] == "kafka stream stale"
+    assert payload["forecast"] is None
 
 
 @pytest.mark.asyncio
@@ -163,7 +195,7 @@ async def test_tick_increments_session_tick():
     sessions = {"s1": session}
 
     engine = RealtimeEngine(
-        settings=MagicMock(),
+        settings=_make_settings(),
         sensor_buffer=buf, simulator=_make_simulator(),
         forecaster=_make_forecaster(), ws_manager=AsyncMock(),
         sessions=sessions,

@@ -166,7 +166,7 @@ def test_result_to_outputvars_maps_targets_correctly(sim):
 
 
 def test_result_to_outputvars_sets_lambda_efficiency_zero(sim):
-    """lambda_, efficiency는 0.0 (engine/sim_loop 후처리)."""
+    """lambda_, efficiency는 0.0 (RealtimeEngine._postprocess_outputs가 덮어씀)."""
     result = {
         "IGCC.DeNOX.AT_H1_901_PV": 25.0,
         "IGCC.CC.G1.DWATT": 250.0,

@@ -110,7 +110,11 @@ def test_attach_buffer_routes_messages(settings_with_csv):
     stream._route_record(fake_record)
 
     assert len(buffer) == 1
-    assert buffer.latest_row() == {"syngas_flow": 100.5}
+    # measured_at은 정규화된 row와 함께 보존(RealtimeEngine이 kafka_latest.ts로 사용).
+    assert buffer.latest_row() == {
+        "syngas_flow": 100.5,
+        "measured_at": "2025-08-25 00:00:00",
+    }
 
 
 def test_route_record_without_buffer_does_nothing(settings_with_csv):

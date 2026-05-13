@@ -70,7 +70,8 @@ class StartSessionRequest(BaseModel):
 class OutputPayload(BaseModel):
     """SnapshotResponse의 출력 변수 묶음.
 
-    `co`는 학습 타겟에서 제외, `efficiency`는 백엔드 sim_loop 후처리값.
+    `co`는 학습 타겟에서 제외, `efficiency`는 RealtimeEngine 후처리값
+    (power/(syngas_flow×syngas_lhv)).
     """
 
     nox: float

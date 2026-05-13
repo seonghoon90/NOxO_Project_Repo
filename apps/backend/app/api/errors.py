@@ -18,7 +18,7 @@ from app.exceptions import (
 _STATUS_MAP: dict[type[DomainError], int] = {
     SessionNotFoundError: 404,
     SessionLimitExceededError: 429,
-    InvalidControlInputError: 422,
+    InvalidControlInputError: 400,
     PredictorUnavailableError: 503,
     DataNotEnoughError: 503,
     DataSourceUnavailableError: 503,

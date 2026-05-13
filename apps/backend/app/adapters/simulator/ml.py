@@ -117,20 +117,14 @@ class MLSimulator:
     def _result_to_outputvars(self, result: dict) -> OutputVars:
         """dt_predict dict 결과 → OutputVars.
 
-        Phase 0 #B1: 모델 출력이 정규화된 경우 본 메서드에서 역변환.
-        현재는 원본 스케일 가정.
-
-        R-A8 / K5 (4차 보강) — lambda_/efficiency 처리 책임 분리 cross-ref:
-        - lambda_: DT engine의 `compute_lambda(state.current)` (Zeldovich ODE에 필요한 stoichiometric ratio)가
-          매 sim_step에서 OutputVars.lambda_를 덮어쓴다. 본 메서드 반환의 0.0은 즉시 무시됨.
-        - efficiency: `apps/backend/app/core/sim_loop.py`의 LHV 후처리 단계가 `power/(syngas_flow × syngas_lhv)`로
-          계산하여 broadcast 직전에 덮어쓴다. 본 메서드 반환의 0.0도 즉시 무시됨.
-        → 두 필드는 ML 모델 학습 타깃이 아니므로 명시적 dummy(0.0)로 두고 downstream이 책임진다.
+        lambda_/efficiency 후처리 책임 — RealtimeEngine._postprocess_outputs로 일원화.
+        본 메서드는 ML 학습 타깃이 아닌 두 필드를 dummy(0.0)로 반환하고,
+        RealtimeEngine이 compute_lambda + power/(syngas_flow×LHV)로 덮어쓴다.
         """
         return OutputVars(
             nox=result["IGCC.DeNOX.AT_H1_901_PV"],
             exhaust_temp=result["IGCC.CC.G1.TTXM"],
             power=result["IGCC.CC.G1.DWATT"],
-            lambda_=0.0,      # engine.py compute_lambda 덮어씀 (R-A8/K5 — 위 docstring 참조)
-            efficiency=0.0,   # sim_loop LHV 후처리 덮어씀 (R-A8/K5 — 위 docstring 참조)
+            lambda_=0.0,      # RealtimeEngine._postprocess_outputs가 덮어씀
+            efficiency=0.0,   # RealtimeEngine._postprocess_outputs가 덮어씀
         )

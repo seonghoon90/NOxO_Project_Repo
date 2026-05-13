@@ -96,6 +96,11 @@ class KafkaSensorStream:
             raw_values = record.value.get("values") or {}
             normalized = normalize_raw_message(raw_values)
             if normalized:
+                # measured_at은 도메인 키 매핑에 들지 않지만 RealtimeEngine이
+                # kafka_latest.ts로 직접 참조하므로 동일 dict에 보존.
+                measured_at = record.value.get("measured_at")
+                if measured_at is not None:
+                    normalized = {**normalized, "measured_at": measured_at}
                 self._buffer.append(normalized)
 
     async def start(self) -> None:
