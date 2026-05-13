@@ -10,6 +10,7 @@ export type AppOutletContext = {
   openSettings: () => void
   closeSettings: () => void
   reportStreamStatus: (status: StreamStatus) => void
+  clock: string
 }
 
 const navItems = [
@@ -57,8 +58,9 @@ export function App() {
       },
       closeSettings: () => setSettingsOpen(false),
       reportStreamStatus: setStreamStatus,
+      clock,
     }),
-    [isServicePage, mode, visibleSettingsOpen],
+    [isServicePage, mode, visibleSettingsOpen, clock],
   )
 
   return (
@@ -111,7 +113,6 @@ export function App() {
             >
               <GearIcon />
             </button>
-            <div className="nav-clock mono">{clock}</div>
           </div>
         ) : null}
       </header>

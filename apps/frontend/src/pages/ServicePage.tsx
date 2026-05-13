@@ -23,7 +23,7 @@ const LAMBDA_RATED = 1.1
 const EFFICIENCY_RATED = 0.89
 
 export function ServicePage() {
-  const { mode, settingsOpen, closeSettings, reportStreamStatus } = useOutletContext<AppOutletContext>()
+  const { mode, settingsOpen, closeSettings, reportStreamStatus, clock } = useOutletContext<AppOutletContext>()
   const {
     state,
     status,
@@ -46,15 +46,19 @@ export function ServicePage() {
     max: activeVariable.max,
     step: activeVariable.step,
   }
-  const displayedNox = mode === 'sim' ? state.metrics.nox : state.metrics.predictedNox
+  // 메인 KPI/도면/임계 여유는 항상 현재 NOx(metrics.nox). 5분 후 예측값(predictedNox)은 ForecastCard에서만 사용.
+  const displayedNox = state.metrics.nox
+  const forecastTargetKst = isRealtimeMode && state.forecast
+    ? formatForecastTargetKst(state.forecast.target_time)
+    : null
   const streamLabel = streamStatusLabel(status)
-  const noxStatus = displayedNox > thresholds.noxLimit ? '위험' : streamLabel.text
+  const noxStatus = displayedNox > thresholds.noxLimit ? '위험' : '정상'
   const controlCards = controlVariableOrder.map((key) => state.variables[key])
   const noxValues = state.history.length > 0 ? state.history.map((point) => point.nox) : [displayedNox]
   // 효율은 정격 이상이면 항상 정상. 미만일 때만 caution/danger 임계로 색 판정.
   const efficiency = state.metrics.efficiency
   const noxHeadroom = thresholds.noxLimit - displayedNox
-  const noxHeadroomTone = headroomTone(noxHeadroom, 12, 5)
+  const noxHeadroomTone = headroomTone(noxHeadroom)
   const efficiencyHeadroomTone = efficiencyTone(efficiency, thresholds)
   const noxRange = getRange(noxValues)
   const tableRows = buildOutputTableRows({
@@ -224,10 +228,24 @@ export function ServicePage() {
         </div>
 
         <aside className="sidebar">
+          <div className="sidebar-clock-wrap">
+            <div className="sidebar-clock-stack">
+              <div className="sidebar-clock mono">{clock}</div>
+              {forecastTargetKst ? (
+                <div className="sidebar-clock sidebar-clock-forecast mono">
+                  <span className="sidebar-clock-icon" aria-label="5분 후 예측 시각" title="5분 후 예측 시각">
+                    <ForecastClockIcon />
+                  </span>
+                  <span>{forecastTargetKst}</span>
+                </div>
+              ) : null}
+            </div>
+          </div>
           {isRealtimeMode ? (
             <ForecastCard
               forecast={state.forecast}
               noxLimit={thresholds.noxLimit}
+              currentNox={state.metrics.nox}
             />
           ) : (
             <>
@@ -448,9 +466,11 @@ export function ServicePage() {
 function ForecastCard({
   forecast,
   noxLimit,
+  currentNox,
 }: {
   forecast: RealtimeStreamPayload['forecast']
   noxLimit: number
+  currentNox: number
 }) {
   if (forecast === null) {
     return (
@@ -469,13 +489,6 @@ function ForecastCard({
 
   const exceeded = forecast.threshold_exceeded
   const [integer, decimal = '0'] = forecast.predicted_nox.toFixed(1).split('.')
-  const targetKst = new Intl.DateTimeFormat('ko-KR', {
-    timeZone: 'Asia/Seoul',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-  }).format(new Date(forecast.target_time))
 
   return (
     <section
@@ -487,9 +500,6 @@ function ForecastCard({
     >
       <div className="kpi-header">
         <div className="kpi-name">5분 후 NOx 예측</div>
-        <span className={exceeded ? 'status-pill status-danger' : 'status-pill status-normal'}>
-          {exceeded ? '위험' : '정상'}
-        </span>
       </div>
       <div className="kpi-value-row">
         <div className={exceeded ? 'kpi-value kpi-value-large caution-text' : 'kpi-value kpi-value-large'}>
@@ -504,12 +514,21 @@ function ForecastCard({
         </div>
       ) : (
         <div className="forecast-headroom mono">
-          여유 {(noxLimit - forecast.predicted_nox).toFixed(1)} ppm
+          {formatForecastDelta(forecast.predicted_nox, currentNox)}
         </div>
       )}
-      <div className="forecast-target mono">target: {targetKst} (KST)</div>
     </section>
   )
+}
+
+// 현재 NOx 대비 5분 후 예측의 증감 — "현재 대비 +2.3 ppm" / "-1.5 ppm".
+function formatForecastDelta(predicted: number, current: number): string {
+  if (!Number.isFinite(predicted) || !Number.isFinite(current)) return '현재 대비 -- ppm'
+  const delta = predicted - current
+  const abs = Math.abs(delta).toFixed(1)
+  if (Number(abs) === 0) return `현재 대비 0.0 ppm`
+  const sign = delta > 0 ? '+' : '-'
+  return `현재 대비 ${sign}${abs} ppm`
 }
 
 function SettingField({
@@ -853,16 +872,16 @@ function getRange(values: number[]) {
   }
 }
 
-function headroomTone(value: number, cautionThreshold: number, dangerThreshold: number) {
-  if (value <= dangerThreshold) return 'summary-value-danger'
-  if (value <= cautionThreshold) return 'summary-value-caution'
-  return 'summary-value-safe'
+// 여유만 있으면(양수) 안전색, 임계 초과(음수)일 때만 위험색.
+function headroomTone(value: number) {
+  return value < 0 ? 'summary-value-danger' : 'summary-value-safe'
 }
 
-// 임계 여유 표기: 정상은 부호 없이 조용하게, 임계 초과(음수)만 "초과 N"으로 강조.
+// 임계 여유 표기: 정상은 값만, 초과(음수)만 "-N"으로 강조.
 function formatHeadroom(value: number, digits: number) {
-  if (value < 0) return `초과 ${Math.abs(value).toFixed(digits)}`
-  return value.toFixed(digits)
+  const abs = Math.abs(value).toFixed(digits)
+  if (Number(abs) === 0) return `0.${'0'.repeat(digits)}`
+  return value < 0 ? `-${abs}` : abs
 }
 
 type OutputTableRow = {
@@ -963,6 +982,30 @@ function efficiencyKpiStatus(efficiency: number, t: Thresholds): string {
 
 function efficiencyTableStatus(efficiency: number, t: Thresholds): string {
   return efficiencyKpiStatus(efficiency, t)
+}
+
+function ForecastClockIcon() {
+  return (
+    <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true">
+      <circle cx="9" cy="10" r="7" fill="none" stroke="currentColor" strokeWidth="1.4" />
+      <path d="M9 6.5V10l2.4 1.6" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+      <path d="M14.5 4.5l3 1.6-1.6 3" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function formatForecastTargetKst(targetTime: string): string {
+  const parts = new Intl.DateTimeFormat('ko-KR', {
+    timeZone: 'Asia/Seoul',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).formatToParts(new Date(targetTime))
+  const lookup = (type: string) =>
+    parts.find((p) => p.type === type)?.value ?? '00'
+  // forecast는 1Hz WS payload — 0.1초 자리 제거.
+  return `${lookup('hour')}시 ${lookup('minute')}분 ${lookup('second')}초`
 }
 
 function efficiencyTone(efficiency: number, t: Thresholds): string {

@@ -283,6 +283,8 @@ a {
   flex-shrink: 0;
   background: var(--surface);
   border-left: 1px solid rgba(255, 255, 255, 0.07);
+  /* ForecastCard ::after halo가 inset: -10px로 카드 밖으로 튀어나와 페이지 가로 스크롤을 만들지 않게 차단 */
+  overflow-x: hidden;
 }
 
 .sidebar-locked .sidebar-section {
@@ -302,6 +304,66 @@ a {
 .sidebar-section {
   padding: 14px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.sidebar-clock-wrap {
+  padding: 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.sidebar-clock-stack {
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-clock {
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background-color: var(--surface-2);
+  color: var(--text);
+  font: 500 16px var(--font-mono);
+  letter-spacing: 0.02em;
+}
+
+/* 두 카드가 위·아래로 붙어 있도록 — 위 카드는 아래 모서리, 아래 카드는 위 모서리 둥글기를 제거 + 테두리 공유 */
+.sidebar-clock-stack .sidebar-clock:not(:last-child) {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  border-bottom: none;
+}
+.sidebar-clock-stack .sidebar-clock + .sidebar-clock {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
+.sidebar-clock-forecast {
+  position: relative;
+  gap: 10px;
+  color: #7dd3fc;
+  border-color: rgba(125, 211, 252, 0.35);
+  background-color: rgba(125, 211, 252, 0.06);
+  animation: clock-forecast-pulse 2.4s ease-in-out infinite;
+}
+
+.sidebar-clock-icon {
+  position: absolute;
+  left: 14px;
+  display: inline-flex;
+  align-items: center;
+  color: #7dd3fc;
+}
+
+@keyframes clock-forecast-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(125, 211, 252, 0);
+  }
+  50% {
+    box-shadow: 0 0 0 3px rgba(125, 211, 252, 0.15);
+  }
 }
 
 .sidebar-title,
