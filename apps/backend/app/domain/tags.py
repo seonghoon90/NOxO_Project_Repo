@@ -58,8 +58,9 @@ TAG_POWER: Final[str] = "IGCC.CC.G1.DWATT"  # 발전량 (MW)
 # ============================================================
 TAG_NOX_PPM: Final[str] = "IGCC.DeNOX.AT_H1_901_PV"   # TODO: 실제 NOx 측정 태그 확인 (가안)
 TAG_EXHAUST_TEMP: Final[str] = "IGCC.CC.G1.TTXM"
-# TAG_NPR_PRIMARY: TODO — IGCC.CC.G1.NQJ는 이미 TAG_N2_FLOW(=n2_flow)에 할당됨.
-#                  실제 NPR primary 측정 태그를 확인 후 추가할 것.
+# NPR primary (IGCC.CC.G1.VNPR_P) — DB 컬럼 npr_primary로는 stream ETL이
+# 적재하지만(docs/data-platform/stream-etl-storage-design.md §Mapping rule), 백엔드 도메인에서는
+# OutputVars/KPI 대상이 아니고 ML 외란 입력(`vnpr_p`)으로만 사용한다.
 # TAG_POWER는 기존 정의(L51) 사용 → "IGCC.CC.G1.DWATT"
 
 
@@ -118,7 +119,7 @@ ALL_TAGS_TO_DOMAIN: Final[dict[str, str]] = {
     TAG_SYNGAS_GCV_2: "syngas_gcv_2",
     TAG_IBH_VALVE: "ibh_valve",
     TAG_N2_FLOW: "n2_flow",
-    # 출력 3개 (npr_primary는 NQJ 충돌로 보류, TODO 참조)
+    # 출력 3개 (npr_primary는 OutputVars 미포함 — stream ETL이 DB 컬럼으로만 적재)
     TAG_NOX_PPM: "nox",
     TAG_EXHAUST_TEMP: "exhaust_temp",
     TAG_POWER: "power",
@@ -130,8 +131,9 @@ ALL_TAGS_TO_DOMAIN: Final[dict[str, str]] = {
 def normalize_raw_message(values: dict[str, float]) -> dict[str, float]:
     """Kafka 메시지의 values dict (원천 태그명) → 도메인 snake_case dict.
 
-    매핑 외 키는 dropped. 외란 매핑 미완 단계에서는 ERD 13개(제어 10 + 출력 3)만
-    반환된다 (npr_primary는 NQJ 키 충돌로 추후 추가 예정).
+    매핑 외 키는 dropped. 도메인 dict에는 제어 10 + 출력 3(nox/exhaust_temp/power) +
+    외란(VNPR_P는 `vnpr_p`로 포함)이 들어간다. npr_primary는 stream ETL이 DB
+    컬럼으로 별도 적재하므로 본 매핑에는 포함하지 않는다.
     """
     return {
         ALL_TAGS_TO_DOMAIN[k]: v
