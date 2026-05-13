@@ -907,7 +907,7 @@ function buildOutputTableRows(args: {
       status: displayedNox > thresholds.noxLimit ? '위험' : '정상',
     },
     {
-      name: '배기온도 (TTXM)',
+      name: '배기온도',
       unit: '°C',
       currentText: metrics.exhaust.toFixed(1),
       ratedText: EXHAUST_RATED.toFixed(1),
@@ -916,7 +916,7 @@ function buildOutputTableRows(args: {
       status: exhaustStatus(metrics.exhaust, thresholds),
     },
     {
-      name: '발전 효율 (η)',
+      name: '발전 효율',
       unit: '%',
       currentText: (metrics.efficiency * 100).toFixed(1),
       ratedText: (EFFICIENCY_RATED * 100).toFixed(1),
@@ -925,7 +925,7 @@ function buildOutputTableRows(args: {
       status: efficiencyTableStatus(metrics.efficiency, thresholds),
     },
     {
-      name: '공기비 (λ)',
+      name: '공기비',
       unit: '',
       currentText: metrics.lambda.toFixed(2),
       ratedText: LAMBDA_RATED.toFixed(2),
