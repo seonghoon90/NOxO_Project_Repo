@@ -62,8 +62,12 @@ export function SmokeCanvas({ intensity }: SmokeCanvasProps) {
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
     if (mq.matches) return
 
-    let scaleX = 1
-    let scaleY = 1
+    // SVG의 preserveAspectRatio="xMidYMid meet"과 동일한 letterbox 매핑.
+    // 컨테이너 종횡비가 viewBox와 다르면 SVG는 더 작은 차원에 맞춰 fit하고
+    // 큰 차원에 양쪽 빈 띠가 생긴다 — 캔버스도 같은 변환을 따라야 굴뚝 좌표에서 연기가 솟는다.
+    let scale = 1
+    let offsetX = 0
+    let offsetY = 0
     const particles: Particle[] = []
     let rafId = 0
 
@@ -72,8 +76,11 @@ export function SmokeCanvas({ intensity }: SmokeCanvasProps) {
       const dpr = window.devicePixelRatio || 1
       canvas!.width = rect.width * dpr
       canvas!.height = rect.height * dpr
-      scaleX = (rect.width * dpr) / VIEW_BOX.width
-      scaleY = (rect.height * dpr) / VIEW_BOX.height
+      const sx = (rect.width * dpr) / VIEW_BOX.width
+      const sy = (rect.height * dpr) / VIEW_BOX.height
+      scale = Math.min(sx, sy)
+      offsetX = (rect.width * dpr - VIEW_BOX.width * scale) / 2
+      offsetY = (rect.height * dpr - VIEW_BOX.height * scale) / 2
     }
 
     const ro = new ResizeObserver(resize)
@@ -109,10 +116,10 @@ export function SmokeCanvas({ intensity }: SmokeCanvasProps) {
           continue
         }
 
-        // 화면 좌표 (viewBox → canvas px)
-        const cx = p.x * scaleX
-        const cy = p.y * scaleY
-        const cr = p.radius * scaleX
+        // 화면 좌표 (viewBox → canvas px, letterbox 보정 포함)
+        const cx = p.x * scale + offsetX
+        const cy = p.y * scale + offsetY
+        const cr = p.radius * scale
         // radial gradient: 중심 흐릿한 흰빛 → 외곽 투명. 진하기 max 0.22로 가벼움
         const alpha = p.life * cur * 0.22
         const grad = ctx!.createRadialGradient(cx, cy, 0, cx, cy, cr)

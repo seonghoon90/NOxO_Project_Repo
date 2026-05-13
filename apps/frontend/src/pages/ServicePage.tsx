@@ -5,6 +5,7 @@ import {
   CONTROL_VARIABLE_KEYS,
   type ConsoleMetrics,
   type MetricPoint,
+  type RealtimeStreamPayload,
   type VariableConfigUpdate,
   type VariableKey,
   variableSeed,
@@ -29,13 +30,15 @@ export function ServicePage() {
     setActiveVar,
     stepActiveVar,
     resetControls,
+    resetOverride,
+    setMode: notifyBackendMode,
     updateActiveVariableConfig,
     restoreActiveVariableDefaults,
   } = useConsoleState(mode)
   const thresholds = useThresholds()
   const [draftConfig, setDraftConfig] = useState<VariableConfigUpdate | null>(null)
-  // 예측 모드는 실시간 운전 데이터 기반 NOx 예측 표시 전용 — 제어 조작은 잠근다.
-  const isPredictionMode = mode === 'pred'
+  // realtime 모드는 Kafka 기반 5분 NOx 예측 표시 — 제어 조작은 잠근다.
+  const isRealtimeMode = mode === 'realtime'
 
   const activeVariable = state.variables[state.activeVar]
   const resolvedDraftConfig = draftConfig ?? {
@@ -69,6 +72,11 @@ export function ServicePage() {
     reportStreamStatus(status)
   }, [reportStreamStatus, status])
 
+  // App.tsx의 mode 토글이 변경되면 backend에 알린다 — 첫 마운트 sim 호출은 idempotent.
+  useEffect(() => {
+    notifyBackendMode(mode)
+  }, [mode, notifyBackendMode])
+
   useEffect(() => {
     if (!settingsOpen) return
     const handleEscape = (event: KeyboardEvent) => {
@@ -89,15 +97,13 @@ export function ServicePage() {
               title="NOx"
               value={displayedNox}
               unit="ppm"
-              subtitle={`허용치 ${thresholds.noxLimit} ppm`}
               status={noxStatus}
               emphatic
             />
             <KpiCard
-              title="배기온도 (TTXM)"
+              title="배기온도"
               value={state.metrics.exhaust}
               unit="°C"
-              subtitle="IGCC.CC.G1.TTXM"
               status={exhaustStatus(state.metrics.exhaust, thresholds)}
               digits={1}
               emphatic
@@ -106,16 +112,14 @@ export function ServicePage() {
               title="발전 효율"
               value={efficiency * 100}
               unit="%"
-              subtitle="η = DWATT / (ṁ_syngas × LHV)"
               status={efficiencyKpiStatus(efficiency, thresholds)}
               digits={1}
               emphatic
             />
             <KpiCard
-              title="공기비 (λ)"
+              title="공기비"
               value={state.metrics.lambda}
               unit=""
-              subtitle="O₂·N₂ → Zeldovich 입력"
               status={lambdaStatus(state.metrics.lambda, thresholds)}
               digits={2}
               emphatic
@@ -126,7 +130,7 @@ export function ServicePage() {
             {controlCards.map((variable) => (
               <KpiCardMini
                 key={variable.key}
-                title={variable.shortLabel}
+                title={variable.label}
                 value={variable.value}
                 unit={variable.unit}
                 digits={variable.digits}
@@ -169,7 +173,7 @@ export function ServicePage() {
             <section className="panel chart-card">
               <header className="chart-header">
                 <div>
-                  <div className="chart-title">배기온도 / 공기비 (λ)</div>
+                  <div className="chart-title">배기온도 / 공기비</div>
                   <div className="chart-subtitle">정규화 · 최근 60s</div>
                 </div>
                 <div className="chart-legend mono">
@@ -219,75 +223,79 @@ export function ServicePage() {
           </section>
         </div>
 
-        <aside className={isPredictionMode ? 'sidebar sidebar-locked' : 'sidebar'}>
-          {isPredictionMode ? (
-            <div className="sidebar-lock-banner mono" role="status">
-              예측 모드 — 제어 잠금 (실시간 데이터 기반 5분 후 NOx 예측)
-            </div>
-          ) : null}
-          <div className="sidebar-section">
-            <div className="sidebar-title">제어 변수 선택</div>
-            <select
-              className="control-select mono"
-              value={state.activeVar}
-              onChange={(event) => setActiveVar(event.target.value as VariableKey)}
-              disabled={isPredictionMode}
-            >
-              {controlVariableOrder.map((key) => (
-                <option key={key} value={key}>
-                  {state.variables[key].shortLabel}
-                </option>
-              ))}
-            </select>
-          </div>
+        <aside className="sidebar">
+          {isRealtimeMode ? (
+            <ForecastCard
+              forecast={state.forecast}
+              noxLimit={thresholds.noxLimit}
+            />
+          ) : (
+            <>
+              <div className="sidebar-section">
+                <div className="sidebar-title">제어 변수 선택</div>
+                <select
+                  className="control-select mono"
+                  value={state.activeVar}
+                  onChange={(event) => setActiveVar(event.target.value as VariableKey)}
+                >
+                  {controlVariableOrder.map((key) => (
+                    <option key={key} value={key}>
+                      {state.variables[key].label}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-          <div className="sidebar-section">
-            <div className="sidebar-title">조작 패널</div>
-            <div className="control-box">
-              <div className="control-label">현재 조작 중:</div>
-              <div className="control-name">{activeVariable.label}</div>
-              <div className="control-meta mono">{activeVariable.rawName}</div>
-              <div className="control-value mono">
-                {formatValue(activeVariable.value, activeVariable.digits)}
-                <span className="control-unit">{activeVariable.unit}</span>
+              <div className="sidebar-section">
+                <div className="sidebar-title">조작 패널</div>
+                <div className="control-box">
+                  <div className="control-label">현재 조작 중:</div>
+                  <div className="control-name">{activeVariable.label}</div>
+                  <div className="control-value mono">
+                    {formatValue(activeVariable.value, activeVariable.digits)}
+                    <span className="control-unit">{activeVariable.unit}</span>
+                  </div>
+                  <div className="control-base mono">
+                    기준치 {formatValue(activeVariable.base, activeVariable.digits)} {activeVariable.unit}
+                  </div>
+                </div>
+                <div className="stepper-row">
+                  <div className="stepper">
+                    <button
+                      type="button"
+                      className="step-button"
+                      onClick={() => stepActiveVar(-1)}
+                      disabled={activeVariable.value <= activeVariable.min}
+                      aria-label="감소"
+                    >
+                      <ArrowDownIcon />
+                    </button>
+                    <div className="step-mid mono">±{formatValue(activeVariable.step, activeVariable.digits)}</div>
+                    <button
+                      type="button"
+                      className="step-button"
+                      onClick={() => stepActiveVar(1)}
+                      disabled={activeVariable.value >= activeVariable.max}
+                      aria-label="증가"
+                    >
+                      <ArrowUpIcon />
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    className="icon-button"
+                    onClick={() => {
+                      resetOverride()
+                      resetControls()
+                    }}
+                    aria-label="초기화"
+                  >
+                    <ResetIcon />
+                  </button>
+                </div>
               </div>
-              <div className="control-base mono">
-                기준치 {formatValue(activeVariable.base, activeVariable.digits)} {activeVariable.unit}
-              </div>
-            </div>
-            <div className="stepper-row">
-              <div className="stepper">
-                <button
-                  type="button"
-                  className="step-button"
-                  onClick={() => stepActiveVar(-1)}
-                  disabled={isPredictionMode || activeVariable.value <= activeVariable.min}
-                  aria-label="감소"
-                >
-                  <ArrowDownIcon />
-                </button>
-                <div className="step-mid mono">±{formatValue(activeVariable.step, activeVariable.digits)}</div>
-                <button
-                  type="button"
-                  className="step-button"
-                  onClick={() => stepActiveVar(1)}
-                  disabled={isPredictionMode || activeVariable.value >= activeVariable.max}
-                  aria-label="증가"
-                >
-                  <ArrowUpIcon />
-                </button>
-              </div>
-              <button
-                type="button"
-                className="icon-button"
-                onClick={resetControls}
-                disabled={isPredictionMode}
-                aria-label="초기화"
-              >
-                <ResetIcon />
-              </button>
-            </div>
-          </div>
+            </>
+          )}
 
           <div className="sidebar-section telemetry">
             <div className="sidebar-title">운영 요약</div>
@@ -342,7 +350,6 @@ export function ServicePage() {
                 <div id="settings-modal-title" className="settings-modal-title">
                   {activeVariable.label} 조작 가드레일
                 </div>
-                <div className="settings-modal-subtitle mono">{activeVariable.rawName}</div>
                 <div className="settings-modal-hint">
                   이 콘솔의 ▲▼ 조작 범위만 좁힙니다. 운영 한계({variableSeed[activeVariable.key].min}~{variableSeed[activeVariable.key].max} {activeVariable.unit}) 자체는 변경되지 않습니다.
                 </div>
@@ -366,7 +373,7 @@ export function ServicePage() {
                         setDraftConfig(null)
                       }}
                     >
-                      {state.variables[key].shortLabel}
+                      {state.variables[key].label}
                     </button>
                   ))}
                 </div>
@@ -438,6 +445,73 @@ export function ServicePage() {
   )
 }
 
+function ForecastCard({
+  forecast,
+  noxLimit,
+}: {
+  forecast: RealtimeStreamPayload['forecast']
+  noxLimit: number
+}) {
+  if (forecast === null) {
+    return (
+      <section className="kpi-card kpi-card-primary forecast-card">
+        <div className="kpi-header">
+          <div className="kpi-name">5분 후 NOx 예측</div>
+          <span className="status-pill status-normal">대기</span>
+        </div>
+        <div className="kpi-value-row">
+          <div className="kpi-value">--</div>
+          <div className="kpi-subtitle">예측 모델 준비 중...</div>
+        </div>
+      </section>
+    )
+  }
+
+  const exceeded = forecast.threshold_exceeded
+  const [integer, decimal = '0'] = forecast.predicted_nox.toFixed(1).split('.')
+  const targetKst = new Intl.DateTimeFormat('ko-KR', {
+    timeZone: 'Asia/Seoul',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).format(new Date(forecast.target_time))
+
+  return (
+    <section
+      className={
+        exceeded
+          ? 'kpi-card kpi-card-primary caution-border forecast-card'
+          : 'kpi-card kpi-card-primary forecast-card'
+      }
+    >
+      <div className="kpi-header">
+        <div className="kpi-name">5분 후 NOx 예측</div>
+        <span className={exceeded ? 'status-pill status-danger' : 'status-pill status-normal'}>
+          {exceeded ? '위험' : '정상'}
+        </span>
+      </div>
+      <div className="kpi-value-row">
+        <div className={exceeded ? 'kpi-value kpi-value-large caution-text' : 'kpi-value kpi-value-large'}>
+          {integer}
+          <span className="kpi-decimal">.{decimal}</span>
+        </div>
+        <div className="kpi-subtitle">ppm</div>
+      </div>
+      {exceeded ? (
+        <div className="forecast-warning mono">
+          ⚠ 임계 초과 (허용 {noxLimit.toFixed(1)} ppm)
+        </div>
+      ) : (
+        <div className="forecast-headroom mono">
+          여유 {(noxLimit - forecast.predicted_nox).toFixed(1)} ppm
+        </div>
+      )}
+      <div className="forecast-target mono">target: {targetKst} (KST)</div>
+    </section>
+  )
+}
+
 function SettingField({
   label,
   unit,
@@ -477,18 +551,15 @@ function SettingField({
 function KpiCard({
   title,
   value,
-  unit,
   status,
-  subtitle,
   emphatic,
   caution,
   digits = 1,
 }: {
   title: string
   value: number
-  unit: string
+  unit?: string
   status: string
-  subtitle?: string
   emphatic?: boolean
   caution?: boolean
   digits?: number
@@ -506,7 +577,6 @@ function KpiCard({
           {integer}
           <span className="kpi-decimal">.{decimal}</span>
         </div>
-        <div className="kpi-subtitle">{subtitle ?? unit}</div>
       </div>
     </section>
   )
@@ -837,7 +907,7 @@ function buildOutputTableRows(args: {
       status: displayedNox > thresholds.noxLimit ? '위험' : '정상',
     },
     {
-      name: '배기온도 (TTXM)',
+      name: '배기온도',
       unit: '°C',
       currentText: metrics.exhaust.toFixed(1),
       ratedText: EXHAUST_RATED.toFixed(1),
@@ -846,7 +916,7 @@ function buildOutputTableRows(args: {
       status: exhaustStatus(metrics.exhaust, thresholds),
     },
     {
-      name: '발전 효율 (η)',
+      name: '발전 효율',
       unit: '%',
       currentText: (metrics.efficiency * 100).toFixed(1),
       ratedText: (EFFICIENCY_RATED * 100).toFixed(1),
@@ -855,7 +925,7 @@ function buildOutputTableRows(args: {
       status: efficiencyTableStatus(metrics.efficiency, thresholds),
     },
     {
-      name: '공기비 (λ)',
+      name: '공기비',
       unit: '',
       currentText: metrics.lambda.toFixed(2),
       ratedText: LAMBDA_RATED.toFixed(2),

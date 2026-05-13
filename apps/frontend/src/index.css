@@ -1458,3 +1458,43 @@ a {
     flex-wrap: wrap;
   }
 }
+
+
+/* ForecastCard (사이드바, realtime 모드 전용) */
+.forecast-card {
+  margin: 8px;
+}
+
+.forecast-card .kpi-meta {
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  opacity: 0.55;
+  margin-top: -4px;
+  margin-bottom: 4px;
+}
+
+.forecast-warning {
+  margin-top: 10px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--color-danger, #ff7676);
+  background: rgba(255, 118, 118, 0.08);
+  border: 1px solid rgba(255, 118, 118, 0.25);
+}
+
+.forecast-headroom {
+  margin-top: 10px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--color-success, #6ee7b7);
+  background: rgba(110, 231, 183, 0.06);
+  border: 1px solid rgba(110, 231, 183, 0.2);
+}
+
+.forecast-target {
+  margin-top: 8px;
+  font-size: 11px;
+  opacity: 0.55;
+}

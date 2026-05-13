@@ -267,3 +267,46 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+
+/* ========== 라벨 outline path 숨김 ==========
+ * SVG에서 텍스트가 outline path로 변환돼 있어 직접 글자 치환이 불가.
+ * outline은 숨기고 LabelTexts overlay로 한국어 라벨을 그린다. */
+.root :global(#ca_fqsg_cl),
+.root :global(#csgv),
+.root :global(#NQKR3_MONITOR),
+.root :global(#nicvs1),
+.root :global(#FSAGR),
+.root :global(#FSAG11),
+.root :global(#FSAG11A),
+.root :global(#FSAG12),
+.root :global(#CSBHX),
+.root :global(#NOJ),
+.root :global(#NOx),
+.root :global(#TTXM),
+.root :global(#DWATT) {
+  display: none;
+}
+/* lambda는 id에 특수문자(엔터티) 포함 — target-lambda 내 box/dot/spark 외 path 숨김 */
+.root :global(#target-lambda > path):not(:global(#box_lambda)):not(:global(#dot_lambda)):not(:global(#spark_lambda)) {
+  display: none;
+}
+
+/* LabelTexts overlay — KPI 값 위쪽에 한국어 라벨 */
+.labelTexts text {
+  font-family: 'Inter', 'Pretendard', -apple-system, sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  fill: #FFFFFF;
+  letter-spacing: 0.01em;
+}
+
+/* 우측 4개 카드 라벨 — 임계 상태에 따라 색 변화 (값/단위와 통일) */
+.root[data-kpi-nox="warn"]    :global([data-role="label-nox"])    { fill: #FFD24A; }
+.root[data-kpi-nox="crit"]    :global([data-role="label-nox"])    { fill: #FF6B6B; }
+.root[data-kpi-ttxm="warn"]   :global([data-role="label-ttxm"])   { fill: #FFD24A; }
+.root[data-kpi-ttxm="crit"]   :global([data-role="label-ttxm"])   { fill: #FF6B6B; }
+.root[data-kpi-dwatt="warn"]  :global([data-role="label-dwatt"])  { fill: #FFD24A; }
+.root[data-kpi-dwatt="crit"]  :global([data-role="label-dwatt"])  { fill: #FF6B6B; }
+.root[data-kpi-lambda="warn"] :global([data-role="label-lambda"]) { fill: #FFD24A; }
+.root[data-kpi-lambda="crit"] :global([data-role="label-lambda"]) { fill: #FF6B6B; }

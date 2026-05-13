@@ -4,6 +4,7 @@ import { KpiTexts } from './KpiTexts'
 import { SparkLines } from './SparkLines'
 import { SmokeCanvas } from './SmokeCanvas'
 import { LegendTexts } from './LegendTexts'
+import { LabelTexts } from './LabelTexts'
 import { computeKpiStates } from './kpiState'
 import { getFlowAnimationVars } from './flowVarsMap'
 import { useCascadeAnimation } from './useCascadeAnimation'
@@ -100,6 +101,7 @@ export function HmiSchematic(props: HmiSchematicProps) {
         />
         <SparkLines history={props.history ?? []} />
         <LegendTexts />
+        <LabelTexts />
       </svg>
     </div>
   )
