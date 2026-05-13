@@ -1,12 +1,13 @@
 import type { MetricPoint } from '../mockConsole'
 
 // 카드 안 spark 영역 (산출 SVG 좌표 기준)
-// 단위 path 우측 끝 ~1207 → spark 시작 1225로 18px 여백 확보
+// 카드 우측 끝 1275. 좌측 라벨 padding ≈ 12px와 동일하게 우측 여백 확보 → spark 끝 1263
+// 단위 path 우측 끝 ~1207 → spark 시작 1213으로 6px 여백
 const SPARK_BOXES = {
-  nox:    { x: 1225, y: 119, w: 50, h: 30, key: 'nox' as const },
-  ttxm:   { x: 1225, y: 215, w: 50, h: 30, key: 'exhaust' as const },
-  dwatt:  { x: 1225, y: 305, w: 50, h: 30, key: 'power' as const },
-  lambda: { x: 1225, y: 390, w: 50, h: 30, key: 'lambda' as const },
+  nox:    { x: 1213, y: 119, w: 50, h: 30, key: 'nox' as const },
+  ttxm:   { x: 1213, y: 215, w: 50, h: 30, key: 'exhaust' as const },
+  dwatt:  { x: 1213, y: 305, w: 50, h: 30, key: 'power' as const },
+  lambda: { x: 1213, y: 390, w: 50, h: 30, key: 'lambda' as const },
 }
 
 export interface SparkLinesProps {
