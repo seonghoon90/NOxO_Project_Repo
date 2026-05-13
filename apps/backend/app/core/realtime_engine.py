@@ -78,12 +78,13 @@ class RealtimeEngine:
     async def _run_forever(self) -> None:
         try:
             loop = asyncio.get_running_loop()
-            next_deadline = loop.time() + self.tick_interval
+            # 첫 tick은 즉시 실행 → 이후 매 1초 deadline 누적 (offset 없이 시작).
+            next_deadline = loop.time()
             while self._stop_event is not None and not self._stop_event.is_set():
                 await self._tick()
                 now = loop.time()
                 # 처리가 한 tick 이상 밀린 경우만 deadline 리셋 (drift 누적 방지).
-                # 정상 경로(now ≤ next_deadline)는 누적 deadline 유지 → 평균 drift 0.
+                # 정상 경로(now ≤ next_deadline+interval)는 누적 deadline 유지 → 평균 drift 0.
                 if now > next_deadline + self.tick_interval:
                     next_deadline = now + self.tick_interval
                 else:

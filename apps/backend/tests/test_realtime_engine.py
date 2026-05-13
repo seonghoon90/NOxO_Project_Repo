@@ -6,6 +6,7 @@ import pytest
 from app.core.realtime_engine import RealtimeEngine
 from app.core.sensor_buffer import SensorBuffer
 from app.core.session import Session
+from app.core.session_context import SessionContext
 from digital_twin.simulation import ControlVars, OutputVars
 
 
@@ -14,6 +15,20 @@ def _make_settings() -> MagicMock:
     s = MagicMock()
     s.syngas_lhv = 11.0
     return s
+
+
+def _make_context() -> SessionContext:
+    """plant_context invariant 검증을 위해 실 SessionContext 사용 (MagicMock 회피)."""
+    seed_buffer = SensorBuffer(maxlen=5)
+    seed_buffer.load_bootstrap([
+        {
+            "syngas_flow": 100.0, "igv_opening": 80.0, "n2_offset": 5.0,
+            "n2_valve_1": 42.0, "syngas_srv": 60.0, "syngas_gcv_1": 55.0,
+            "syngas_gcv_1a": 54.0, "syngas_gcv_2": 53.0, "ibh_valve": 30.0,
+            "n2_flow": 25.0, "exhaust_temp": 580.0,
+        }
+    ])
+    return SessionContext.from_sensor_buffer("s1", seed_buffer)
 
 
 def _make_buffer() -> SensorBuffer:
@@ -31,7 +46,7 @@ def _make_buffer() -> SensorBuffer:
 
 def _make_session(sid: str = "s1", mode: str = "sim") -> Session:
     now = datetime.now(timezone.utc)
-    s = Session(sid=sid, context=MagicMock(), created_at=now, last_active_at=now)
+    s = Session(sid=sid, context=_make_context(), created_at=now, last_active_at=now)
     if mode == "realtime":
         s.set_mode("realtime")
     return s

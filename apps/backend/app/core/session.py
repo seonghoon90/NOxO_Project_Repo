@@ -30,12 +30,13 @@ class Session:
     tick: int = 0
 
     def set_mode(self, mode: str) -> None:
-        """모드 전환. realtime 진입 시 override 자동 해제."""
+        """모드 전환. realtime 진입 시 override + pending input flag 자동 해제."""
         if mode not in _VALID_MODES:
             raise ValueError(f"invalid mode: {mode}")
         self.mode = mode  # type: ignore[assignment]
         if mode == "realtime":
             self.control_override = None
+            self.context.pending_input_flag = False
         self._touch()
 
     def set_override(self, controls: ControlVars) -> None:
@@ -55,8 +56,12 @@ class Session:
         self._touch()
 
     def clear_override(self) -> None:
-        """Kafka 추종 복귀. idempotent (이미 None이거나 realtime이어도 no-op)."""
+        """Kafka 추종 복귀. idempotent (이미 None이거나 realtime이어도 no-op).
+
+        override가 해제되므로 즉시 ML 호출 게이트(pending_input_flag)도 함께 해제.
+        """
         self.control_override = None
+        self.context.pending_input_flag = False
         self._touch()
 
     def _touch(self) -> None:
