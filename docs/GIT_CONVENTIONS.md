@@ -2,13 +2,15 @@
 
 ## 최초 1회 환경 설정
 
-clone 후 한 번만 실행한다.
+특별한 환경 설정은 필요하지 않다.
 
-```bash
-git config core.hooksPath .githooks
-```
-
-이 명령으로 `.githooks/pre-commit`이 활성화되어 commit 시 CLAUDE.md ↔ AGENTS.md 양방향 sync가 자동 수행된다.
+> **2026-05 변경**: 이전 버전의 `.githooks/pre-commit` + `scripts/sync-agents-md.sh` 기반 `CLAUDE.md ↔ AGENTS.md` 양방향 sync 자동화는 폐기되었다.
+> 이제 본문은 `AGENTS.md`에만 작성하고, `CLAUDE.md`는 `@./AGENTS.md` 한 줄로 import 한다. Claude Code는 import를 자동으로 따라가며 Codex/Antigravity/Cursor는 `AGENTS.md`를 직접 읽으므로, 단일 파일만 편집하면 된다(sync drift가 구조적으로 불가능).
+> 따라서 기존에 적용했던 `git config core.hooksPath .githooks` 설정이 있다면 다음으로 해제할 수 있다:
+>
+> ```bash
+> git config --unset core.hooksPath
+> ```
 
 ## 작업 시작 시 (필수)
 

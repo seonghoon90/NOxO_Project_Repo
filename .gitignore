@@ -80,3 +80,6 @@ digital_twin/models/*.pkl
 
 # Git worktrees
 .worktrees/
+
+# Agent 개인 도구 (Codex/Antigravity/Cursor 사용자만 필요)
+.agents/
