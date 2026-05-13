@@ -1,9 +1,9 @@
 import { KPI_ANCHORS } from './schematic-roles'
 import styles from './HmiSchematic.module.css'
 
-// 박스 path 중심 x 좌표 — schematic.svg의 각 BOX/target 그룹 외곽 path에서 추출.
-// 라벨은 박스 중앙에 정렬돼야 자연스러워, KPI_ANCHORS의 숫자값 x(좌측 정렬용)는 무시하고 별도 dict 사용.
-const BOX_CENTER_X: Record<keyof typeof KPI_ANCHORS, number> = {
+// 좌측 10개 박스 path의 중심 x — 박스 가운데 정렬용.
+// 우측 4개(nox/ttxm/dwatt/lambda)는 KPI_ANCHORS의 좌측 정렬 좌표 그대로 사용한다.
+const BOX_CENTER_X: Partial<Record<keyof typeof KPI_ANCHORS, number>> = {
   syngas: 92.5,
   csgv: 453.5,
   nqkr3: 92.5,
@@ -14,13 +14,6 @@ const BOX_CENTER_X: Record<keyof typeof KPI_ANCHORS, number> = {
   fsag12: 746.5,
   csbhx: 277.5,
   nqj: 479.5,
-  nox: 1194.5,
-  ttxm: 1194.5,
-  dwatt: 1194.5,
-  lambda: 1194.5,
-  'legend-fuel': 0,
-  'legend-n2': 0,
-  'legend-air': 0,
 }
 
 // KPI_ANCHORS의 숫자값 y에서 라벨 위치는 -20px 위쪽
@@ -48,13 +41,16 @@ export function LabelTexts() {
     <g data-role="label-texts" className={styles.labelTexts}>
       {LABELS.map(({ key, text }) => {
         const anchor = KPI_ANCHORS[key]
-        const cx = BOX_CENTER_X[key]
+        const centerX = BOX_CENTER_X[key]
+        // 좌측 10개: 박스 중앙. 우측 4개: KPI_ANCHORS 좌측 정렬 좌표 그대로.
+        const x = centerX ?? anchor.x
+        const textAnchor = centerX !== undefined ? 'middle' : anchor.textAnchor
         return (
           <text
             key={key}
-            x={cx}
+            x={x}
             y={anchor.y + LABEL_Y_OFFSET}
-            textAnchor="middle"
+            textAnchor={textAnchor}
             data-role={`label-${key}`}
           >
             {text}
