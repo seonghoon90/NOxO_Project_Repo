@@ -297,6 +297,16 @@
   font-family: 'Inter', 'Pretendard', -apple-system, sans-serif;
   font-size: 11px;
   font-weight: 500;
-  fill: #aab8c8;
+  fill: #FFFFFF;
   letter-spacing: 0.01em;
 }
+
+/* 우측 4개 카드 라벨 — 임계 상태에 따라 색 변화 (값/단위와 통일) */
+.root[data-kpi-nox="warn"]    :global([data-role="label-nox"])    { fill: #FFD24A; }
+.root[data-kpi-nox="crit"]    :global([data-role="label-nox"])    { fill: #FF6B6B; }
+.root[data-kpi-ttxm="warn"]   :global([data-role="label-ttxm"])   { fill: #FFD24A; }
+.root[data-kpi-ttxm="crit"]   :global([data-role="label-ttxm"])   { fill: #FF6B6B; }
+.root[data-kpi-dwatt="warn"]  :global([data-role="label-dwatt"])  { fill: #FFD24A; }
+.root[data-kpi-dwatt="crit"]  :global([data-role="label-dwatt"])  { fill: #FF6B6B; }
+.root[data-kpi-lambda="warn"] :global([data-role="label-lambda"]) { fill: #FFD24A; }
+.root[data-kpi-lambda="crit"] :global([data-role="label-lambda"]) { fill: #FF6B6B; }
