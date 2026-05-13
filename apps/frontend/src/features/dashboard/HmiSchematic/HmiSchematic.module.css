@@ -200,7 +200,7 @@
 .root[data-kpi-dwatt="crit"] :global([data-role="card-box-dwatt"]),
 .root[data-kpi-lambda="crit"] :global([data-role="card-box-lambda"]) {
   stroke: #FF6B6B;
-  animation: glow-pulse-crit 0.8s ease-in-out infinite;
+  animation: glow-pulse-crit 1.4s ease-in-out infinite;
 }
 .root[data-kpi-nox="crit"]    :global(#metric_NOx > path:not(#box_NOx):not(#spark_NOx)),
 .root[data-kpi-ttxm="crit"]   :global(#target-TTXM > path:not(#box_TTXM):not(#spark_TTXM)),

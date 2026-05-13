@@ -258,103 +258,141 @@ export function useConsoleState(mode: Mode) {
         void stopSession(sid)
       }
     }
-  }, [connectStream, disconnectStream, enableBackend, mode, startMockLoop, stopMockLoop])
+    // 의도: mode 전환은 POST /api/session/{sid}/mode로 처리한다(setMode 액션).
+    // mode를 deps에 두면 토글마다 세션이 재생성되어 status가 live→connecting→live로 깜빡이고
+    // 누적된 시계열도 리셋되므로 의존성에서 제외한다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connectStream, disconnectStream, enableBackend, startMockLoop, stopMockLoop])
 
-  return {
-    state,
-    status,
-    setActiveVar: (activeVar: VariableKey) =>
-      setState((current) => ({ ...current, activeVar })),
-    updateActiveVariableConfig: (update: VariableConfigUpdate) =>
-      setState((current) => {
-        const active = current.variables[current.activeVar]
-        // 백엔드 DEFAULT_CONTROL_BOUNDS와 동일한 seed 한계가 절대 상한.
-        // 이 콘솔의 모달은 운영자 개인 가드레일 — 백엔드 한계를 넘어설 수 없다.
-        const seed = variableSeed[current.activeVar]
-        const lo = Math.max(seed.min, Math.min(update.min, update.max))
-        const hi = Math.min(seed.max, Math.max(update.min, update.max))
-        const nextMin = Math.min(lo, hi)
-        const nextMax = Math.max(lo, hi)
-        const nextValue = roundForDigits(
-          Math.min(nextMax, Math.max(nextMin, active.value)),
-          active.digits,
-        )
+  // 액션 함수들은 매 렌더 새 참조가 되면 ServicePage의 useEffect[mode, notifyBackendMode]가
+  // 매 tick 발화되어 /mode 무한 호출 + /control 누락이 발생한다. useCallback + stateRef로
+  // stable identity 유지. state.variables가 필요한 액션은 stateRef를 통해 최신값 접근.
+  const stateRef = useRef(state)
+  useEffect(() => {
+    stateRef.current = state
+  }, [state])
 
-        return {
-          ...current,
-          variables: {
-            ...current.variables,
-            [current.activeVar]: {
-              ...active,
-              min: roundForDigits(nextMin, active.digits),
-              max: roundForDigits(nextMax, active.digits),
-              step: roundForDigits(Math.max(update.step, 0), active.digits),
-              value: nextValue,
-            },
-          },
-        }
-      }),
-    restoreActiveVariableDefaults: () =>
-      setState((current) => ({
+  const setActiveVar = useCallback((activeVar: VariableKey) => {
+    setState((current) => ({ ...current, activeVar }))
+  }, [])
+
+  const updateActiveVariableConfig = useCallback((update: VariableConfigUpdate) => {
+    setState((current) => {
+      const active = current.variables[current.activeVar]
+      // 백엔드 DEFAULT_CONTROL_BOUNDS와 동일한 seed 한계가 절대 상한.
+      // 이 콘솔의 모달은 운영자 개인 가드레일 — 백엔드 한계를 넘어설 수 없다.
+      const seed = variableSeed[current.activeVar]
+      const lo = Math.max(seed.min, Math.min(update.min, update.max))
+      const hi = Math.min(seed.max, Math.max(update.min, update.max))
+      const nextMin = Math.min(lo, hi)
+      const nextMax = Math.max(lo, hi)
+      const nextValue = roundForDigits(
+        Math.min(nextMax, Math.max(nextMin, active.value)),
+        active.digits,
+      )
+
+      return {
         ...current,
         variables: {
           ...current.variables,
           [current.activeVar]: {
-            ...current.variables[current.activeVar],
-            min: variableSeed[current.activeVar].min,
-            max: variableSeed[current.activeVar].max,
-            step: variableSeed[current.activeVar].step,
-          },
-        },
-      })),
-    toggleOverlay: () =>
-      setState((current) => ({
-        ...current,
-        overlayVisible: !current.overlayVisible,
-      })),
-    resetControls: () => {
-      tickRef.current += 1
-      if (enableBackend && sessionIdRef.current) {
-        const nextVariables = resetVariableValues(state.variables)
-        void sendControl(sessionIdRef.current, nextVariables)
-      }
-      setState((current) => resetConsoleState(current, mode, tickRef.current))
-    },
-    stepActiveVar: (direction: 1 | -1) => {
-      tickRef.current += 1
-      if (enableBackend && sessionIdRef.current) {
-        const active = state.variables[state.activeVar]
-        const nextValue = roundForDigits(
-          Math.min(
-            active.max,
-            Math.max(active.min, active.value + active.step * direction),
-          ),
-          active.digits,
-        )
-        void sendControl(sessionIdRef.current, {
-          ...state.variables,
-          [state.activeVar]: {
             ...active,
+            min: roundForDigits(nextMin, active.digits),
+            max: roundForDigits(nextMax, active.digits),
+            step: roundForDigits(Math.max(update.step, 0), active.digits),
             value: nextValue,
           },
-        })
+        },
       }
-      setState((current) =>
-        applyVariableStep(current, direction, mode, tickRef.current),
+    })
+  }, [])
+
+  const restoreActiveVariableDefaults = useCallback(() => {
+    setState((current) => ({
+      ...current,
+      variables: {
+        ...current.variables,
+        [current.activeVar]: {
+          ...current.variables[current.activeVar],
+          min: variableSeed[current.activeVar].min,
+          max: variableSeed[current.activeVar].max,
+          step: variableSeed[current.activeVar].step,
+        },
+      },
+    }))
+  }, [])
+
+  const toggleOverlay = useCallback(() => {
+    setState((current) => ({
+      ...current,
+      overlayVisible: !current.overlayVisible,
+    }))
+  }, [])
+
+  const resetControls = useCallback(() => {
+    tickRef.current += 1
+    if (enableBackend && sessionIdRef.current) {
+      const nextVariables = resetVariableValues(stateRef.current.variables)
+      void sendControl(sessionIdRef.current, nextVariables)
+      setState((current) => ({ ...current, variables: nextVariables }))
+      return
+    }
+    setState((current) => resetConsoleState(current, mode, tickRef.current))
+  }, [enableBackend, mode])
+
+  const stepActiveVar = useCallback((direction: 1 | -1) => {
+    tickRef.current += 1
+    // backend 연결 모드: variables만 즉시 갱신 + control POST.
+    // metrics는 다음 WS payload(override 적용된 값)로 갱신되므로 mock 합성 불가.
+    // mock 모드: applyVariableStep이 deriveMetrics로 합성된 값 채움.
+    if (enableBackend && sessionIdRef.current) {
+      const snapshot = stateRef.current
+      const active = snapshot.variables[snapshot.activeVar]
+      const nextValue = roundForDigits(
+        Math.min(
+          active.max,
+          Math.max(active.min, active.value + active.step * direction),
+        ),
+        active.digits,
       )
-    },
-    setMode: (nextMode: Mode) => {
-      const sid = sessionIdRef.current
-      if (sid && enableBackend) {
-        void changeMode(sid, nextMode)
+      const nextVariables = {
+        ...snapshot.variables,
+        [snapshot.activeVar]: { ...active, value: nextValue },
       }
-    },
-    resetOverride: () => {
-      const sid = sessionIdRef.current
-      if (sid && enableBackend) {
-        void resetOverrideRequest(sid)
-      }
-    },
+      void sendControl(sessionIdRef.current, nextVariables)
+      setState((current) => ({ ...current, variables: nextVariables }))
+      return
+    }
+    setState((current) =>
+      applyVariableStep(current, direction, mode, tickRef.current),
+    )
+  }, [enableBackend, mode])
+
+  const setMode = useCallback((nextMode: Mode) => {
+    const sid = sessionIdRef.current
+    if (sid && enableBackend) {
+      void changeMode(sid, nextMode)
+    }
+  }, [enableBackend])
+
+  const resetOverride = useCallback(() => {
+    const sid = sessionIdRef.current
+    if (sid && enableBackend) {
+      void resetOverrideRequest(sid)
+    }
+  }, [enableBackend])
+
+  return {
+    state,
+    status,
+    setActiveVar,
+    updateActiveVariableConfig,
+    restoreActiveVariableDefaults,
+    toggleOverlay,
+    resetControls,
+    stepActiveVar,
+    setMode,
+    resetOverride,
   }
 }
 

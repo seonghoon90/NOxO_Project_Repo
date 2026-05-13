@@ -19,7 +19,7 @@ CONTROL_TAGS = {
 
 def _initial_payload():
     return {
-        CONTROL_TAGS["syngas"]: 1500.0,
+        CONTROL_TAGS["syngas"]: 50.0,
         CONTROL_TAGS["igv"]: 75.0,
         CONTROL_TAGS["n2"]: 200.0,
         CONTROL_TAGS["n2_valve_1"]: 50.0,

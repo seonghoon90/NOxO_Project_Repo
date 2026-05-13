@@ -67,11 +67,39 @@ TAG_EXHAUST_TEMP: Final[str] = "IGCC.CC.G1.TTXM"
 # 외란 29개 — TODO: 모델링 팀과 매핑 검토 (후속 작업)
 # 외란 매핑이 미완이어도 시스템은 동작 (DT 모델이 ffill 폴백 경로로 작동)
 # ============================================================
+# RAW_FEATURES 39 - CONTROL_TAGS 10 = 29개 외란.
+# 도메인명은 raw 태그의 마지막 segment를 lowercase한 잠정 명명 (모델팀 합의 전까지).
+# 충돌 케이스(PV 2건)는 device prefix를 붙여 분리.
 DISTURBANCE_TAGS: Final[dict[str, str]] = {
-    # 예시 (실제 매핑은 후속 작업):
-    # "IGCC.CC.G1.PCD": "compressor_discharge_pressure",
-    # 추후 digital_twin/preprocess.RAW_FEATURES 39개에서
-    # CONTROL_TAGS 10개 + 출력 5개를 뺀 24개에 임의 도메인명 부여
+    "IGCC.CC.G1.FPSG": "fpsg",
+    "IGCC.CC.G1.FTSG": "ftsg",
+    "IGCC.CC.G1.LHVSYNDW_SCF": "lhvsyndw_scf",
+    "IGCC.CC.G1.FPSG2": "fpsg2",
+    "IGCC.CC.G1.FPSG3": "fpsg3",
+    "IGCC.CC.G1.AFDPM": "afdpm",
+    "IGCC.CC.G1.CTIM": "ctim",
+    "IGCC.CC.G1.afpap": "afpap",
+    "IGCC.CC.G1.CPD": "cpd",
+    "IGCC.CC.G1.CTD": "ctd",
+    "IGCC.CC.G1.tnh_v": "tnh_v",
+    "IGCC.CC.G1.ATID": "atid",
+    "IGCC.CC.G1.EXHMASS": "exhmass",
+    "IGCC.CC.G1.FPGN1_SEL": "fpgn1_sel",
+    "IGCC.CC.G1.FPGN2_SEL": "fpgn2_sel",
+    "IGCC.CC.G1.ROUTPUT_32": "routput_32",
+    "IGCC.CC.G1.VNPR_S": "vnpr_s",
+    "IGCC.CC.G1.VNPR_P": "vnpr_p",
+    "IGCC.CC.G1.NPNJ": "npnj",
+    "IGCC.CC.G1.NTNJ": "ntnj",
+    "IGCC.CC.G1.NQJO2": "nqjo2",
+    "IGCC.CC.G1.ndt1": "ndt1",
+    "IGCC.CC.G1.NPNJ2": "npnj2",
+    "IGCC.CC.G1.ROUTPUT_6": "routput_6",
+    "IGCC.IG.PIC7069A.PV": "pic7069a_pv",
+    "IGCC.IG.ZT7069B.PV": "zt7069b_pv",
+    "IGCC.DeNOX.TT_H1_90123": "tt_h1_90123",
+    "IGCC.CC.G1.itdp": "itdp",
+    "IGCC.CC.G1.tcsph1": "tcsph1",
 }
 
 
@@ -183,11 +211,11 @@ def control_vars_to_tag_dict(vars: ControlVars) -> dict[str, float]:
 # ============================================================
 @dataclass(frozen=True)
 class ControlBounds:
-    syngas_flow_min: float = 800.0
-    syngas_flow_max: float = 2200.0
+    syngas_flow_min: float = 0.0
+    syngas_flow_max: float = 100.0
     igv_opening_min: float = 30.0
     igv_opening_max: float = 100.0
-    n2_offset_min: float = 0.0
+    n2_offset_min: float = -100.0
     n2_offset_max: float = 500.0
     # 신규 7개 — 개도 변수는 [0, 100], n2_flow는 [0, 500] 가안
     n2_valve_1_min: float = 0.0
@@ -195,7 +223,7 @@ class ControlBounds:
     syngas_srv_min: float = 0.0
     syngas_srv_max: float = 100.0
     syngas_gcv_1_min: float = 0.0
-    syngas_gcv_1_max: float = 100.0
+    syngas_gcv_1_max: float = 300.0
     syngas_gcv_1a_min: float = 0.0
     syngas_gcv_1a_max: float = 100.0
     syngas_gcv_2_min: float = 0.0

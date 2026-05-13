@@ -113,15 +113,15 @@ class ThresholdConfig:
     lambda_min: float = 0.5           # 공기비 최소 클램프 (연료과잉 방지)
 
     # 운영 임계 — 프론트 화면 표시용. 시뮬 동작에는 영향 없음.
-    nox_warning_ppm: float = 50.0     # NOx 경고 임계치 [ppm] — 규제 가안
+    nox_warning_ppm: float = 29.5     # NOx 경고 임계치 [ppm] — CSV 실측 mean+1.3σ≈p99
 
     # 발전 효율 운영 임계 [가안] — 정격 0.89 기준. 정격 미만일 때만 주의/위험 색.
-    efficiency_caution: float = 0.85  # 미만 시 주의 (주황)
-    efficiency_danger: float = 0.80   # 미만 시 위험 (빨강)
+    efficiency_caution: float = 0.3633  # backend 산출 분포 mean-2σ. 단위 정합 미해결 — 후속 작업 시 재산정
+    efficiency_danger: float = 0.3630   # backend 산출 분포 mean-3σ
 
     # 배기온도 상한 운영 임계 [°C, 가안] — 정격 580 기준 상승만 경고
-    exhaust_caution_c: float = 600.0
-    exhaust_danger_c: float = 620.0
+    exhaust_caution_c: float = 633.0   # CSV 실측 mean+1σ≈p90
+    exhaust_danger_c: float = 638.0    # CSV 실측 mean+2σ
 
     # 공기비(λ) 운영 한계 [무차원, 가안] — lambda_min(0.5)과 별개의 운영 한계
     lambda_caution_lo: float = 0.9

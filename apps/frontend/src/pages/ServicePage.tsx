@@ -551,6 +551,7 @@ function SettingField({
 function KpiCard({
   title,
   value,
+  unit,
   status,
   emphatic,
   caution,
@@ -577,6 +578,7 @@ function KpiCard({
           {integer}
           <span className="kpi-decimal">.{decimal}</span>
         </div>
+        {unit ? <div className="kpi-unit">{unit}</div> : null}
       </div>
     </section>
   )
@@ -970,11 +972,11 @@ function efficiencyTone(efficiency: number, t: Thresholds): string {
 }
 
 function formatEfficiencyHeadroom(efficiency: number, t: Thresholds): string {
-  // 정격 이상이면 그냥 "정상 운전" 표시. caution 미만일 때만 부족분(%p) 표시.
-  if (efficiency >= t.efficiencyCaution) {
-    return ((efficiency - t.efficiencyCaution) * 100).toFixed(1)
-  }
-  return `부족 ${((t.efficiencyCaution - efficiency) * 100).toFixed(1)}`
+  // 임계 기준 %p 편차: 임계 이상 +N, 미만 -N, 정확히 0이면 부호 없이 0.0
+  const deltaPp = (efficiency - t.efficiencyCaution) * 100
+  const abs = Math.abs(deltaPp).toFixed(1)
+  if (abs === '0.0') return '0.0'
+  return deltaPp > 0 ? `+${abs}` : `-${abs}`
 }
 
 function exhaustStatus(value: number, t: Thresholds): string {
