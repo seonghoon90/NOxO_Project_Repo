@@ -59,6 +59,57 @@ def test_get_session_metadata(client):
     assert "created_at" in body and "last_active_at" in body
 
 
+def test_get_session_snapshot_returns_last_stream_payload(client):
+    sid = client.post("/api/session/start", json={}).json()["sid"]
+    client.app.state.realtime_engine._last_payloads[sid] = {
+        "v": 1,
+        "sid": sid,
+        "tick": 7,
+        "ts": "2026-05-13T06:00:00.000Z",
+        "mode": "realtime",
+        "override_active": False,
+        "current": {
+            "controls": {
+                "syngas_flow": 50.0,
+                "igv_opening": 75.0,
+                "n2_offset": 200.0,
+                "n2_valve_1": 50.0,
+                "syngas_srv": 60.0,
+                "syngas_gcv_1": 55.0,
+                "syngas_gcv_1a": 55.0,
+                "syngas_gcv_2": 55.0,
+                "ibh_valve": 30.0,
+                "n2_flow": 100.0,
+            },
+            "outputs": {
+                "nox": 28.5,
+                "exhaust_temp": 580.0,
+                "power": 165.2,
+                "lambda_": 2.1,
+                "efficiency": 0.42,
+            },
+        },
+        "kafka_latest": None,
+        "forecast": {
+            "predicted_nox": 31.2,
+            "target_time": "2026-05-13T06:05:00.000Z",
+            "threshold_value": 30.0,
+            "threshold_exceeded": True,
+        },
+        "warning": None,
+    }
+
+    res = client.get(f"/api/session/{sid}/snapshot")
+    assert res.status_code == 200
+    body = res.json()
+    assert body["sid"] == sid
+    assert body["t"] == 7
+    assert body["current"]["syngas_flow"] == 50.0
+    assert body["output"]["nox"] == 28.5
+    assert body["output"]["predicted_nox"] == 31.2
+    assert body["warning"] is False
+
+
 def test_get_session_404(client):
     res = client.get("/api/session/non-existent")
     assert res.status_code == 404

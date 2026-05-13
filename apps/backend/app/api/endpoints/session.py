@@ -5,7 +5,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.api.deps import get_session_service
+from app.api.deps import get_realtime_engine, get_session_service
 from app.core.session import Session
 from app.exceptions import SessionLimitExceededError, SessionNotFoundError
 from app.schemas.session import (
@@ -21,6 +21,7 @@ from app.services.session_service import SessionService
 router = APIRouter(prefix="/session", tags=["session"])
 
 SessionServiceDep = Annotated[SessionService, Depends(get_session_service)]
+RealtimeEngineDep = Annotated[object, Depends(get_realtime_engine)]
 
 
 def _serialize_override(session: Session) -> ControlPayload | None:
@@ -63,6 +64,36 @@ def get_session(
         created_at=session.created_at,
         last_active_at=session.last_active_at,
     )
+
+
+@router.get("/{sid}/snapshot")
+def get_session_snapshot(
+    sid: str,
+    service: SessionServiceDep,
+    realtime_engine: RealtimeEngineDep,
+) -> dict:
+    """프론트 WebSocket 재연결용 마지막 payload snapshot."""
+    try:
+        service.get(sid)
+    except SessionNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    payload = realtime_engine.last_payload(sid)
+    if payload is None:
+        raise HTTPException(status_code=404, detail="snapshot not available yet")
+
+    outputs = dict(payload["current"]["outputs"])
+    if payload.get("forecast") is not None:
+        outputs["predicted_nox"] = payload["forecast"]["predicted_nox"]
+
+    return {
+        "sid": sid,
+        "t": payload["tick"],
+        "current": payload["current"]["controls"],
+        "output": outputs,
+        "warning": payload.get("warning") is not None,
+        "last_updated": payload["ts"],
+    }
 
 
 @router.post("/{sid}/mode", response_model=SessionModeResponse)
