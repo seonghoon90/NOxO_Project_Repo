@@ -690,9 +690,9 @@ function ForecastCard({
   }
 
   const exceeded = forecast.threshold_exceeded
-  // 화면 표시·delta 비교는 15% O2 보정값(predicted_nox_15pct). threshold_exceeded는
-  // backend가 raw 기준으로 판정해 송신하므로 그대로 사용.
-  const displayedForecast = forecast.predicted_nox_15pct
+  // 화면 표시·delta 비교는 15% O2 보정값(predicted_nox_15pct). backend 구버전 호환을 위해
+  // 미전송 시 raw predicted_nox로 폴백. threshold_exceeded는 backend raw 기준 유지.
+  const displayedForecast = forecast.predicted_nox_15pct ?? forecast.predicted_nox
   const [integer, decimal = '0'] = displayedForecast.toFixed(1).split('.')
 
   return (

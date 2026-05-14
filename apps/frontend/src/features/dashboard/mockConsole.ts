@@ -538,7 +538,8 @@ export type RealtimeStreamPayload = {
     }
     outputs: {
       nox: number
-      nox_15pct: number
+      // backend 구버전(nox_15pct 미전송)과의 호환을 위해 optional. 매핑 단계에서 raw nox로 폴백.
+      nox_15pct?: number
       exhaust_temp: number
       power: number
       lambda_: number
@@ -551,7 +552,8 @@ export type RealtimeStreamPayload = {
   } | null
   forecast: {
     predicted_nox: number
-    predicted_nox_15pct: number
+    // 동일 사유로 optional. ForecastCard 등 표시단에서 predicted_nox로 폴백.
+    predicted_nox_15pct?: number
     target_time: string
     threshold_value: number
     threshold_exceeded: boolean
@@ -598,15 +600,20 @@ export function createStateFromPayload(
       value: roundForDigits(value, variables[key].digits),
     }
   }
+  // backend 구버전 호환: nox_15pct 미전송 시 raw nox로 폴백
+  const noxCorrected = outputs.nox_15pct ?? outputs.nox
   const metrics: ConsoleMetrics = {
     nox: outputs.nox,
-    nox15pct: outputs.nox_15pct,
+    nox15pct: noxCorrected,
     exhaust: outputs.exhaust_temp,
     lambda: outputs.lambda_,
     power: outputs.power,
     efficiency: outputs.efficiency,
-    // predictedNox는 표시 일관성을 위해 15% O2 보정값 사용 (forecast 없으면 현재 보정값)
-    predictedNox: payload.forecast?.predicted_nox_15pct ?? outputs.nox_15pct,
+    // predictedNox는 표시 일관성을 위해 15% O2 보정값 사용. 양쪽 모두 폴백 체인 적용.
+    predictedNox:
+      payload.forecast?.predicted_nox_15pct
+      ?? payload.forecast?.predicted_nox
+      ?? noxCorrected,
   }
   return {
     ...current,
