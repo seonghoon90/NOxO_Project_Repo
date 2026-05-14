@@ -11,11 +11,11 @@ describe('getFlowAnimationVars (연속 보간)', () => {
     expect(v['--flow-fuel-state']).toBe('paused')
   })
 
-  it('ratio ≥ 0.05 → running, duration 0.4~4s 범위', () => {
+  it('ratio ≥ 0.05 → running, duration 0.1~4s 범위', () => {
     const v = getFlowAnimationVars({ fuel: 0.30, nox: 0.30, air: 0.30 })
     expect(v['--flow-fuel-state']).toBe('running')
     const d = durationSeconds(v['--flow-fuel-duration'])
-    expect(d).toBeGreaterThanOrEqual(0.4)
+    expect(d).toBeGreaterThanOrEqual(0.1)
     expect(d).toBeLessThanOrEqual(4.0)
   })
 
@@ -27,9 +27,9 @@ describe('getFlowAnimationVars (연속 보간)', () => {
     expect(mid).toBeGreaterThan(high)
   })
 
-  it('ratio 1.0 → 약 0.4s', () => {
+  it('ratio 1.0 → 약 0.1s', () => {
     const v = getFlowAnimationVars({ fuel: 1.0, nox: 0, air: 0 })
-    expect(durationSeconds(v['--flow-fuel-duration'])).toBeCloseTo(0.4, 1)
+    expect(durationSeconds(v['--flow-fuel-duration'])).toBeCloseTo(0.1, 1)
   })
 
   it('flow-cards는 항상 1.2s, running', () => {

@@ -23,6 +23,7 @@ import {
  * - `connecting`   : 최초 핸드셰이크 진행 중
  * - `reconnecting` : 일시적 끊김 후 backoff 재시도 중 (마지막 snapshot 표시)
  * - `disconnected` : 재시도 모두 실패 — 화면은 마지막 실데이터 유지, mock 합성 안 함
+ * - `restarting`   : 사용자 명시적 서버 재시작(POST /api/reset) 진행 중 — health 폴링 + 새 세션 부트스트랩
  * - `mock`         : 백엔드 자체 비활성 (`VITE_ENABLE_BACKEND_STREAM=false`) — 명시적 mock
  */
 export type StreamStatus =
@@ -30,11 +31,25 @@ export type StreamStatus =
   | 'connecting'
   | 'reconnecting'
   | 'disconnected'
+  | 'restarting'
   | 'mock'
+
+export type RestartOutcome =
+  | { kind: 'ok' }
+  | { kind: 'invalid-password'; message: string }
+  | { kind: 'unavailable'; message: string }
+  | { kind: 'error'; message: string }
 
 const RECONNECT_DELAYS_MS = [1000, 2000, 4000] // exponential backoff 최대 3회
 const NORMAL_CLOSE_CODES = new Set([1000]) // 명시적 stop / 정상 종료
 const ACTIVE_SESSION_STORAGE_KEY = 'noxo.activeSessionId'
+
+// 서버 재시작(POST /api/reset) 후 컨테이너 부팅 대기.
+// 백엔드가 200을 즉시 반환 후 ~1~2초 내 죽고 ~10~20초 후 부활하므로
+// 초기 지연 + 최대 ~30초 폴링이면 충분히 커버.
+const RESTART_INITIAL_DELAY_MS = 1500
+const RESTART_POLL_INTERVAL_MS = 1000
+const RESTART_POLL_MAX_MS = 30000
 
 export function useConsoleState(mode: Mode) {
   const tickRef = useRef(0)
@@ -382,6 +397,93 @@ export function useConsoleState(mode: Mode) {
     }
   }, [enableBackend])
 
+  // POST /api/reset → 백엔드/Kafka producer 컨테이너 동시 재시작.
+  // password 필수 — 백엔드 RESET_PASSWORD env와 비교.
+  // 응답 200이면 기존 WS 끊고 health 폴링 → 새 sid 발급 → WS 재연결.
+  // 401(불일치) / 503(미설정/비-Docker) / 기타는 호출자에 메시지로 전달.
+  const restartSession = useCallback(async (password: string): Promise<RestartOutcome> => {
+    if (!enableBackend) {
+      return {
+        kind: 'unavailable',
+        message: 'mock 모드에서는 서버 재시작을 사용할 수 없습니다.',
+      }
+    }
+    if (!password) {
+      return {
+        kind: 'invalid-password',
+        message: '비밀번호를 입력하세요.',
+      }
+    }
+
+    let response: Response
+    try {
+      response = await fetch(`${apiBaseUrl()}/api/reset`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      })
+    } catch (error) {
+      console.warn('reset request failed', error)
+      return {
+        kind: 'error',
+        message: '서버 재시작 요청을 보내지 못했습니다.',
+      }
+    }
+
+    if (!response.ok) {
+      const message = await extractRestartErrorMessage(response)
+      if (response.status === 401) {
+        return { kind: 'invalid-password', message: '비밀번호가 일치하지 않습니다.' }
+      }
+      return response.status === 503
+        ? { kind: 'unavailable', message }
+        : { kind: 'error', message }
+    }
+
+    // 이후 자동 재연결을 막고 깔끔하게 끊는다 — 새 sid 발급 전에 옛 sid로 reconnect되면 404.
+    const previousSid = sessionIdRef.current
+    sessionIdRef.current = null
+    cancelReconnect()
+    reconnectAttemptRef.current = 0
+    expectedCloseRef.current = true
+    if (socketRef.current) {
+      socketRef.current.close()
+      socketRef.current = null
+    }
+    clearStoredSessionId(previousSid)
+    setStatus('restarting')
+
+    // 백엔드가 죽고 다시 살아날 때까지 대기.
+    await sleep(RESTART_INITIAL_DELAY_MS)
+    const ready = await pollBackendHealth()
+    if (!ready) {
+      setStatus('disconnected')
+      return {
+        kind: 'error',
+        message: '서버 응답 대기 시간이 초과되었습니다. 잠시 후 다시 시도하세요.',
+      }
+    }
+
+    try {
+      const session = await startSession()
+      sessionIdRef.current = session.sid
+      setStoredSessionId(session.sid)
+      reconnectAttemptRef.current = 0
+      if (session.snapshot) {
+        setState((current) => createStateFromSnapshot(session.snapshot!, current))
+      }
+      connectStream(session.sid)
+      return { kind: 'ok' }
+    } catch (error) {
+      console.error('post-restart session bootstrap failed', error)
+      setStatus('disconnected')
+      return {
+        kind: 'error',
+        message: '재시작 후 세션 재구성에 실패했습니다.',
+      }
+    }
+  }, [cancelReconnect, connectStream, enableBackend])
+
   return {
     state,
     status,
@@ -393,6 +495,7 @@ export function useConsoleState(mode: Mode) {
     stepActiveVar,
     setMode,
     resetOverride,
+    restartSession,
   }
 }
 
@@ -479,6 +582,44 @@ async function resetOverrideRequest(sid: string): Promise<void> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({}),
   })
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms))
+}
+
+async function extractRestartErrorMessage(response: Response): Promise<string> {
+  try {
+    const body = (await response.json()) as { detail?: string; message?: string }
+    if (typeof body.detail === 'string' && body.detail.length > 0) return body.detail
+    if (typeof body.message === 'string' && body.message.length > 0) return body.message
+  } catch {
+    // JSON 아님 — fallback 메시지로 떨어진다
+  }
+  return response.status === 503
+    ? '현재 환경에서는 서버 재시작이 지원되지 않습니다.'
+    : `서버 재시작 요청이 실패했습니다 (HTTP ${response.status}).`
+}
+
+// GET /api/health 200을 받을 때까지 일정 간격으로 폴링.
+// AbortController로 단일 시도 타임아웃을 짧게 잡아 — 백엔드가 죽어 있는 동안 fetch가 길게 걸리지 않게.
+async function pollBackendHealth(): Promise<boolean> {
+  const deadline = Date.now() + RESTART_POLL_MAX_MS
+  while (Date.now() < deadline) {
+    try {
+      const controller = new AbortController()
+      const timer = window.setTimeout(() => controller.abort(), 1500)
+      const response = await fetch(`${apiBaseUrl()}/api/health`, {
+        signal: controller.signal,
+      })
+      window.clearTimeout(timer)
+      if (response.ok) return true
+    } catch {
+      // 컨테이너 부팅 중 — 다음 폴링까지 대기
+    }
+    await sleep(RESTART_POLL_INTERVAL_MS)
+  }
+  return false
 }
 
 function buildControlTagPayload(

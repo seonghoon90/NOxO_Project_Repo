@@ -283,6 +283,8 @@ a {
   flex-shrink: 0;
   background: var(--surface);
   border-left: 1px solid rgba(255, 255, 255, 0.07);
+  /* ForecastCard ::after halo가 inset: -10px로 카드 밖으로 튀어나와 페이지 가로 스크롤을 만들지 않게 차단 */
+  overflow-x: hidden;
 }
 
 .sidebar-locked .sidebar-section {
@@ -304,6 +306,66 @@ a {
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
+.sidebar-clock-wrap {
+  padding: 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.sidebar-clock-stack {
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-clock {
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background-color: var(--surface-2);
+  color: var(--text);
+  font: 500 16px var(--font-mono);
+  letter-spacing: 0.02em;
+}
+
+/* 두 카드가 위·아래로 붙어 있도록 — 위 카드는 아래 모서리, 아래 카드는 위 모서리 둥글기를 제거 + 테두리 공유 */
+.sidebar-clock-stack .sidebar-clock:not(:last-child) {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  border-bottom: none;
+}
+.sidebar-clock-stack .sidebar-clock + .sidebar-clock {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
+.sidebar-clock-forecast {
+  position: relative;
+  gap: 10px;
+  color: #7dd3fc;
+  border-color: rgba(125, 211, 252, 0.35);
+  background-color: rgba(125, 211, 252, 0.06);
+  animation: clock-forecast-pulse 2.4s ease-in-out infinite;
+}
+
+.sidebar-clock-icon {
+  position: absolute;
+  left: 14px;
+  display: inline-flex;
+  align-items: center;
+  color: #7dd3fc;
+}
+
+@keyframes clock-forecast-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(125, 211, 252, 0);
+  }
+  50% {
+    box-shadow: 0 0 0 3px rgba(125, 211, 252, 0.15);
+  }
+}
+
 .sidebar-title,
 .section-label,
 .process-label {
@@ -313,6 +375,186 @@ a {
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
+}
+
+/* 서버 초기화 카드 — sidebar-clock과 동일 높이/형태, 위험 액션이라 빨강 톤 */
+.sidebar-restart-wrap {
+  padding: 14px;
+}
+
+.sidebar-restart-card {
+  width: 100%;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: var(--radius);
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  background-color: rgba(248, 113, 113, 0.08);
+  color: #fca5a5;
+  font: 500 14px var(--font-mono);
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.sidebar-restart-card:hover:not(:disabled) {
+  background-color: rgba(248, 113, 113, 0.16);
+  border-color: rgba(248, 113, 113, 0.55);
+  color: #fecaca;
+}
+
+.sidebar-restart-card:disabled,
+.sidebar-restart-card.is-busy {
+  cursor: progress;
+  color: rgba(248, 113, 113, 0.7);
+  border-color: rgba(248, 113, 113, 0.25);
+  animation: sidebar-restart-pulse 1.4s ease-in-out infinite;
+}
+
+.sidebar-restart-icon {
+  display: inline-flex;
+  align-items: center;
+  width: 18px;
+  height: 18px;
+}
+
+.sidebar-restart-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.sidebar-restart-notice {
+  margin-top: 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.4;
+  letter-spacing: 0.01em;
+  text-align: center;
+  animation: sidebar-restart-fade 0.2s ease-out;
+}
+
+.sidebar-restart-notice.ok {
+  background-color: rgba(74, 222, 128, 0.12);
+  border: 1px solid rgba(74, 222, 128, 0.35);
+  color: #86efac;
+}
+
+.sidebar-restart-notice.warn {
+  background-color: rgba(250, 204, 21, 0.1);
+  border: 1px solid rgba(250, 204, 21, 0.35);
+  color: #fde68a;
+}
+
+@keyframes sidebar-restart-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(248, 113, 113, 0);
+  }
+  50% {
+    box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.18);
+  }
+}
+
+@keyframes sidebar-restart-fade {
+  from {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 서버 재시작 비밀번호 모달 — settings-modal보다 좁고 가벼운 confirm 형태 */
+.restart-modal {
+  width: min(360px, 100%);
+  padding: 20px;
+  border-radius: 12px;
+  border: 1px solid rgba(248, 113, 113, 0.32);
+  background: linear-gradient(180deg, rgba(28, 22, 24, 0.98), rgba(20, 16, 18, 0.98));
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.5);
+}
+
+.restart-modal-header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.restart-modal-title {
+  color: #fca5a5;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.restart-modal-hint {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.restart-modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.restart-modal-label {
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.restart-modal-input {
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background-color: var(--surface-2);
+  color: var(--text);
+  font-size: 14px;
+  letter-spacing: 0.08em;
+}
+
+.restart-modal-input:focus {
+  outline: none;
+  border-color: rgba(248, 113, 113, 0.55);
+  box-shadow: 0 0 0 2px rgba(248, 113, 113, 0.18);
+}
+
+.restart-modal-input:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.restart-modal-error {
+  margin-top: 2px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background-color: rgba(248, 113, 113, 0.1);
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  color: #fecaca;
+  font-size: 12px;
+}
+
+.restart-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.restart-modal-submit {
+  background: rgba(248, 113, 113, 0.18);
+  border-color: rgba(248, 113, 113, 0.55);
+  color: #fecaca;
 }
 
 .kpi-row {
@@ -1111,11 +1353,78 @@ a {
   font-size: 11px;
 }
 
+/* input과 동일한 폭을 차지하도록 우측 unit 자리(40px + 10px gap)만큼 우측 마진을 둔다 */
+.settings-quick-row {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  margin-right: 50px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.settings-quick-pick {
+  appearance: none;
+  border: 0;
+  border-left: 1px solid var(--line);
+  background: transparent;
+  color: var(--text-2);
+  font: 600 11px var(--font-ui);
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.settings-quick-pick:first-child {
+  border-left: 0;
+}
+
+.settings-quick-pick:hover {
+  background: rgba(59, 130, 246, 0.08);
+  color: var(--text);
+}
+
+.settings-quick-pick.active {
+  background: var(--blue-bg);
+  color: #93c5fd;
+  box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.55);
+}
+
 .settings-modal-actions {
   margin-top: 18px;
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
   gap: 10px;
+}
+
+.settings-modal-toast {
+  flex: 1;
+  min-height: 24px;
+  display: flex;
+  align-items: center;
+}
+
+.settings-toast-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  background: rgba(34, 197, 94, 0.12);
+  color: #4ade80;
+  font: 600 11px var(--font-ui);
+  letter-spacing: 0.02em;
+  animation: settings-toast-fade 1.5s ease-out forwards;
+}
+
+@keyframes settings-toast-fade {
+  0% { opacity: 0; transform: translateY(2px); }
+  15% { opacity: 1; transform: translateY(0); }
+  75% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(0); }
 }
 
 .button-secondary,

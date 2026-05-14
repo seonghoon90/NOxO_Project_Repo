@@ -11,6 +11,8 @@ import {
   variableSeed,
 } from '../features/dashboard/mockConsole'
 import { useConsoleState, type StreamStatus } from '../features/dashboard/useConsoleState'
+
+type RestartNotice = { tone: 'ok' | 'warn'; text: string }
 import { useThresholds, type Thresholds } from '../features/dashboard/useThresholds'
 import type { AppOutletContext } from '../app/App'
 
@@ -23,7 +25,7 @@ const LAMBDA_RATED = 1.1
 const EFFICIENCY_RATED = 0.89
 
 export function ServicePage() {
-  const { mode, settingsOpen, closeSettings, reportStreamStatus } = useOutletContext<AppOutletContext>()
+  const { mode, settingsOpen, closeSettings, reportStreamStatus, clock } = useOutletContext<AppOutletContext>()
   const {
     state,
     status,
@@ -34,9 +36,16 @@ export function ServicePage() {
     setMode: notifyBackendMode,
     updateActiveVariableConfig,
     restoreActiveVariableDefaults,
+    restartSession,
   } = useConsoleState(mode)
   const thresholds = useThresholds()
   const [draftConfig, setDraftConfig] = useState<VariableConfigUpdate | null>(null)
+  const [savedToast, setSavedToast] = useState(false)
+  const [restartBusy, setRestartBusy] = useState(false)
+  const [restartNotice, setRestartNotice] = useState<RestartNotice | null>(null)
+  const [restartPromptOpen, setRestartPromptOpen] = useState(false)
+  const [restartPassword, setRestartPassword] = useState('')
+  const [restartPromptError, setRestartPromptError] = useState<string | null>(null)
   // realtime 모드는 Kafka 기반 5분 NOx 예측 표시 — 제어 조작은 잠근다.
   const isRealtimeMode = mode === 'realtime'
 
@@ -46,15 +55,19 @@ export function ServicePage() {
     max: activeVariable.max,
     step: activeVariable.step,
   }
-  const displayedNox = mode === 'sim' ? state.metrics.nox : state.metrics.predictedNox
+  // 메인 KPI/도면/임계 여유는 항상 현재 NOx(metrics.nox). 5분 후 예측값(predictedNox)은 ForecastCard에서만 사용.
+  const displayedNox = state.metrics.nox
+  const forecastTargetKst = isRealtimeMode && state.forecast
+    ? formatForecastTargetKst(state.forecast.target_time)
+    : null
   const streamLabel = streamStatusLabel(status)
-  const noxStatus = displayedNox > thresholds.noxLimit ? '위험' : streamLabel.text
+  const noxStatus = displayedNox > thresholds.noxLimit ? '위험' : '정상'
   const controlCards = controlVariableOrder.map((key) => state.variables[key])
   const noxValues = state.history.length > 0 ? state.history.map((point) => point.nox) : [displayedNox]
   // 효율은 정격 이상이면 항상 정상. 미만일 때만 caution/danger 임계로 색 판정.
   const efficiency = state.metrics.efficiency
   const noxHeadroom = thresholds.noxLimit - displayedNox
-  const noxHeadroomTone = headroomTone(noxHeadroom, 12, 5)
+  const noxHeadroomTone = headroomTone(noxHeadroom)
   const efficiencyHeadroomTone = efficiencyTone(efficiency, thresholds)
   const noxRange = getRange(noxValues)
   const tableRows = buildOutputTableRows({
@@ -65,8 +78,78 @@ export function ServicePage() {
   })
   const handleCloseSettings = useCallback(() => {
     setDraftConfig(null)
+    setSavedToast(false)
     closeSettings()
   }, [closeSettings])
+
+  // 사이드바 버튼 → 비밀번호 모달 오픈
+  const handleOpenRestartPrompt = useCallback(() => {
+    if (restartBusy) return
+    setRestartPassword('')
+    setRestartPromptError(null)
+    setRestartNotice(null)
+    setRestartPromptOpen(true)
+  }, [restartBusy])
+
+  // 모달 닫기 — 입력값/에러 즉시 폐기 (메모리에도 비밀번호를 남기지 않는다)
+  const handleCloseRestartPrompt = useCallback(() => {
+    setRestartPromptOpen(false)
+    setRestartPassword('')
+    setRestartPromptError(null)
+  }, [])
+
+  // 모달 제출 — 비어 있으면 즉시 거절, 200/401/503 분기 처리
+  const handleSubmitRestart = useCallback(async () => {
+    if (restartBusy) return
+    const password = restartPassword
+    if (!password) {
+      setRestartPromptError('비밀번호를 입력하세요.')
+      return
+    }
+    setRestartBusy(true)
+    setRestartPromptError(null)
+    const outcome = await restartSession(password)
+    setRestartBusy(false)
+
+    if (outcome.kind === 'ok') {
+      handleCloseRestartPrompt()
+      setRestartNotice({ tone: 'ok', text: '서버 재시작 완료 — 새 세션이 연결되었습니다.' })
+      return
+    }
+    if (outcome.kind === 'invalid-password') {
+      // 모달 유지 + 입력란 비우기 + 에러 표시
+      setRestartPassword('')
+      setRestartPromptError(outcome.message)
+      return
+    }
+    // unavailable / error: 모달 닫고 사이드바 토스트로
+    handleCloseRestartPrompt()
+    setRestartNotice({ tone: 'warn', text: outcome.message })
+  }, [restartBusy, restartPassword, restartSession, handleCloseRestartPrompt])
+
+  // restart 결과 알림은 3초 후 자동 소거
+  useEffect(() => {
+    if (!restartNotice) return
+    const timer = window.setTimeout(() => setRestartNotice(null), 3000)
+    return () => window.clearTimeout(timer)
+  }, [restartNotice])
+
+  // 모달 ESC 닫기
+  useEffect(() => {
+    if (!restartPromptOpen) return
+    const handler = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !restartBusy) handleCloseRestartPrompt()
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [restartPromptOpen, restartBusy, handleCloseRestartPrompt])
+
+  // 적용 클릭 시 1.5초간 "저장 완료" 토스트 노출
+  useEffect(() => {
+    if (!savedToast) return
+    const timer = window.setTimeout(() => setSavedToast(false), 1500)
+    return () => window.clearTimeout(timer)
+  }, [savedToast])
 
   useEffect(() => {
     reportStreamStatus(status)
@@ -224,10 +307,24 @@ export function ServicePage() {
         </div>
 
         <aside className="sidebar">
+          <div className="sidebar-clock-wrap">
+            <div className="sidebar-clock-stack">
+              <div className="sidebar-clock mono">{clock}</div>
+              {forecastTargetKst ? (
+                <div className="sidebar-clock sidebar-clock-forecast mono">
+                  <span className="sidebar-clock-icon" aria-label="5분 후 예측 시각" title="5분 후 예측 시각">
+                    <ForecastClockIcon />
+                  </span>
+                  <span>{forecastTargetKst}</span>
+                </div>
+              ) : null}
+            </div>
+          </div>
           {isRealtimeMode ? (
             <ForecastCard
               forecast={state.forecast}
               noxLimit={thresholds.noxLimit}
+              currentNox={state.metrics.nox}
             />
           ) : (
             <>
@@ -333,6 +430,31 @@ export function ServicePage() {
               />
             </div>
           </div>
+          <div className="sidebar-restart-wrap">
+            <button
+              type="button"
+              className={`sidebar-restart-card${restartBusy ? ' is-busy' : ''}`}
+              onClick={handleOpenRestartPrompt}
+              disabled={restartBusy}
+              aria-busy={restartBusy}
+            >
+              <span className="sidebar-restart-icon" aria-hidden="true">
+                <ServerRestartIcon />
+              </span>
+              <span className="sidebar-restart-text">
+                {restartBusy ? '서버 재시작 중…' : '서버 초기화'}
+              </span>
+            </button>
+            {restartNotice ? (
+              <div
+                className={`sidebar-restart-notice ${restartNotice.tone}`}
+                role="status"
+                aria-live="polite"
+              >
+                {restartNotice.text}
+              </div>
+            ) : null}
+          </div>
         </aside>
       </section>
 
@@ -388,6 +510,11 @@ export function ServicePage() {
                 onChange={(value) =>
                   setDraftConfig((current) => ({ ...(current ?? resolvedDraftConfig), max: value }))
                 }
+                quickPicks={buildPercentPicks(
+                  variableSeed[activeVariable.key].min,
+                  variableSeed[activeVariable.key].max,
+                  activeVariable.digits,
+                )}
               />
               <SettingField
                 label="하한"
@@ -399,6 +526,11 @@ export function ServicePage() {
                 onChange={(value) =>
                   setDraftConfig((current) => ({ ...(current ?? resolvedDraftConfig), min: value }))
                 }
+                quickPicks={buildPercentPicks(
+                  variableSeed[activeVariable.key].min,
+                  variableSeed[activeVariable.key].max,
+                  activeVariable.digits,
+                )}
               />
               <SettingField
                 label="step"
@@ -408,10 +540,14 @@ export function ServicePage() {
                 onChange={(value) =>
                   setDraftConfig((current) => ({ ...(current ?? resolvedDraftConfig), step: value }))
                 }
+                quickPicks={STEP_QUICK_PICKS}
               />
             </div>
 
             <div className="settings-modal-actions">
+              <div className="settings-modal-toast" aria-live="polite">
+                {savedToast ? <span className="settings-toast-text">저장 완료</span> : null}
+              </div>
               <button
                 type="button"
                 className="button-secondary"
@@ -423,6 +559,7 @@ export function ServicePage() {
                     max: defaults.max,
                     step: defaults.step,
                   })
+                  setSavedToast(true)
                 }}
               >
                 기본값 복원
@@ -432,12 +569,85 @@ export function ServicePage() {
                 className="button-primary"
                 onClick={() => {
                   updateActiveVariableConfig(draftConfig ?? resolvedDraftConfig)
-                  handleCloseSettings()
+                  setSavedToast(true)
                 }}
               >
                 적용
               </button>
             </div>
+          </section>
+        </div>
+      ) : null}
+
+      {restartPromptOpen ? (
+        <div
+          className="modal-backdrop"
+          onClick={() => {
+            if (!restartBusy) handleCloseRestartPrompt()
+          }}
+        >
+          <section
+            className="restart-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="restart-modal-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="restart-modal-header">
+              <div id="restart-modal-title" className="restart-modal-title">
+                서버 초기화 확인
+              </div>
+              <div className="restart-modal-hint">
+                계속하려면 관리자 비밀번호를 입력하세요.<br />
+                백엔드와 producer 컨테이너가 재시작됩니다.
+              </div>
+            </div>
+            <form
+              className="restart-modal-form"
+              onSubmit={(event) => {
+                event.preventDefault()
+                void handleSubmitRestart()
+              }}
+            >
+              <label className="restart-modal-label" htmlFor="restart-password">
+                비밀번호
+              </label>
+              <input
+                id="restart-password"
+                type="password"
+                className="restart-modal-input mono"
+                value={restartPassword}
+                autoComplete="off"
+                autoFocus
+                disabled={restartBusy}
+                onChange={(event) => {
+                  setRestartPassword(event.target.value)
+                  if (restartPromptError) setRestartPromptError(null)
+                }}
+              />
+              {restartPromptError ? (
+                <div className="restart-modal-error" role="alert">
+                  {restartPromptError}
+                </div>
+              ) : null}
+              <div className="restart-modal-actions">
+                <button
+                  type="button"
+                  className="button-secondary"
+                  onClick={handleCloseRestartPrompt}
+                  disabled={restartBusy}
+                >
+                  취소
+                </button>
+                <button
+                  type="submit"
+                  className="button-primary restart-modal-submit"
+                  disabled={restartBusy}
+                >
+                  {restartBusy ? '재시작 중…' : '재시작'}
+                </button>
+              </div>
+            </form>
           </section>
         </div>
       ) : null}
@@ -448,9 +658,11 @@ export function ServicePage() {
 function ForecastCard({
   forecast,
   noxLimit,
+  currentNox,
 }: {
   forecast: RealtimeStreamPayload['forecast']
   noxLimit: number
+  currentNox: number
 }) {
   if (forecast === null) {
     return (
@@ -469,13 +681,6 @@ function ForecastCard({
 
   const exceeded = forecast.threshold_exceeded
   const [integer, decimal = '0'] = forecast.predicted_nox.toFixed(1).split('.')
-  const targetKst = new Intl.DateTimeFormat('ko-KR', {
-    timeZone: 'Asia/Seoul',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-  }).format(new Date(forecast.target_time))
 
   return (
     <section
@@ -487,9 +692,6 @@ function ForecastCard({
     >
       <div className="kpi-header">
         <div className="kpi-name">5분 후 NOx 예측</div>
-        <span className={exceeded ? 'status-pill status-danger' : 'status-pill status-normal'}>
-          {exceeded ? '위험' : '정상'}
-        </span>
       </div>
       <div className="kpi-value-row">
         <div className={exceeded ? 'kpi-value kpi-value-large caution-text' : 'kpi-value kpi-value-large'}>
@@ -504,12 +706,21 @@ function ForecastCard({
         </div>
       ) : (
         <div className="forecast-headroom mono">
-          여유 {(noxLimit - forecast.predicted_nox).toFixed(1)} ppm
+          {formatForecastDelta(forecast.predicted_nox, currentNox)}
         </div>
       )}
-      <div className="forecast-target mono">target: {targetKst} (KST)</div>
     </section>
   )
+}
+
+// 현재 NOx 대비 5분 후 예측의 증감 — "현재 대비 +2.3 ppm" / "-1.5 ppm".
+function formatForecastDelta(predicted: number, current: number): string {
+  if (!Number.isFinite(predicted) || !Number.isFinite(current)) return '현재 대비 -- ppm'
+  const delta = predicted - current
+  const abs = Math.abs(delta).toFixed(1)
+  if (Number(abs) === 0) return `현재 대비 0.0 ppm`
+  const sign = delta > 0 ? '+' : '-'
+  return `현재 대비 ${sign}${abs} ppm`
 }
 
 function SettingField({
@@ -520,6 +731,7 @@ function SettingField({
   min,
   max,
   onChange,
+  quickPicks,
 }: {
   label: string
   unit: string
@@ -528,6 +740,7 @@ function SettingField({
   min?: number
   max?: number
   onChange: (value: number) => void
+  quickPicks?: ReadonlyArray<{ label: string; value: number }>
 }) {
   return (
     <label className="settings-field">
@@ -544,8 +757,54 @@ function SettingField({
         />
         <span className="settings-field-unit">{unit}</span>
       </div>
+      {quickPicks && quickPicks.length > 0 ? (
+        <div className="settings-quick-row" role="group" aria-label={`${label} 빠른 선택`}>
+          {quickPicks.map((pick) => {
+            const active = approxEqual(pick.value, value, digits)
+            return (
+              <button
+                key={`${label}-${pick.label}`}
+                type="button"
+                className={active ? 'settings-quick-pick active' : 'settings-quick-pick'}
+                onClick={() => onChange(pick.value)}
+                aria-pressed={active}
+              >
+                {pick.label}
+              </button>
+            )
+          })}
+        </div>
+      ) : null}
     </label>
   )
+}
+
+function approxEqual(a: number, b: number, digits: number): boolean {
+  const eps = Math.pow(10, -Math.max(digits, 0)) / 2
+  return Math.abs(a - b) <= eps
+}
+
+const STEP_QUICK_PICKS: ReadonlyArray<{ label: string; value: number }> = [
+  { label: '0.1', value: 0.1 },
+  { label: '0.5', value: 0.5 },
+  { label: '1', value: 1 },
+  { label: '5', value: 5 },
+  { label: '10', value: 10 },
+]
+
+// 운영 한계 min~max를 0/25/50/75/100%로 분할 — digits에 맞춰 반올림
+function buildPercentPicks(
+  min: number,
+  max: number,
+  digits: number,
+): ReadonlyArray<{ label: string; value: number }> {
+  const span = max - min
+  const factor = Math.pow(10, Math.max(digits, 0))
+  const round = (n: number) => Math.round(n * factor) / factor
+  return [0, 0.25, 0.5, 0.75, 1].map((ratio) => ({
+    label: `${Math.round(ratio * 100)}%`,
+    value: round(min + span * ratio),
+  }))
 }
 
 function KpiCard({
@@ -853,16 +1112,16 @@ function getRange(values: number[]) {
   }
 }
 
-function headroomTone(value: number, cautionThreshold: number, dangerThreshold: number) {
-  if (value <= dangerThreshold) return 'summary-value-danger'
-  if (value <= cautionThreshold) return 'summary-value-caution'
-  return 'summary-value-safe'
+// 여유만 있으면(양수) 안전색, 임계 초과(음수)일 때만 위험색.
+function headroomTone(value: number) {
+  return value < 0 ? 'summary-value-danger' : 'summary-value-safe'
 }
 
-// 임계 여유 표기: 정상은 부호 없이 조용하게, 임계 초과(음수)만 "초과 N"으로 강조.
+// 임계 여유 표기: 정상은 값만, 초과(음수)만 "-N"으로 강조.
 function formatHeadroom(value: number, digits: number) {
-  if (value < 0) return `초과 ${Math.abs(value).toFixed(digits)}`
-  return value.toFixed(digits)
+  const abs = Math.abs(value).toFixed(digits)
+  if (Number(abs) === 0) return `0.${'0'.repeat(digits)}`
+  return value < 0 ? `-${abs}` : abs
 }
 
 type OutputTableRow = {
@@ -965,6 +1224,30 @@ function efficiencyTableStatus(efficiency: number, t: Thresholds): string {
   return efficiencyKpiStatus(efficiency, t)
 }
 
+function ForecastClockIcon() {
+  return (
+    <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true">
+      <circle cx="9" cy="10" r="7" fill="none" stroke="currentColor" strokeWidth="1.4" />
+      <path d="M9 6.5V10l2.4 1.6" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+      <path d="M14.5 4.5l3 1.6-1.6 3" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function formatForecastTargetKst(targetTime: string): string {
+  const parts = new Intl.DateTimeFormat('ko-KR', {
+    timeZone: 'Asia/Seoul',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).formatToParts(new Date(targetTime))
+  const lookup = (type: string) =>
+    parts.find((p) => p.type === type)?.value ?? '00'
+  // forecast는 1Hz WS payload — 0.1초 자리 제거.
+  return `${lookup('hour')}시 ${lookup('minute')}분 ${lookup('second')}초`
+}
+
 function efficiencyTone(efficiency: number, t: Thresholds): string {
   if (efficiency < t.efficiencyDanger) return 'summary-value-danger'
   if (efficiency < t.efficiencyCaution) return 'summary-value-caution'
@@ -1006,6 +1289,8 @@ function streamStatusLabel(status: StreamStatus): { text: string; tone: string }
       return { text: 'CONNECTING', tone: 'caution' }
     case 'reconnecting':
       return { text: 'RECONNECTING', tone: 'caution' }
+    case 'restarting':
+      return { text: 'RESTARTING', tone: 'caution' }
     case 'disconnected':
       return { text: 'OFFLINE', tone: 'alert' }
     case 'mock':
@@ -1048,6 +1333,41 @@ function CloseIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" strokeWidth="1.6" />
+    </svg>
+  )
+}
+
+function ServerRestartIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect
+        x="4"
+        y="4"
+        width="16"
+        height="6"
+        rx="1.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.4"
+      />
+      <rect
+        x="4"
+        y="14"
+        width="16"
+        height="6"
+        rx="1.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.4"
+      />
+      <circle cx="8" cy="7" r="0.9" fill="currentColor" />
+      <circle cx="8" cy="17" r="0.9" fill="currentColor" />
+      <path
+        d="M14 7h3M14 17h3"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+      />
     </svg>
   )
 }

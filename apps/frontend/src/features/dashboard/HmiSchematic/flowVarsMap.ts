@@ -20,16 +20,16 @@ interface Stage {
   state: 'running' | 'paused'
 }
 
-// ratio 0~1 → 연속 보간 duration
+// ratio 0~1 → 연속 보간 duration (변화폭 40배, 초·중반 가속 강화)
 //   < 0.05 : 정지 (잡음 데이터 스파이크 방지)
-//   ≥ 0.05 : 4.0s(느림) → 0.4s(빠름) 반비례 보간
-//   공식: duration = 4.0 / (1 + ratio * 9)  → ratio 0.05=2.76s, 0.5=0.73s, 1.0=0.4s
+//   ≥ 0.05 : 4.0s(느림) → 0.1s(빠름) 지수 감쇠
+//   공식: duration = 4.0 * (1/40)^ratio  → r=0.2≈1.74s, 0.3≈1.15s, 0.5≈0.63s, 0.7≈0.34s, 1.0=0.10s
 function stageOf(ratio: number): Stage {
   if (!Number.isFinite(ratio) || ratio < 0.05) {
     return { duration: '1.2s', state: 'paused' }
   }
   const r = Math.min(Math.max(ratio, 0), 1)
-  const duration = 4.0 / (1 + r * 9)
+  const duration = 4.0 * Math.pow(1 / 40, r)
   return { duration: `${duration.toFixed(2)}s`, state: 'running' }
 }
 

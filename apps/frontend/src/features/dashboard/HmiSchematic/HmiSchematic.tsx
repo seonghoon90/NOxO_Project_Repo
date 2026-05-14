@@ -9,6 +9,7 @@ import { computeKpiStates } from './kpiState'
 import { getFlowAnimationVars } from './flowVarsMap'
 import { useCascadeAnimation } from './useCascadeAnimation'
 import { cssVarsFromProps, type SchematicInputs } from './cssVarsFromProps'
+import type { VariableConfig } from '../mockConsole'
 import { clamp, finiteOr, normalize } from './numericHelpers'
 import { VIEW_BOX } from './schematic-roles'
 import type { MetricPoint } from '../mockConsole'
@@ -29,18 +30,16 @@ export function HmiSchematic(props: HmiSchematicProps) {
     lambda: props.lambda,
   })
 
-  const fuelRatio = clamp(
-    normalize(finiteOr(props.syngasFlow.value, props.syngasFlow.min), props.syngasFlow.min, props.syngasFlow.max),
-    0,
-    1,
-  )
-  const noxRatio = clamp(finiteOr(props.nox, 0) / 50, 0, 1)
-  const airRatio = clamp(
-    normalize(finiteOr(props.igvOpening.value, props.igvOpening.min), props.igvOpening.min, props.igvOpening.max),
-    0,
-    1,
-  )
-  const flowVars = getFlowAnimationVars({ fuel: fuelRatio, nox: noxRatio, air: airRatio })
+  // 각 계통 파이프 속도는 해당 라인에 연결된 변수들의 단순 평균 ratio로 결정
+  const fuelRatio = avgRatio([
+    props.syngasFlow, props.syngasSrv, props.syngasGcv1, props.syngasGcv1a, props.syngasGcv2,
+  ])
+  // flow-nox(초록) 라인은 도면 의미상 "질소 계통"
+  const n2Ratio = avgRatio([props.n2Flow, props.n2Valve1])
+  const airRatio = avgRatio([props.igvOpening, props.ibhValve])
+  // SmokeCanvas 강도는 NOx ppm 기반 — 임계 30ppm 근처가 현재 화면 수준이 되도록 max 100ppm 기준
+  const noxRatio = clamp(finiteOr(props.nox, 0) / 100, 0, 1)
+  const flowVars = getFlowAnimationVars({ fuel: fuelRatio, nox: n2Ratio, air: airRatio })
 
   useCascadeAnimation(props.n2Flow.value, rootRef)
 
@@ -105,4 +104,12 @@ export function HmiSchematic(props: HmiSchematicProps) {
       </svg>
     </div>
   )
+}
+
+function avgRatio(cfgs: ReadonlyArray<VariableConfig>): number {
+  const sum = cfgs.reduce((acc, cfg) => {
+    const r = normalize(finiteOr(cfg.value, cfg.min), cfg.min, cfg.max)
+    return acc + clamp(r, 0, 1)
+  }, 0)
+  return cfgs.length > 0 ? sum / cfgs.length : 0
 }

@@ -41,7 +41,7 @@ function createParticle(intensity: number): Particle {
     life: 1,
     lifeStep: 0.004 + Math.random() * 0.004,
     radius: 6 + Math.random() * 4,
-    maxRadius: 18 + Math.random() * 14 + intensity * 12,
+    maxRadius: 18 + Math.random() * 14 + intensity * 24,
   }
 }
 
@@ -89,8 +89,8 @@ export function SmokeCanvas({ intensity }: SmokeCanvasProps) {
 
     function frame() {
       const cur = intensityRef.current
-      // 신규 입자 생성 빈도 (intensity 0 → 0/frame, 1 → ~3/frame)
-      const spawn = cur * 3
+      // 신규 입자 생성 빈도 (intensity 0 → 0/frame, 1 → ~6/frame)
+      const spawn = cur * 6
       const spawnFloor = Math.floor(spawn)
       const spawnFrac = spawn - spawnFloor
       const spawnCount = spawnFloor + (Math.random() < spawnFrac ? 1 : 0)
