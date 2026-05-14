@@ -31,6 +31,7 @@ IGCC 가스터빈 운전 데이터(`NOx_test_20250825.csv`)를 1초 간격으로
 - **새 입력 CSV**: `sensor_csv.py::DEFAULT_INPUT_FILE` 또는 `KAFKA_INPUT_FILE` 환경변수로 전환. 컬럼 헤더 변경 시 `parse_value` 호환성 점검.
 - **새 적재 컬럼**: `database/sensor_data_stream.sql` 수정 → `etl_consumer.py`의 INSERT 컬럼 동기화 → [`database/AGENTS.md`](../database/AGENTS.md) 영향 평가.
 - **로컬 검증**: `docker compose -f docker/docker-compose.kafka.yml up -d`로 Redpanda + producer + etl-consumer 일괄 기동.
+- **자동 루프**: `producer.py`의 `run_producer_loop`는 CSV 소진 시 처음(15분 이후)부터 재발행. `KAFKA_MAX_MESSAGES=0`(기본)이면 무한, `> 0`이면 N개 후 종료.
 
 ## 4. ⛔ HOW NOT — 시스템을 깨뜨리는 비명백한 함정
 
@@ -40,6 +41,7 @@ IGCC 가스터빈 운전 데이터(`NOx_test_20250825.csv`)를 1초 간격으로
 - producer 실행 환경에서 CSV 파일이 컨테이너 내부에 없음 — `KAFKA_INPUT_FILE` 또는 `data/raw/` 볼륨 마운트 확인 (기본 경로는 `data/raw/250811-250825/NOx_test_20250825.csv`)
 - `sensor_data_stream`을 batch ETL 대상(`sensor_data`)으로 오인해 적재 — 두 테이블은 의도적으로 분리. 혼합 시 schema/적재 정책 충돌
 - secrets(`DATABASE_URL` 등)를 코드/compose 평문 — `.env` 또는 Airflow Connections 사용
+- producer를 stateless 단발 스크립트로 가정해 외부 supervisor로 재기동 시도 — 자체 무한 루프이므로 외부 재기동은 컨테이너 stop/start로만 의미가 있음 (`/api/reset` 경로)
 
 ## 5. WHERE — 다른 모듈과의 의존성
 
@@ -58,6 +60,7 @@ IGCC 가스터빈 운전 데이터(`NOx_test_20250825.csv`)를 1초 간격으로
 - **`sensor_data` vs `sensor_data_stream` 분리**: batch ETL(Airflow)의 `sensor_data`는 학습/조회용 정제 데이터, streaming의 `sensor_data_stream`은 실시간 시뮬용 raw. 두 경로의 적재 정책/스키마가 달라 분리.
 - **Redpanda 채택 이유**: Kafka 호환 + JVM 불요로 로컬/EC2 리소스 절약. 운영 동작은 동일.
 - **사건 이력**: stream ETL의 `auto_offset_reset` 기본값이 잘못 설정돼 재기동마다 전체 토픽을 재적재하던 이슈가 PR #54에서 수정됨.
+- **producer 자동 루프 도입 배경**: 시연 데이터가 하루치 CSV 1개뿐이라, 단발 발행으로는 23시간 45분 이후 데이터 흐름이 끊긴다. 시각상 "이음매"(CSV 끝→처음 점프)는 시연 데이터 특성상 허용.
 
 ## 7. COMMANDS — 빌드/테스트/린트
 

@@ -8,6 +8,7 @@ from fastapi import APIRouter
 from app.api.endpoints import (
     health,
     prediction,
+    reset,
     session,
     stream,
     streaming,
@@ -21,3 +22,4 @@ api_router.include_router(stream.router)
 api_router.include_router(streaming.router)
 api_router.include_router(prediction.router)
 api_router.include_router(threshold.router)
+api_router.include_router(reset.router)
