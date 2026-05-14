@@ -24,6 +24,10 @@ services:
     build:
       context: ..
       dockerfile: apps/backend/Dockerfile
+    container_name: noxo-backend
+    restart: unless-stopped
+    depends_on:
+      - docker-socket-proxy
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-changeme}@host.docker.internal:5432/${POSTGRES_DB:-igcc_db}
       LOG_LEVEL: ${LOG_LEVEL:-info}
@@ -31,10 +35,29 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-redpanda:9092}
       KAFKA_SENSOR_TOPIC: ${KAFKA_SENSOR_TOPIC:-noxo.sensor.raw}
       KAFKA_CONSUMER_GROUP_ID: ${KAFKA_CONSUMER_GROUP_ID:-noxo-backend-stream}
+      RESET_PASSWORD: ${RESET_PASSWORD:-}
+      RESET_BACKEND_ENABLED: ${RESET_BACKEND_ENABLED:-true}
+      BACKEND_CONTAINER_NAME: ${BACKEND_CONTAINER_NAME:-noxo-backend}
+      PRODUCER_CONTAINER_NAME: ${PRODUCER_CONTAINER_NAME:-kafka-producer}
+      DOCKER_HOST: tcp://docker-socket-proxy:2375
       TZ: Asia/Seoul
     volumes:
       - ../data:/app/data:ro
       - dt_models:/app/digital_twin/models
+      # docker.sock 직접 마운트 없음 — proxy 경유
+    networks: [noxo-net]
+
+  docker-socket-proxy:
+    image: tecnativa/docker-socket-proxy:0.3
+    container_name: docker-socket-proxy
+    restart: unless-stopped
+    environment:
+      CONTAINERS: 1   # /containers/* 허용 (restart 포함)
+      POST: 1         # POST 메서드 허용 (default read-only이므로 명시 필요)
+      LOG_LEVEL: warning
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    # 외부 포트 노출 안 함 — backend가 같은 docker network 내에서만 접근
     networks: [noxo-net]
 
   frontend:

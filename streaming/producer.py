@@ -3,6 +3,7 @@ import os
 import time
 from datetime import datetime
 from pathlib import Path
+from typing import Callable, Iterable
 
 from kafka import KafkaProducer
 
@@ -27,6 +28,45 @@ def build_producer() -> KafkaProducer:
     )
 
 
+def run_producer_loop(
+    *,
+    producer,
+    topic: str,
+    generator_factory: Callable[[], Iterable[dict]],
+    interval_seconds: float,
+    max_messages: int,
+    sleep_fn: Callable[[float], None] = time.sleep,
+) -> int:
+    """CSV 소진 시 처음으로 회귀하며 발행 루프 실행.
+
+    `max_messages > 0`이면 N개 발행 후 즉시 종료(테스트/검증용 상한).
+    `max_messages == 0`이면 SIGINT/예외로 중단될 때까지 무한 루프.
+
+    반환값: 총 발행 메시지 수.
+    """
+    sent_count = 0
+    loop_count = 0
+    while True:
+        loop_count += 1
+        print(f"[Kafka Producer] loop #{loop_count} start")
+        sent_in_loop = 0
+        for message in generator_factory():
+            message["published_at"] = (
+                datetime.utcnow().isoformat(timespec="seconds") + "Z"
+            )
+            producer.send(topic, key=message["measured_at"], value=message)
+            sent_count += 1
+            sent_in_loop += 1
+            print(f"[Kafka Producer] sent #{sent_count}: {message['measured_at']}")
+            if max_messages and sent_count >= max_messages:
+                return sent_count
+            sleep_fn(interval_seconds)
+        print(
+            f"[Kafka Producer] loop #{loop_count} done — "
+            f"sent_in_loop={sent_in_loop}, restarting from start"
+        )
+
+
 def main() -> None:
     if not INPUT_FILE.is_file():
         raise FileNotFoundError(f"Kafka input CSV not found: {INPUT_FILE}")
@@ -34,33 +74,26 @@ def main() -> None:
     print(
         "[Kafka Producer] start "
         f"topic={TOPIC}, bootstrap={BOOTSTRAP_SERVERS}, input={INPUT_FILE}, "
-        f"skip_bootstrap_minutes={BOOTSTRAP_MINUTES}"
+        f"skip_bootstrap_minutes={BOOTSTRAP_MINUTES}, "
+        f"max_messages={MAX_MESSAGES}, auto_loop={'on' if MAX_MESSAGES == 0 else 'off'}"
     )
 
-    sent_count = 0
     producer = build_producer()
+    sent_total = 0
     try:
-        for message in iter_sensor_rows_after_bootstrap(
-            INPUT_FILE,
-            minutes=BOOTSTRAP_MINUTES,
-        ):
-            message["published_at"] = datetime.utcnow().isoformat(timespec="seconds") + "Z"
-            producer.send(
-                TOPIC,
-                key=message["measured_at"],
-                value=message,
-            )
-            sent_count += 1
-            print(f"[Kafka Producer] sent #{sent_count}: {message['measured_at']}")
-
-            if MAX_MESSAGES and sent_count >= MAX_MESSAGES:
-                break
-
-            time.sleep(INTERVAL_SECONDS)
+        sent_total = run_producer_loop(
+            producer=producer,
+            topic=TOPIC,
+            generator_factory=lambda: iter_sensor_rows_after_bootstrap(
+                INPUT_FILE, minutes=BOOTSTRAP_MINUTES
+            ),
+            interval_seconds=INTERVAL_SECONDS,
+            max_messages=MAX_MESSAGES,
+        )
     finally:
         producer.flush()
         producer.close()
-        print(f"[Kafka Producer] done. sent={sent_count}")
+        print(f"[Kafka Producer] done. sent={sent_total}")
 
 
 if __name__ == "__main__":

@@ -29,6 +29,8 @@ services:
     build:
       context: ..
       dockerfile: streaming/Dockerfile
+    container_name: kafka-producer
+    restart: unless-stopped
     profiles: ["streaming"]
     depends_on:
       - redpanda
