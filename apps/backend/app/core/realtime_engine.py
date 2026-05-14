@@ -26,7 +26,7 @@ from digital_twin.simulation import (
     DTConfig,
     OutputVars,
 )
-from digital_twin.simulation.features import compute_lambda
+from digital_twin.simulation.features import compute_efficiency_from_lhv, compute_lambda
 
 logger = logging.getLogger(__name__)
 
@@ -186,14 +186,9 @@ class RealtimeEngine:
             synthesized = self._synthesize_row(kafka_row, input_controls, session)
             session.context.recent_df_buffer.append(synthesized)
 
-        # 3. DT current 추론 + lambda_/efficiency 후처리
-        ml_outputs = self.simulator.predict_for_session(
-            input_controls, session.context
-        )
-        current_outputs = self._postprocess_outputs(ml_outputs, input_controls)
-
-        # o2_pct는 nox_15pct 표시 보정(current + forecast)에 사용. 학습/예측 입력엔 미사용.
-        # bool은 isinstance(_, int) 통과하므로 명시적 제외, 비숫자/NaN은 None으로 폴백.
+        # 3. O2 추출 (lambda_ 역산식 + nox_15pct 표시 보정 공용 입력).
+        # 학습/예측 입력엔 미사용. bool은 isinstance(_, int) 통과하므로 명시적 제외,
+        # 비숫자/NaN은 None으로 폴백 → compute_lambda가 IGV/syngas 근사식으로 자동 전환.
         raw_o2 = kafka_row.get("o2_pct")
         if isinstance(raw_o2, bool) or not isinstance(raw_o2, (int, float)):
             o2_pct = None
@@ -202,7 +197,15 @@ class RealtimeEngine:
             if not math.isfinite(o2_pct):
                 o2_pct = None
 
-        # 4. realtime 모드면 forecast (o2_pct로 표시 보정값도 함께 채움)
+        # 4. DT current 추론 + lambda_/efficiency 후처리
+        ml_outputs = self.simulator.predict_for_session(
+            input_controls, session.context
+        )
+        current_outputs = self._postprocess_outputs(
+            ml_outputs, input_controls, o2_pct, kafka_row
+        )
+
+        # 5. realtime 모드면 forecast (o2_pct로 표시 보정값도 함께 채움)
         forecast_payload = None
         warning = None
         if session.mode == "realtime":
@@ -218,7 +221,7 @@ class RealtimeEngine:
                     logger.warning("forecast_failed sid=%s err=%s", session.sid, exc)
                     warning = "forecast unavailable"
 
-        # 5. payload 조립
+        # 6. payload 조립
         return self._build_payload(
             session=session,
             input_controls=input_controls,
@@ -232,13 +235,21 @@ class RealtimeEngine:
         )
 
     def _postprocess_outputs(
-        self, ml_outputs: OutputVars, controls: ControlVars
+        self,
+        ml_outputs: OutputVars,
+        controls: ControlVars,
+        o2_pct: float | None,
+        kafka_row: dict[str, Any],
     ) -> OutputVars:
         """ML 출력의 lambda_/efficiency 덮어쓰기.
 
         ML 모델은 두 필드를 학습 타깃에 포함하지 않으므로 dummy(0.0)를 반환한다.
         - lambda_ : digital_twin.simulation.features.compute_lambda로 재계산
-        - efficiency: power / (syngas_flow × syngas_lhv) 후처리 + [0,1] 클램프
+            O2 측정값(AIT_H1_902)이 있으면 20.9/(20.9-O2) 역산식,
+            없으면 IGV/syngas 근사식 폴백.
+        - efficiency : digital_twin.simulation.features.compute_efficiency_from_lhv
+            LHV 실측값(LHVSYNDW_SCF)이 있으면 ASME PTC 22 표준식 사용.
+            LHV 결측 시 기존 상수 LHV 폴백(단위 부정합이라 의미 약함).
         StubSimulator는 자체 lambda_/efficiency를 반환하지만, 일관성을 위해 모든
         simulator 출력에 동일 후처리를 적용한다 (Stub의 lambda_/efficiency도 동일식).
         """
@@ -246,14 +257,32 @@ class RealtimeEngine:
             syngas_flow=controls.syngas_flow,
             n2_offset=controls.n2_offset,
             igv_opening=controls.igv_opening,
+            o2_dry_pct=o2_pct,
             op=self.dt_config.operating_point,
             fc=self.dt_config.features,
         )
-        denom = controls.syngas_flow * self.settings.syngas_lhv
-        if denom > 0.0:
-            efficiency = max(0.0, min(1.0, ml_outputs.power / denom))
+
+        # LHV 실측값 (Kafka LHVSYNDW_SCF) 추출. bool 명시 제외 + finite 검증은
+        # compute_efficiency_from_lhv 내부에서 처리되므로 여기는 None만 분기.
+        raw_lhv = kafka_row.get("lhvsyndw_scf")
+        if isinstance(raw_lhv, bool) or not isinstance(raw_lhv, (int, float)):
+            lhv_kj_per_nm3: float | None = None
         else:
-            efficiency = ml_outputs.efficiency
+            lhv_kj_per_nm3 = float(raw_lhv)
+
+        efficiency = compute_efficiency_from_lhv(
+            power_mw=ml_outputs.power,
+            syngas_flow=controls.syngas_flow,
+            lhv_kj_per_nm3=lhv_kj_per_nm3,
+            molar_mass_g_per_mol=self.dt_config.features.syngas_molar_mass,
+        )
+        if efficiency is None:
+            # LHV 결측·비현실값 → 기존 상수 LHV 폴백 (단위 부정합 한계 존속)
+            denom = controls.syngas_flow * self.settings.syngas_lhv
+            if denom > 0.0:
+                efficiency = max(0.0, min(1.0, ml_outputs.power / denom))
+            else:
+                efficiency = ml_outputs.efficiency
         return OutputVars(
             nox=ml_outputs.nox,
             exhaust_temp=ml_outputs.exhaust_temp,

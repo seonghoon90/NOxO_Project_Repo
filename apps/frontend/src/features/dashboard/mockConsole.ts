@@ -110,31 +110,33 @@ export const CONTROL_VARIABLE_KEYS: VariableKey[] = [
   'n2Flow',
 ]
 export const variableSeed: Record<VariableKey, VariableConfig> = {
+  // 모든 base/min/max는 학습 CSV(NOx_test_20250825.csv, DWATT>50MW 86401행) median 기반.
+  // 운영 한계(min/max)는 학습 정상 운전 분포 ±25% + 도메인 상식 (밸브 0~100% 등).
   syngasFlow: {
     key: 'syngasFlow',
     label: '합성가스 유량',
     shortLabel: '합성가스',
     rawName: 'IGCC.CC.G1.ca_fqsg_cl',
-    unit: 'raw',
+    unit: 'kg/s',
     digits: 1,
     step: 0.5,
-    base: 43.4,
+    base: 43.0,    // median
     min: 0,
-    max: 100,
-    value: 43.4,
+    max: 80,       // median×1.9, plant 정격 영역
+    value: 43.0,
   },
   igvOpening: {
     key: 'igvOpening',
     label: 'IGV 개도',
     shortLabel: 'IGV',
     rawName: 'IGCC.CC.G1.csgv',
-    unit: '°',
+    unit: '%',     // 개도이므로 ° → %로 정정
     digits: 1,
     step: 1,
-    base: 75,
+    base: 63.0,    // median
     min: 30,
     max: 100,
-    value: 75,
+    value: 63.0,
   },
   n2Offset: {
     key: 'n2Offset',
@@ -143,11 +145,11 @@ export const variableSeed: Record<VariableKey, VariableConfig> = {
     rawName: 'IGCC.CC.G1.NQKR3_MONITOR',
     unit: 'raw',
     digits: 1,
-    step: 10,
-    base: 200,
-    min: 0,
-    max: 500,
-    value: 200,
+    step: 1,       // step 10→1, median 부근 미세 조정 가능
+    base: -10.0,   // median (음수 영역)
+    min: -50,
+    max: 50,
+    value: -10.0,
   },
   n2Valve1: {
     key: 'n2Valve1',
@@ -157,10 +159,10 @@ export const variableSeed: Record<VariableKey, VariableConfig> = {
     unit: '%',
     digits: 1,
     step: 1,
-    base: 28.4,
+    base: 27.5,    // median
     min: 0,
     max: 100,
-    value: 28.4,
+    value: 27.5,
   },
   syngasSrv: {
     key: 'syngasSrv',
@@ -170,10 +172,10 @@ export const variableSeed: Record<VariableKey, VariableConfig> = {
     unit: '%',
     digits: 1,
     step: 1,
-    base: 39.3,
+    base: 38.6,    // median
     min: 0,
     max: 100,
-    value: 39.3,
+    value: 38.6,
   },
   syngasGcv1: {
     key: 'syngasGcv1',
@@ -183,10 +185,10 @@ export const variableSeed: Record<VariableKey, VariableConfig> = {
     unit: '%',
     digits: 1,
     step: 1,
-    base: 28.4,
+    base: 72.6,    // median (이전 28.4는 학습 분포 밖)
     min: 0,
     max: 100,
-    value: 28.4,
+    value: 72.6,
   },
   syngasGcv1a: {
     key: 'syngasGcv1a',
@@ -196,10 +198,10 @@ export const variableSeed: Record<VariableKey, VariableConfig> = {
     unit: '%',
     digits: 1,
     step: 1,
-    base: 45.9,
+    base: 43.7,    // median
     min: 0,
     max: 100,
-    value: 45.9,
+    value: 43.7,
   },
   syngasGcv2: {
     key: 'syngasGcv2',
@@ -209,7 +211,7 @@ export const variableSeed: Record<VariableKey, VariableConfig> = {
     unit: '%',
     digits: 1,
     step: 1,
-    base: 15.0,
+    base: 15.0,    // median
     min: 0,
     max: 100,
     value: 15.0,
@@ -222,10 +224,10 @@ export const variableSeed: Record<VariableKey, VariableConfig> = {
     unit: '%',
     digits: 1,
     step: 1,
-    base: 25.0,
+    base: 0.2,     // median (정상 운전 시 거의 닫힘; 가열 시 100%까지 가능)
     min: 0,
     max: 100,
-    value: 25.0,
+    value: 0.2,
   },
   n2Flow: {
     key: 'n2Flow',
@@ -235,10 +237,10 @@ export const variableSeed: Record<VariableKey, VariableConfig> = {
     unit: 'kg/s',
     digits: 1,
     step: 0.5,
-    base: 30.6,
+    base: 29.0,    // median
     min: 0,
     max: 60,
-    value: 30.6,
+    value: 29.0,
   },
 }
 

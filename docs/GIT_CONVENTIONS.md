@@ -86,3 +86,7 @@ git log HEAD..origin/dev --oneline
 - **main** : 배포용 (직접 커밋 지양)
 - **dev** : 개발 통합 브랜치
 - **feature 브랜치** : `<type>/<description>` (예: `feat/dashboard-trend-plot`, `docs/claude-md-map`)
+
+## ⚠️ LEARNED CAUTIONS
+
+- (2026-05-14) 명시 승인 없이 `git push`를 임의 실행하지 말 것. 커밋까지만 진행하고 push는 사용자 확정 후에만.

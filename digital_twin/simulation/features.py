@@ -35,30 +35,45 @@ _FC = DEFAULT_CONFIG.features
 #   λ > 1 : 공기 과잉 (lean), NOx 증가 경향
 #   λ < 1 : 연료 과잉 (rich), CO 증가 경향
 #
-# 정확한 계산은 합성가스 조성(H2/CO/CH4 비율)이 필요하지만
-# 프로토타입에서는 IGV 개도(공기 유량 비례) / 합성가스 유량의
-# 비율로 근사한다. n2_offset은 미세 보정 항으로 처리.
+# 우선순위:
+#   1) 배기 O2 측정값(AIT_H1_902)이 있으면 표준 역산식
+#      λ = 20.9 / (20.9 - O2_dry_pct)
+#      산업 표준 (EPA 40 CFR Part 60). 가스터빈 정상 λ=2~4가 자연스럽게 산출.
+#   2) O2 측정이 없으면 IGV/syngas 비율 근사식으로 폴백
+#      (합성가스 조성/공기 유량 직접 측정이 없을 때의 차선).
 # ============================================================
+_O2_IN_AIR_PCT = 20.9  # 대기 중 O2 부피% (건조 기준)
+
+
 def compute_lambda(
     syngas_flow: float,
     n2_offset: float,
     igv_opening: float,
     *,
+    o2_dry_pct: float | None = None,
     op: OperatingPoint = _OP,
     fc: FeatureConfig = _FC,
 ) -> float:
-    """공기비 λ 근사 계산.
+    """공기비 λ 계산. O2 측정값이 있으면 역산식, 없으면 근사식 폴백.
 
     Args:
-        syngas_flow: 합성가스 유량.
-        n2_offset:   희석질소 오프셋.
-        igv_opening: IGV 개도(%) — 공기 유량 비례 변수로 사용.
-        op: 기준 운전점 설정.
-        fc: 피처 계산 상수.
+        syngas_flow: 합성가스 유량 (폴백 경로 입력).
+        n2_offset:   희석질소 오프셋 (폴백 경로 입력).
+        igv_opening: IGV 개도(%) — 폴백 경로의 공기 유량 비례 변수.
+        o2_dry_pct: 배기 건조 O2 농도 [%]. None/비현실값이면 폴백.
+        op: 기준 운전점 설정 (폴백 경로).
+        fc: 피처 계산 상수 (폴백 경로).
 
     Returns:
         λ (무차원). lambda_min 미만으로 떨어지지 않도록 클램프.
     """
+    if o2_dry_pct is not None and math.isfinite(o2_dry_pct):
+        # O2가 대기 농도(20.9%) 이상이면 측정 이상 — 폴백으로 전환
+        if 0.0 <= o2_dry_pct < _O2_IN_AIR_PCT:
+            denom = max(_O2_IN_AIR_PCT - o2_dry_pct, 0.5)
+            lambda_ = _O2_IN_AIR_PCT / denom
+            return max(DEFAULT_CONFIG.thresholds.lambda_min, lambda_)
+
     igv_ratio = max(igv_opening, 1.0) / op.igv_opening
     fuel_ratio = max(syngas_flow, 1.0) / op.syngas_flow
 
@@ -124,6 +139,80 @@ def compute_efficiency(
     fuel_deviation = abs(syngas_flow - op.syngas_flow) / op.syngas_flow
     eta -= fuel_deviation * fc.off_design_penalty
 
+    return max(0.0, min(1.0, eta))
+
+
+# ============================================================
+# 3-2) 열역학적 발전 효율 계산 (실측 LHV 기반)
+# [ASME PTC 22 표준: η = 전기출력 / 입력열량]
+# ------------------------------------------------------------
+# 의미:
+#   η = power [MJ/s] / Q_in [MJ/s]
+#   Q_in = syngas_flow [kg/s] × LHV_mass [MJ/kg]
+#   LHV_mass [MJ/kg] = LHV_vol [kJ/Nm³] × 1e-3 / ρ_stp [kg/Nm³]
+#
+# ρ_stp는 LHV가 Nm³(0°C, 1 atm) 기준이므로 표준상태 밀도를 사용한다
+#   ρ_stp = (P_0 × M) / (R × T_0)  ≈ 0.955 kg/Nm³ (M=21.4 g/mol)
+# 운전 압력/온도(FPSG/FTSG)는 입력 열량 계산에 들어가지 않는다.
+#
+# 검증: 학습 CSV(86,401행, DWATT>50MW) 적용 시 mean=0.397, p5~p95=0.388~0.406
+# GE 7F 단순 사이클 LHV 효율(~0.385) 도메인 범위 정합.
+#
+# 우선순위:
+#   1) LHV 측정값 유효 → 실측 기반 계산
+#   2) LHV 결측 → None 반환. 호출부가 폴백 처리.
+# ============================================================
+_R_GAS = 8.314      # 기체상수 [J/(mol·K)]
+_STP_P_PA = 101325  # 표준상태 압력 [Pa]
+_STP_T_K = 273.15   # 표준상태 온도 [K]
+
+
+def _stp_density(molar_mass_g_per_mol: float) -> float:
+    """표준상태(0°C, 1 atm) 이상기체 밀도 [kg/Nm³]."""
+    return (_STP_P_PA * molar_mass_g_per_mol * 1e-3) / (_R_GAS * _STP_T_K)
+
+
+def compute_efficiency_from_lhv(
+    power_mw: float,
+    syngas_flow: float,
+    *,
+    lhv_kj_per_nm3: float | None,
+    molar_mass_g_per_mol: float,
+) -> float | None:
+    """실측 LHV 기반 발전 효율 (열역학 표준식).
+
+    Args:
+        power_mw: 발전기 출력 [MW = MJ/s]. Kafka DWATT.
+        syngas_flow: 합성가스 질량유량 [kg/s]. Kafka ca_fqsg_cl.
+        lhv_kj_per_nm3: 합성가스 부피 LHV [kJ/Nm³]. Kafka LHVSYNDW_SCF.
+        molar_mass_g_per_mol: 합성가스 평균 분자량 [g/mol]. config 상수.
+
+    Returns:
+        효율 [무차원, 0.0~1.0 클램프]. 측정값 결측·비현실값일 때 None.
+    """
+    if lhv_kj_per_nm3 is None:
+        return None
+    if not (
+        math.isfinite(lhv_kj_per_nm3)
+        and math.isfinite(power_mw)
+        and math.isfinite(syngas_flow)
+    ):
+        return None
+    if lhv_kj_per_nm3 <= 0.0 or syngas_flow <= 0.0:
+        return None
+
+    rho_stp = _stp_density(molar_mass_g_per_mol)
+    if rho_stp <= 0.0:
+        return None
+
+    # LHV 단위 환산: kJ/Nm³ → MJ/kg
+    lhv_mj_per_kg = (lhv_kj_per_nm3 * 1e-3) / rho_stp
+
+    input_heat_mj_per_s = syngas_flow * lhv_mj_per_kg
+    if input_heat_mj_per_s <= 0.0:
+        return None
+
+    eta = power_mw / input_heat_mj_per_s
     return max(0.0, min(1.0, eta))
 
 
