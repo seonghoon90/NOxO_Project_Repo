@@ -79,6 +79,31 @@ class TestComputeLambdaFallback:
         assert lam >= _LAMBDA_MIN
 
 
+class TestComputeLambdaFallbackOperatingPointAligned:
+    """OperatingPoint 학습 분포 정합 회귀.
+
+    가안 OperatingPoint(syngas_flow=1500 등)와 학습 평균(43)의 35배 괴리로
+    폴백 λ가 32까지 폭주했던 버그 방지. 새 OperatingPoint(median 기반) +
+    base_lambda=1.93 정합 후, 학습 mean 입력 시 폴백 λ가 정상 범위(1.5~2.5).
+    """
+
+    def test_fallback_at_training_mean_yields_normal_lambda(self):
+        # 학습 데이터 mean (DWATT>50MW 구간)
+        lam = compute_lambda(
+            syngas_flow=43.0,   # ca_fqsg_cl median
+            n2_offset=-10.0,    # NQKR3_MONITOR median
+            igv_opening=63.0,   # csgv median
+            o2_dry_pct=None,    # 폴백 강제
+        )
+        # base_lambda=1.93 + 정합 비율(=1) → λ≈1.93 부근
+        assert 1.5 < lam < 2.5, f"폴백 λ={lam} 학습 평균에서 비정상"
+
+    def test_fallback_no_longer_explodes(self):
+        # 회귀: 가안 OperatingPoint(1500) 시절 λ=32 발생 — 절대 재현 안 돼야 함
+        lam = compute_lambda(43.0, -10.0, 63.0, o2_dry_pct=None)
+        assert lam < 10.0, f"폴백 λ={lam} 가안값 회귀 발생"
+
+
 class TestComputeLambdaClamp:
     """lambda_min 클램프 동작 검증."""
 

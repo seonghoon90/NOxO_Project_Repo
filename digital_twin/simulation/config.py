@@ -25,22 +25,23 @@ from dataclasses import dataclass, field
 class OperatingPoint:
     """기준(정격) 운전점. 파생 피처 계산 기준값으로 사용된다.
 
-    제어 변수 10개의 기준값(`BACKEND_ARCHITECTURE.md §7` 예시 기준).
-    신규 7개 변수의 단위/한계는 [추후 결정] — 임의 가안값.
+    제어 변수 10개 + 배기온도의 기준값. 학습 CSV(NOx_test_20250825.csv)
+    정상 운전 구간(DWATT>50MW, 86401행)의 median 값.
     """
 
-    syngas_flow: float = 1500.0    # 합성가스 유량 [가안]
-    igv_opening: float = 75.0      # IGV 개도 [%]
-    n2_offset: float = 200.0       # 희석질소 오프셋 [가안]
-    n2_valve_1: float = 50.0       # N2 주입 제어밸브 #1 개도 [%, 가안]
-    syngas_srv: float = 60.0       # Syngas SRV 개도 [%, 가안]
-    syngas_gcv_1: float = 55.0     # Syngas GCV #1 개도 [%, 가안]
-    syngas_gcv_1a: float = 55.0    # Syngas GCV #1A 개도 [%, 가안]
-    syngas_gcv_2: float = 55.0     # Syngas GCV #2 개도 [%, 가안]
-    ibh_valve: float = 30.0        # IBH 입구 가열 제어밸브 개도 [%, 가안]
-    n2_flow: float = 100.0         # N2 주입 유량 [가안]
-    exhaust_temp: float = 580.0    # 배기온도 기준점 [°C] IGCC.CC.G1.TTXM 평균 가안
-    air_flow: float = 4500.0       # IGV 75%일 때 추정 공기유량 [kg/h, 가안]
+    # 학습 CSV mean/median 기반 (정상 운전 86401행, DWATT>50MW)
+    syngas_flow: float = 43.0      # ca_fqsg_cl [kg/s] median=43.03
+    igv_opening: float = 63.0      # csgv [%] median=62.83
+    n2_offset: float = -10.0       # NQKR3_MONITOR median=-9.98
+    n2_valve_1: float = 27.5       # nicvs1 [%] median=27.45
+    syngas_srv: float = 38.6       # FSAGR [%] median=38.64
+    syngas_gcv_1: float = 72.6     # FSAG11 [%] median=72.61
+    syngas_gcv_1a: float = 43.7    # FSAG11A [%] median=43.67
+    syngas_gcv_2: float = 15.0     # FSAG12 [%] median=14.96
+    ibh_valve: float = 0.2         # CSBHX [%] median=0.20 (정상 운전 시 거의 닫힘)
+    n2_flow: float = 29.0          # NQJ median=29.03
+    exhaust_temp: float = 627.9    # TTXM [°C] median=627.92
+    air_flow: float = 4500.0       # IGV 63%일 때 추정 공기유량 [kg/h, 가안] — 실측 태그 부재
 
 
 # ============================================================
@@ -153,7 +154,9 @@ class FeatureConfig:
     """공기비·CO·효율 계산식 상수."""
 
     # compute_lambda
-    base_lambda: float = 1.10          # 기준 운전점에서의 λ [무차원]
+    # 정상 운전 학습 데이터 mean O2=10.07% 대입 시 λ = 20.9/(20.9-10.07) ≈ 1.93.
+    # 폴백 식이 O2 역산식과 정합되도록 base_lambda를 1.93으로 맞춘다.
+    base_lambda: float = 1.93          # 기준 운전점에서의 λ [무차원]
     n2_correction: float = 0.0005      # N2 1단위 증가당 λ 보정 계수
     n2_scale: float = 1000.0           # N2 몰분율 환산 스케일 (delta_n2 계산용)
 
