@@ -51,8 +51,24 @@ class ResetService:
             raise ResetUnavailableError(
                 "docker socket not mounted or docker daemon unreachable"
             )
-        if self._pending_task is not None and not self._pending_task.done():
-            raise ResetAlreadyInProgressError()
+        # 진행 중 task 가시화 — 실패/취소로 끝난 이전 task의 예외를 silently 묻지
+        # 않도록 done 상태에서 결과를 1회 로깅 후 새 reset을 허용한다.
+        # 체크와 set 사이에 await를 넣지 말 것 — race 발생 시 split-brain 재시작.
+        if self._pending_task is not None:
+            if not self._pending_task.done():
+                raise ResetAlreadyInProgressError()
+            # cancel된 task의 .exception() 호출은 CancelledError를 raise하므로 분리 처리.
+            if self._pending_task.cancelled():
+                logger.warning(
+                    "previous_reset_task_cancelled — 새 reset 허용",
+                )
+            else:
+                prior_exc = self._pending_task.exception()
+                if prior_exc is not None:
+                    logger.warning(
+                        "previous_reset_task_ended_with_error err=%r — 새 reset 허용",
+                        prior_exc,
+                    )
         # hmac.compare_digest는 양쪽이 모두 str(ASCII)이거나 모두 bytes여야 한다.
         # 비-ASCII 입력 시 TypeError → 500 응답에 traceback이 노출돼
         # 비밀번호 측면 채널이 될 수 있어 bytes(utf-8)로 정규화한다.
@@ -74,28 +90,31 @@ class ResetService:
         # 어댑터(`_restart_sync`)가 모든 예외를 swallow하지만 defense-in-depth로
         # 두 호출을 별도 try 블록으로 격리한다.
         #
-        # CancelledError 처리: producer try에서 CancelledError를 raise하면 backend
-        # try가 실행되지 않아 spec §7 위반이 된다. 따라서 producer cancel을 만나도
-        # backend 재시작은 시도한 뒤 backend try에서 다시 raise한다 (shutdown
-        # 경로면 backend도 곧 cancel되므로 무해, 일반 cancel이면 backend 재시작
-        # 보장이 우선).
+        # CancelledError 정책: producer가 cancel되어도 backend 재시작 시도를
+        # 보장한다(spec §7 invariant 우선). 이후 try/finally의 finally에서 cancel을
+        # 재전파해 호출자(lifespan shutdown)의 cancel 의도를 보존한다.
         producer_cancelled = False
+        backend_cancelled = False
         try:
-            await self._restart_adapter.restart(self._producer_container)
-        except asyncio.CancelledError:
-            logger.info("delayed_restart_producer_cancelled (expected on shutdown)")
-            producer_cancelled = True
-        except Exception as exc:
-            logger.warning(
-                "delayed_restart_producer_failed err=%s — backend restart 시도 계속",
-                exc,
-            )
-        try:
-            await self._restart_adapter.restart(self._backend_container)
-        except asyncio.CancelledError:
-            logger.info("delayed_restart_backend_cancelled (expected on shutdown)")
-            raise
-        except Exception as exc:
-            logger.warning("delayed_restart_backend_failed err=%s", exc)
-        if producer_cancelled:
-            raise asyncio.CancelledError()
+            try:
+                await self._restart_adapter.restart(self._producer_container)
+            except asyncio.CancelledError:
+                logger.info("delayed_restart_producer_cancelled (expected on shutdown)")
+                producer_cancelled = True
+            except Exception as exc:
+                logger.warning(
+                    "delayed_restart_producer_failed err=%s — backend restart 시도 계속",
+                    exc,
+                )
+            try:
+                await self._restart_adapter.restart(self._backend_container)
+            except asyncio.CancelledError:
+                logger.info("delayed_restart_backend_cancelled (expected on shutdown)")
+                backend_cancelled = True
+            except Exception as exc:
+                logger.warning("delayed_restart_backend_failed err=%s", exc)
+        finally:
+            # 어느 쪽이든 cancel을 받았다면 호출자에게 명시적으로 전파한다.
+            # finally 블록에 두어 backend try가 raise하지 않더라도 동일 정책 적용.
+            if producer_cancelled or backend_cancelled:
+                raise asyncio.CancelledError()

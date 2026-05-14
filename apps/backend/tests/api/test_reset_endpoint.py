@@ -111,3 +111,35 @@ def test_returns_422_when_password_blank():
 
     assert res.status_code == 422
     service.schedule_reset.assert_not_awaited()
+
+
+def test_returns_422_when_password_too_long():
+    """회귀: max_length=128 초과 시 422 + 서비스 미호출."""
+    service = MagicMock()
+    service.schedule_reset = AsyncMock()
+    _override_with(service)
+
+    with TestClient(app) as client:
+        res = client.post("/api/reset", json={"password": "x" * 129})
+
+    assert res.status_code == 422
+    service.schedule_reset.assert_not_awaited()
+    # 평문이 응답 어디에도 노출되지 않아야 한다 (마스킹 + ctx 치환)
+    assert "x" * 100 not in res.text
+
+
+def test_returns_409_when_reset_already_in_progress():
+    """회귀: 진행 중 task 있을 때 409 매핑."""
+    from app.exceptions import ResetAlreadyInProgressError
+
+    service = MagicMock()
+    service.schedule_reset = AsyncMock(side_effect=ResetAlreadyInProgressError())
+    _override_with(service)
+
+    with TestClient(app) as client:
+        res = client.post("/api/reset", json={"password": "secret"})
+
+    assert res.status_code == 409
+    body = res.json()
+    assert body["error_code"] == "RESET_ALREADY_IN_PROGRESS"
+    assert body["detail"] == "Reset already in progress"

@@ -97,3 +97,61 @@ def test_validation_error_password_missing_no_input_leak():
     assert res2.status_code == 422
     body_text = res2.text
     assert "supersecret-original" not in body_text
+
+
+def test_validation_error_masks_token_and_secret_fields():
+    """회귀: password 외 token/secret/api_key 화이트리스트 필드도 마스킹."""
+    from pydantic import BaseModel, Field as PField
+
+    class _MultiSecretPayload(BaseModel):
+        token: str = PField(..., min_length=10)
+        api_key: str = PField(..., min_length=10)
+
+    app = FastAPI()
+    register_exception_handlers(app)
+
+    @app.post("/multi-secret")
+    def _ep(payload: _MultiSecretPayload):
+        return {"ok": True}
+
+    client = TestClient(app)
+    res = client.post("/multi-secret", json={"token": "x", "api_key": "y"})
+    assert res.status_code == 422
+    body_text = res.text
+    # 평문 누출 없음
+    assert '"input":"x"' not in body_text
+    assert '"input":"y"' not in body_text
+    # 마스킹 또는 ctx 치환 확인
+    body = res.json()
+    for err in body["detail"]:
+        loc = err.get("loc", [])
+        if "token" in loc or "api_key" in loc:
+            assert err.get("input") in ("***", None)
+            if "ctx" in err:
+                assert err["ctx"] == {"masked": True}
+
+
+def test_validation_error_preserves_non_sensitive_field_input():
+    """회귀: 마스킹 화이트리스트 외 필드는 input이 보존된다 (개발자 디버깅 가시성)."""
+    from pydantic import BaseModel, Field as PField
+
+    class _NormalPayload(BaseModel):
+        username: str = PField(..., min_length=3)
+
+    app = FastAPI()
+    register_exception_handlers(app)
+
+    @app.post("/normal")
+    def _ep(payload: _NormalPayload):
+        return {"ok": True}
+
+    client = TestClient(app)
+    res = client.post("/normal", json={"username": "ab"})
+    assert res.status_code == 422
+    body = res.json()
+    found_input = False
+    for err in body["detail"]:
+        if "username" in err.get("loc", []):
+            assert err.get("input") == "ab"
+            found_input = True
+    assert found_input

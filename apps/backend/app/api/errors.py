@@ -32,18 +32,28 @@ _STATUS_MAP: dict[type[DomainError], int] = {
     ResetAlreadyInProgressError: 409,
 }
 
-_SENSITIVE_FIELDS: frozenset[str] = frozenset({"password"})
+_SENSITIVE_FIELDS: frozenset[str] = frozenset(
+    {"password", "token", "secret", "api_key"}
+)
 
 
 def _mask_validation_errors(errors: list[dict]) -> list[dict]:
     # Pydantic v2 RequestValidationError는 errors[*].input에 원본 값을 포함한다.
-    # password 등 민감 필드는 평문 노출 위험이 있어 마스킹 후 응답.
+    # 화이트리스트의 정확 매칭 필드(loc 일부)는 평문 노출을 막기 위해 input·ctx를
+    # 마스킹한다. ctx에는 일부 검증자가 입력값 일부를 다시 포함시킬 수 있으므로
+    # 통째로 ***로 치환.
     masked: list[dict] = []
     for err in errors:
         loc = err.get("loc", ())
-        is_sensitive = any(part in _SENSITIVE_FIELDS for part in loc if isinstance(part, str))
-        if is_sensitive and "input" in err:
-            err = {**err, "input": "***"}
+        is_sensitive = any(
+            part in _SENSITIVE_FIELDS for part in loc if isinstance(part, str)
+        )
+        if is_sensitive:
+            err = {**err}
+            if "input" in err:
+                err["input"] = "***"
+            if "ctx" in err:
+                err["ctx"] = {"masked": True}
         masked.append(err)
     return masked
 
