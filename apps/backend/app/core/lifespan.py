@@ -28,6 +28,12 @@ from app.db.session import DbContext
 from app.domain.tags import normalize_raw_message
 from app.exceptions import PredictorUnavailableError
 from app.repositories.simulation_log_repo import SimulationLogRepository
+from app.adapters.container_restart import (
+    ContainerRestartAdapter,
+    DockerSocketAdapter,
+    NoopRestartAdapter,
+)
+from app.services.reset_service import ResetService
 
 logger = logging.getLogger(__name__)
 
@@ -122,6 +128,30 @@ async def lifespan(app: FastAPI):
     app.state.kafka_sensor_stream = kafka_sensor_stream
     app.state.simulation_log_repo = simulation_log_repo
     app.state.realtime_engine = realtime_engine
+
+    # === ResetService (시연용 컨테이너 재시작) ===
+    # 주의: 여기서 `is_available()`로 Noop 다운그레이드를 결정하지 않는다.
+    # docker-socket-proxy가 backend보다 늦게 ready되거나 일시적으로 다운된
+    # 후 복구되는 케이스에서 영구 Noop으로 갇히지 않게 하기 위함. 가용성 판단은
+    # 매 /api/reset 요청마다 ResetService가 adapter.is_available()를 호출해 수행한다
+    # (spec §5.2.4, §11.2 startup race 항목).
+    restart_adapter: ContainerRestartAdapter
+    if os.getenv("RESET_BACKEND_ENABLED", "true").lower() == "true":
+        try:
+            restart_adapter = DockerSocketAdapter()
+        except Exception as exc:
+            logger.warning("docker_socket_adapter_init_failed err=%s", exc)
+            restart_adapter = NoopRestartAdapter()
+    else:
+        restart_adapter = NoopRestartAdapter()
+
+    reset_service = ResetService(
+        restart_adapter=restart_adapter,
+        backend_container=os.getenv("BACKEND_CONTAINER_NAME", "noxo-backend"),
+        producer_container=os.getenv("PRODUCER_CONTAINER_NAME", "kafka-producer"),
+        reset_password=os.getenv("RESET_PASSWORD") or None,
+    )
+    app.state.reset_service = reset_service
 
     await kafka_sensor_stream.start()
     await realtime_engine.start()

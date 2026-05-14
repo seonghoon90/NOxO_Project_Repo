@@ -17,6 +17,7 @@ from app.core.session import Session
 from app.core.ws_manager import WebSocketManager
 from app.repositories.simulation_log_repo import SimulationLogRepository
 from app.services.forecast_service import ForecastService
+from app.services.reset_service import ResetService
 from app.services.session_service import SessionService
 from app.services.threshold_service import ThresholdService
 
@@ -96,3 +97,7 @@ def get_forecast_service(
 
 def get_threshold_service() -> ThresholdService:
     return ThresholdService()
+
+
+def get_reset_service(request: Request) -> ResetService:
+    return request.app.state.reset_service
