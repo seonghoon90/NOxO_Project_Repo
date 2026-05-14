@@ -11,6 +11,7 @@
 ## 2. CONTENTS — 파일/디렉토리와 기술 스택
 
 - `docker-compose.yml` — 기본 compose 설정 (frontend + backend)
+  - 신규 `docker-socket-proxy` 서비스 (tecnativa proxy `0.3`) — backend가 docker daemon에 접근하기 위한 보안 sidecar
 - `docker-compose.dev.yml` — 개발 환경 override
 - `docker-compose.prod.yml` — 프로덕션 환경 override
 - `docker-compose.data.yml` — PostgreSQL 단일 서비스 (profile `local-db`로 격리, opt-in 기동)
@@ -37,6 +38,10 @@
 - 동일 컨테이너 이름을 여러 compose 파일에서 정의 — `docker-compose up`이 한 쪽만 인식, 의도와 다른 서비스 기동
 - volume 정의 없이 DB 컨테이너 재기동 — 데이터 유실 (named volume 또는 bind mount 필수)
 - `docker-compose.data.yml`을 profile 없이 기동 — `local-db` profile로만 활성화되도록 설계됨. profile 미지정 시 PostgreSQL이 안 뜸
+- backend 컨테이너에 `/var/run/docker.sock`을 직접 마운트 — `:ro`라도 send/recv 통제 불가로 호스트 점령 위험. 반드시 `docker-socket-proxy` 경유. backend env에 `DOCKER_HOST=tcp://docker-socket-proxy:2375` 고정
+- `docker-socket-proxy`의 외부 포트 노출 — 호스트에서 reachable해지면 격리 의미 상실. 같은 docker network 내부에서만 접근
+- `docker-socket-proxy`의 환경변수에 `CONTAINERS=1, POST=1` 외 다른 그룹 화이트리스트 추가 — 의도한 blast radius 확장. 변경 시 `apps/backend/AGENTS.md` HOW NOT과 동시 갱신
+- proxy 이미지 태그를 `latest`로 변경 — `tecnativa/docker-socket-proxy:0.3` 고정 (`docker/AGENTS.md` §4 latest 금지 가드와 동일)
 
 ## 5. WHERE — 다른 모듈과의 의존성
 
@@ -60,6 +65,8 @@
 - **EC2 배포 (`docker-compose.ec2.yml`)**: 백엔드 컨테이너가 EC2 외부의 RDS PostgreSQL에 접속하는 설정 override. 로컬 dev는 컨테이너 내부 DB(profile 활성화 시).
 - **Jenkins 로컬**: 운영 Jenkins(root `Jenkinsfile`)와 분리된 로컬 테스트 환경. CI 변경 시 로컬에서 검증 후 적용.
 - **Kafka 스택**: 실시간 스트리밍 시뮬용 — Redpanda(Kafka 호환). 상세는 [`docs/data-platform/kafka-streaming-simulation.md`](../docs/data-platform/kafka-streaming-simulation.md).
+- **`docker-socket-proxy` 도입 배경**: backend 컨테이너에 docker socket을 직접 마운트하면 backend 탈취 = 호스트 점령. tecnativa proxy를 sidecar로 두고 `CONTAINERS=1, POST=1` 그룹 화이트리스트로 backend가 호출 가능한 docker API를 컨테이너 lifecycle 조작으로 한정. 상세 의사결정은 `docs/superpowers/specs/2026-05-14-server-reset-design.md` §5.3 / §11.2.
+- **proxy의 healthcheck 부재 처리**: tecnativa proxy 이미지는 distroless로 shell이 없어 `docker compose`의 `healthcheck` exec 형식을 정의할 수 없다. 따라서 backend의 `depends_on: [docker-socket-proxy]`는 `service_started`(default)만 보장. backend 측에서 매 `/api/reset` 요청마다 `is_available()` ping으로 재확인하는 lazy 패턴이 race를 흡수한다.
 
 ## 7. COMMANDS — 빌드/테스트/린트
 

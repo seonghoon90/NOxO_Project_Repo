@@ -11,8 +11,8 @@ FastAPI 기반 API 서버. 시뮬 세션 관리, 제어 입력 주입, WebSocket
 ## 2. CONTENTS — 파일/디렉토리와 기술 스택
 
 - `app/api/` — REST/WebSocket 엔드포인트 (`router.py`, `deps.py`, `errors.py`)
-  - `endpoints/`: `health`, `session`, `stream`(REST), `streaming`(WebSocket), `prediction`, `threshold`
-- `app/services/` — 비즈니스 로직 (`session_service`, `forecast_service`, `threshold_service`)
+  - `endpoints/`: `health`, `session`, `stream`(REST), `streaming`(WebSocket), `prediction`, `threshold`, `reset`
+- `app/services/` — 비즈니스 로직 (`session_service`, `forecast_service`, `threshold_service`, `reset_service`)
 - `app/domain/` — 도메인 모델 + IGCC 태그 매핑 (`tags.py` — 10 ControlVars의 `_FIELD_RULES`가 SoT)
 - `app/repositories/` — DB 접근 레이어
   - `sensor_repo.py`: `sensor_data` 14컬럼 조회 (`fetch_recent_window` — ML 스냅샷 입력)
@@ -21,6 +21,7 @@ FastAPI 기반 API 서버. 시뮬 세션 관리, 제어 입력 주입, WebSocket
   - `simulator/`: `ml.py` `MLSimulator` (정상 경로) / `stub.py` `StubSimulator` (fallback)
   - `forecaster/`: `ml.py` `MLForecaster` / `stub.py` `StubForecaster`
   - `data_source/`: `snapshot.py` `SnapshotDataSource` — `sensor_repo` 경유 ML 스냅샷 제공
+  - `container_restart/`: `docker_socket.py` `DockerSocketAdapter` (운영) / `noop.py` `NoopRestartAdapter` (개발 폴백)
 - `app/core/` — 런타임 핵심 모듈 (Simulator/Forecaster 외 모두 여기)
   - `lifespan.py` — startup DI 주입 (모든 singleton을 `app.state`에 attach)
   - `sim_loop.py` `SimLoopManager` — 시뮬 step 비동기 루프 (efficiency 후처리 포함)
@@ -56,6 +57,11 @@ FastAPI 기반 API 서버. 시뮬 세션 관리, 제어 입력 주입, WebSocket
 - `APP_ENV=production`에서 `MLSimulator` 초기화 실패를 Stub로 fallback — `lifespan.py`는 prod에서 `PredictorUnavailableError`를 raise. `SIMULATOR_FALLBACK_STUB=true`를 prod 환경에 설정 금지
 - `SENSOR_COLUMN_MAPPING` 없이 prod ML 스냅샷 모드 기동 — `lifespan.py`가 `DataSourceUnavailableError` raise. 환경별 매핑을 `.env`로 명시
 - `sensor_repo`/`simulation_log_repo`를 "폐기됐다"고 가정하고 제거 — 둘 다 운영 경로. 변경 시 영향 평가 필수
+- `RESET_PASSWORD`를 코드/compose 평문으로 박아두기 — `.env`만 사용. git 커밋 시 누설
+- `/api/reset`을 in-process reset으로 재구현 — 의도적으로 컨테이너 재시작 방식 채택. ML 모델/DB 풀까지 깨끗하게 재초기화하기 위함
+- backend 컨테이너에 `/var/run/docker.sock`을 직접 마운트해 proxy 우회 — `:ro`라도 send/recv 통제 불가로 컨테이너 탈취 = 호스트 점령. 반드시 `docker-socket-proxy` 경유(`DOCKER_HOST=tcp://docker-socket-proxy:2375`)
+- lifespan에서 `DockerSocketAdapter.is_available()` 결과로 `NoopRestartAdapter` 영구 다운그레이드 — proxy가 backend보다 늦게 ready되면 영원히 503. 가용성 판단은 매 요청마다 `ResetService`에 위임
+- `DockerSocketAdapter._restart_sync`에서 예외를 raise하도록 변경 — `_delayed_restart`가 producer 재시작 실패 시 backend 재시작을 skip하게 됨. 반드시 swallow + log
 
 ## 5. WHERE — 다른 모듈과의 의존성
 
@@ -85,6 +91,9 @@ FastAPI 기반 API 서버. 시뮬 세션 관리, 제어 입력 주입, WebSocket
   - 세션/예측 영속화 — `simulation_log_repo`가 startup 시 `ensure_tables()`로 DDL 보장
 - **MLSimulator 분기 배경 (env-driven)**: prod에서는 ML 모델 누락이 즉시 알림 대상이어야 하므로 raise. dev/test에서는 Stub로 fallback해 UI 검증 가능. `SIMULATOR_FALLBACK_STUB=true`로 강제 Stub 전환도 가능.
 - **`SnapshotDataSource` 도입 배경**: ML 모드에서 DT 입력은 최근 1초/분 단위 시계열이 필요한데, 매 시뮬 step마다 DB를 직접 조회하면 성능 문제 → SnapshotDataSource가 캐시 + 버퍼링 책임을 가짐.
+- **`/api/reset` 컨테이너 재시작 방식 채택 배경**: 시연용 데이터 소스가 하루치 CSV 1개라, 데이터 시각을 처음으로 되돌리려면 producer도 같이 재기동해야 한다. backend in-process reset만으로는 producer 상태를 되돌릴 수 없어 docker socket 경유 컨테이너 재시작을 채택. 디테일은 `docs/superpowers/specs/2026-05-14-server-reset-design.md` 참고.
+- **`docker-socket-proxy` 도입 배경**: backend에 `/var/run/docker.sock`을 직접 마운트하면 `:ro`라도 `send()/recv()` 기반 docker API 호출이 모두 통하므로 backend 컨테이너 탈취 = 호스트 점령. blast radius를 좁히기 위해 `tecnativa/docker-socket-proxy:0.3`를 별도 컨테이너로 두고 backend는 `DOCKER_HOST=tcp://docker-socket-proxy:2375` env로 proxy를 경유. proxy의 화이트리스트는 `CONTAINERS=1, POST=1`만 켜서 backend는 컨테이너 read + lifecycle(restart/start/stop/kill 등 컨테이너 그룹 전체)은 가능하지만 새 컨테이너 생성·이미지 pull·exec attach·볼륨 마운트·host filesystem 접근은 불가. tecnativa proxy는 그룹 단위 ACL이라 `restart`만 허용하고 `kill`/`exec`은 차단하는 endpoint-level filtering은 불가 — 후속 작업으로 caddy-docker-proxy 변형 검토.
+- **`DockerSocketAdapter`의 lazy `is_available()` 패턴**: lifespan에서 1회 probe로 Noop을 결정하지 않는다. proxy는 자체 healthcheck가 없어(distroless, shell 부재) `depends_on: condition: service_healthy`로 대기시킬 수 없고, backend가 proxy보다 먼저 ready되면 startup probe가 실패한다. 매 `/api/reset` 요청마다 가용성을 ping으로 재확인해 proxy가 늦게 올라오거나 mid-flight로 다운된 후 복구되는 케이스를 자동 회복.
 
 ## 7. COMMANDS — 빌드/테스트/린트
 
