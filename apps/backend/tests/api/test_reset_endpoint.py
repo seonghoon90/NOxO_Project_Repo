@@ -28,7 +28,7 @@ def test_returns_200_with_reset_response_on_success():
         return_value=ResetResponse(
             status="restarting",
             message="Backend and producer will restart shortly",
-            restart_in_seconds=2.0,
+            restart_in_seconds=5.0,
         )
     )
     _override_with(service)
@@ -40,7 +40,7 @@ def test_returns_200_with_reset_response_on_success():
     assert res.json() == {
         "status": "restarting",
         "message": "Backend and producer will restart shortly",
-        "restart_in_seconds": 2.0,
+        "restart_in_seconds": 5.0,
     }
     service.schedule_reset.assert_awaited_once_with(password="secret")
 

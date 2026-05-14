@@ -62,6 +62,10 @@ FastAPI 기반 API 서버. 시뮬 세션 관리, 제어 입력 주입, WebSocket
 - backend 컨테이너에 `/var/run/docker.sock`을 직접 마운트해 proxy 우회 — `:ro`라도 send/recv 통제 불가로 컨테이너 탈취 = 호스트 점령. 반드시 `docker-socket-proxy` 경유(`DOCKER_HOST=tcp://docker-socket-proxy:2375`)
 - lifespan에서 `DockerSocketAdapter.is_available()` 결과로 `NoopRestartAdapter` 영구 다운그레이드 — proxy가 backend보다 늦게 ready되면 영원히 503. 가용성 판단은 매 요청마다 `ResetService`에 위임
 - `DockerSocketAdapter._restart_sync`에서 예외를 raise하도록 변경 — `_delayed_restart`가 producer 재시작 실패 시 backend 재시작을 skip하게 됨. 반드시 swallow + log
+- `ResetService._DEFAULT_DELAY_SECONDS`를 5초 미만으로 낮추기 — nginx buffering 또는 proxy 10초 timeout 환경에서 응답이 client에 flush되기 전 backend가 죽어 reset이 끊긴 것처럼 보인다. 시연 환경에서 명시적으로 짧혀야 한다면 `delay_seconds` 인자로만 override
+- `ResetService.schedule_reset`에서 비밀번호를 `str` 그대로 `hmac.compare_digest`에 전달 — 비-ASCII 입력 시 TypeError → 500 traceback이 응답에 leak되며 비밀번호 길이 측면 채널이 된다. 양쪽 모두 `bytes(utf-8)` 정규화 필수
+- `RequestValidationError` 응답에 `errors[*].input`을 그대로 노출 — Pydantic v2 default. password 등 민감 필드는 `app/api/errors.py::_mask_validation_errors`로 마스킹 후 응답
+- `ResetService._pending_task` dedupe 제거 — 동일 컨테이너에 동시 restart API 호출이 발생해 split-brain. 진행 중이면 `ResetAlreadyInProgressError`(409)로 거부 유지
 
 ## 5. WHERE — 다른 모듈과의 의존성
 

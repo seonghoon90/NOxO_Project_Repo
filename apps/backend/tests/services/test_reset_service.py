@@ -5,7 +5,11 @@ from unittest.mock import AsyncMock, MagicMock, call
 
 import pytest
 
-from app.exceptions import InvalidResetPasswordError, ResetUnavailableError
+from app.exceptions import (
+    InvalidResetPasswordError,
+    ResetAlreadyInProgressError,
+    ResetUnavailableError,
+)
 from app.services.reset_service import ResetService
 
 
@@ -106,3 +110,105 @@ async def test_producer_restart_failure_does_not_block_backend_restart():
         call("kafka-producer"),
         call("noxo-backend"),
     ]
+
+
+@pytest.mark.asyncio
+async def test_producer_cancellederror_still_triggers_backend_restart():
+    """회귀: producer 호출에서 CancelledError 발생해도 backend 재시작 시도 후 cancel 전파."""
+    service, adapter = _make_service(reset_password="secret", delay_seconds=0.0)
+
+    async def restart_side_effect(name: str) -> None:
+        if name == "kafka-producer":
+            raise asyncio.CancelledError()
+
+    adapter.restart = AsyncMock(side_effect=restart_side_effect)
+
+    response = await service.schedule_reset(password="secret")
+    assert response.status == "restarting"
+
+    with pytest.raises(asyncio.CancelledError):
+        await service._pending_task
+
+    # producer cancel 후에도 backend 호출은 발사돼야 한다 (spec §7 invariant)
+    assert adapter.restart.await_args_list == [
+        call("kafka-producer"),
+        call("noxo-backend"),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_concurrent_reset_raises_already_in_progress():
+    """회귀: _pending_task가 살아있을 때 두 번째 호출은 409로 거부된다."""
+    service, adapter = _make_service(reset_password="secret", delay_seconds=0.0)
+
+    # 첫 호출이 await중이도록 restart를 영구 대기시킴
+    pending_event = asyncio.Event()
+
+    async def block_forever(_name: str) -> None:
+        await pending_event.wait()
+
+    adapter.restart = AsyncMock(side_effect=block_forever)
+
+    response1 = await service.schedule_reset(password="secret")
+    assert response1.status == "restarting"
+    # 첫 task가 _delayed_restart 안에서 producer restart를 await하도록 한 tick 양보
+    await asyncio.sleep(0)
+
+    # 두 번째 호출은 진행 중 task를 감지해 409 raise
+    with pytest.raises(ResetAlreadyInProgressError):
+        await service.schedule_reset(password="secret")
+
+    # 첫 task만 살아있어야 한다 (두 번째 호출이 _pending_task를 덮어쓰지 않음)
+    pending_event.set()
+    service._pending_task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await service._pending_task
+
+
+@pytest.mark.asyncio
+async def test_concurrent_reset_allowed_after_previous_completes():
+    """회귀: 이전 task가 done이면 새 reset이 허용된다."""
+    service, adapter = _make_service(reset_password="secret", delay_seconds=0.0)
+
+    # 첫 호출 완료 후
+    await service.schedule_reset(password="secret")
+    await service._pending_task
+    assert service._pending_task.done()
+
+    # 두 번째 호출은 정상 진행
+    response2 = await service.schedule_reset(password="secret")
+    assert response2.status == "restarting"
+    await service._pending_task
+
+
+@pytest.mark.asyncio
+async def test_password_with_unicode_does_not_raise_typeerror():
+    """회귀: 비-ASCII 비밀번호 입력 시 TypeError 없이 InvalidResetPassword로 처리."""
+    service, _ = _make_service(reset_password="비밀번호")
+    # 다른 비-ASCII 입력
+    with pytest.raises(InvalidResetPasswordError):
+        await service.schedule_reset(password="잘못된비밀번호")
+
+
+@pytest.mark.asyncio
+async def test_password_with_unicode_matches():
+    """회귀: 동일한 비-ASCII 비밀번호는 정상 매칭."""
+    service, adapter = _make_service(reset_password="비밀번호", delay_seconds=0.0)
+    response = await service.schedule_reset(password="비밀번호")
+    assert response.status == "restarting"
+    await service._pending_task
+    assert adapter.restart.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_default_delay_is_5_seconds():
+    """회귀: nginx buffering 환경 안전을 위해 default delay 5초."""
+    service, _ = _make_service(reset_password="secret")
+    # delay_seconds 인자 없이 default 사용
+    service_default = ResetService(
+        restart_adapter=service._restart_adapter,
+        backend_container="noxo-backend",
+        producer_container="kafka-producer",
+        reset_password="secret",
+    )
+    assert service_default._delay_seconds == 5.0

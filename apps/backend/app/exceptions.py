@@ -51,3 +51,12 @@ class InvalidResetPasswordError(DomainError):
 
     def __init__(self) -> None:
         super().__init__("Reset password does not match")
+
+
+class ResetAlreadyInProgressError(DomainError):
+    """이미 리셋 백그라운드 task가 진행 중인 상태에서 추가 호출 — split-brain 재시작 방지."""
+
+    error_code = "RESET_ALREADY_IN_PROGRESS"
+
+    def __init__(self) -> None:
+        super().__init__("Reset already in progress")
