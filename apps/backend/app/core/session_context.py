@@ -35,17 +35,21 @@ class SessionContext:
         """스냅샷 DataFrame → SessionContext.
 
         변환:
-          - buffer 행: RAW 39 + TTXM 1 = 40 키 (measured_at/NOx/DWATT drop)
+          - buffer 행: RAW 39 + TTXM + NOx + DWATT = 42 키 (measured_at drop)
           - plant_context: 마지막 행에서 (RAW - CONTROL_TAGS) + TTXM = 30 키
           - initial_controls: 마지막 행의 CONTROL_TAGS 10 키
 
         외란 매핑 미완 단계에서 누락된 컬럼은 0.0으로 폴백 (DT가 ffill 처리).
+        NOx/DWATT는 forecaster lag 입력에 필수 — 누락 시 모델이 NOx=0 시계열로
+        외삽해 학습 분포 밖 예측을 내보낸다.
         """
         from app.domain.tags import CONTROL_TAGS
+        from digital_twin.forecaster.predict import DWATT_COL
+        from digital_twin.forecaster.preprocess import NOX_TARGET_COL
         from digital_twin.preprocess import RAW_FEATURES
 
         TTXM_COL = "IGCC.CC.G1.TTXM"
-        BUFFER_COLS = list(RAW_FEATURES) + [TTXM_COL]            # 40
+        BUFFER_COLS = list(RAW_FEATURES) + [TTXM_COL, NOX_TARGET_COL, DWATT_COL]   # 42
         PLANT_KEYS = [c for c in RAW_FEATURES if c not in CONTROL_TAGS] + [TTXM_COL]  # 30
 
         df = snapshot_df.copy()

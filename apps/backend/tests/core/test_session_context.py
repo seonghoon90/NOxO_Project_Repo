@@ -82,8 +82,12 @@ def test_buffer_to_df_returns_dataframe(ctx_basic):
     assert isinstance(df, pd.DataFrame)
 
 
-def test_from_snapshot_builds_buffer_with_40_columns():
-    """스냅샷 43컬럼 → buffer 행 40 키 (measured_at, NOx, DWATT drop, TTXM 유지)."""
+def test_from_snapshot_builds_buffer_with_42_columns():
+    """스냅샷 43컬럼 → buffer 행 42 키 (measured_at drop, RAW + TTXM + NOx + DWATT 유지).
+
+    NOx/DWATT는 forecaster lag 입력에 필수 — drop 시 모델이 NOx=0 시계열로
+    외삽해 비정상적으로 낮은 예측을 내보낸다.
+    """
     from digital_twin.preprocess import RAW_FEATURES
     cols = ["measured_at"] + list(RAW_FEATURES) + ["IGCC.DeNOX.AT_H1_901_PV", "IGCC.CC.G1.DWATT", "IGCC.CC.G1.TTXM"]
     df = pd.DataFrame({c: [0.0] * 900 if c != "measured_at"
@@ -91,11 +95,26 @@ def test_from_snapshot_builds_buffer_with_40_columns():
                        for c in cols})
     ctx = SessionContext.from_snapshot("sid1", df)
     first_row = ctx.recent_df_buffer[0]
-    assert len(first_row) == 40
+    assert len(first_row) == 42
     assert "measured_at" not in first_row
-    assert "IGCC.DeNOX.AT_H1_901_PV" not in first_row
-    assert "IGCC.CC.G1.DWATT" not in first_row
+    assert "IGCC.DeNOX.AT_H1_901_PV" in first_row
+    assert "IGCC.CC.G1.DWATT" in first_row
     assert "IGCC.CC.G1.TTXM" in first_row
+
+
+def test_from_snapshot_preserves_nox_values_for_forecaster():
+    """스냅샷의 NOx 값이 buffer 행에 그대로 보존되어야 한다. 모델 lag 입력 필수."""
+    from digital_twin.preprocess import RAW_FEATURES
+    cols = ["measured_at"] + list(RAW_FEATURES) + ["IGCC.DeNOX.AT_H1_901_PV", "IGCC.CC.G1.DWATT", "IGCC.CC.G1.TTXM"]
+    df = pd.DataFrame({c: ([0.0] * 900 if c != "measured_at"
+                          else pd.date_range("2026-05-11", periods=900, freq="1s"))
+                       for c in cols})
+    df["IGCC.DeNOX.AT_H1_901_PV"] = 28.0
+    df["IGCC.CC.G1.DWATT"] = 165.0
+    ctx = SessionContext.from_snapshot("sid_nox", df)
+    last_row = ctx.recent_df_buffer[-1]
+    assert last_row["IGCC.DeNOX.AT_H1_901_PV"] == 28.0
+    assert last_row["IGCC.CC.G1.DWATT"] == 165.0
 
 
 def test_from_snapshot_extracts_plant_context_30_keys():
