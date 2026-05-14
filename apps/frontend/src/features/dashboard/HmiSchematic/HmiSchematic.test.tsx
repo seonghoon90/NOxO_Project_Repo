@@ -31,8 +31,18 @@ const baseProps = {
   ibhValve: vc(50, 0, 100),
   nox: 10,
   ttxm: 580,
-  lambda: 1.10,
+  lambda: 2.5,
   power: 240,
+  kpiThresholds: {
+    noxWarn: 25,
+    noxCrit: 30,
+    ttxmWarn: 642,
+    ttxmCrit: 650,
+    lambdaWarnLo: 2.0,
+    lambdaWarnHi: 3.5,
+    lambdaCritLo: 1.5,
+    lambdaCritHi: 4.0,
+  },
 }
 
 describe('HmiSchematic', () => {
@@ -43,7 +53,7 @@ describe('HmiSchematic', () => {
 
   it('14개 <text> 렌더 (4 KPI + 10 보조), 메인 KPI textContent가 props 값과 일치', () => {
     const { container } = render(
-      <HmiSchematic {...baseProps} nox={26.5} ttxm={580} power={248.6} lambda={1.10} />,
+      <HmiSchematic {...baseProps} nox={26.5} ttxm={580} power={248.6} lambda={2.50} />,
     )
     const texts = container.querySelectorAll('text[data-role^="kpi-text-"]')
     expect(texts.length).toBe(14)
@@ -52,7 +62,7 @@ describe('HmiSchematic', () => {
     expect(map.get('kpi-text-nox')).toBe('26.5')
     expect(map.get('kpi-text-ttxm')).toBe('580.0')
     expect(map.get('kpi-text-dwatt')).toBe('248.6')
-    expect(map.get('kpi-text-lambda')).toBe('1.10')
+    expect(map.get('kpi-text-lambda')).toBe('2.50')
   })
 
   it('nox=10 → data-kpi-nox=normal, 27 → warn, 35 → crit', () => {
@@ -66,13 +76,13 @@ describe('HmiSchematic', () => {
 
   it('ttxm/dwatt/lambda 양방향 임계 반영', () => {
     const { rerender, getByTestId } = render(
-      <HmiSchematic {...baseProps} ttxm={621} power={170} lambda={0.99} />,
+      <HmiSchematic {...baseProps} ttxm={651} power={170} lambda={1.4} />,
     )
     const root = getByTestId('hmi-schematic-root')
     expect(root.getAttribute('data-kpi-ttxm')).toBe('crit')
     expect(root.getAttribute('data-kpi-dwatt')).toBe('crit')
     expect(root.getAttribute('data-kpi-lambda')).toBe('crit')
-    rerender(<HmiSchematic {...baseProps} ttxm={580} power={240} lambda={1.10} />)
+    rerender(<HmiSchematic {...baseProps} ttxm={580} power={240} lambda={2.5} />)
     expect(root.getAttribute('data-kpi-ttxm')).toBe('normal')
     expect(root.getAttribute('data-kpi-dwatt')).toBe('normal')
     expect(root.getAttribute('data-kpi-lambda')).toBe('normal')

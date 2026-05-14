@@ -55,15 +55,15 @@ export function ServicePage() {
     max: activeVariable.max,
     step: activeVariable.step,
   }
-  // 메인 KPI/도면/임계 여유는 항상 현재 NOx(metrics.nox). 5분 후 예측값(predictedNox)은 ForecastCard에서만 사용.
-  const displayedNox = state.metrics.nox
+  // 메인 KPI/도면/임계 여유는 15% O2 보정 NOx(nox15pct). 5분 후 예측값(predictedNox)은 ForecastCard에서만 사용.
+  const displayedNox = state.metrics.nox15pct
   const forecastTargetKst = isRealtimeMode && state.forecast
     ? formatForecastTargetKst(state.forecast.target_time)
     : null
   const streamLabel = streamStatusLabel(status)
   const noxStatus = displayedNox > thresholds.noxLimit ? '위험' : '정상'
   const controlCards = controlVariableOrder.map((key) => state.variables[key])
-  const noxValues = state.history.length > 0 ? state.history.map((point) => point.nox) : [displayedNox]
+  const noxValues = state.history.length > 0 ? state.history.map((point) => point.nox15pct) : [displayedNox]
   // 효율은 정격 이상이면 항상 정상. 미만일 때만 caution/danger 임계로 색 판정.
   const efficiency = state.metrics.efficiency
   const noxHeadroom = thresholds.noxLimit - displayedNox
@@ -235,6 +235,16 @@ export function ServicePage() {
                 lambda={state.metrics.lambda}
                 power={state.metrics.power}
                 history={state.history}
+                kpiThresholds={{
+                  noxWarn: 25,
+                  noxCrit: thresholds.noxLimit,
+                  ttxmWarn: thresholds.exhaustCautionC,
+                  ttxmCrit: thresholds.exhaustDangerC,
+                  lambdaWarnLo: thresholds.lambdaCautionLo,
+                  lambdaWarnHi: thresholds.lambdaCautionHi,
+                  lambdaCritLo: thresholds.lambdaDangerLo,
+                  lambdaCritHi: thresholds.lambdaDangerHi,
+                }}
               />
             </div>
           </section>
@@ -324,7 +334,7 @@ export function ServicePage() {
             <ForecastCard
               forecast={state.forecast}
               noxLimit={thresholds.noxLimit}
-              currentNox={state.metrics.nox}
+              currentNox={state.metrics.nox15pct}
             />
           ) : (
             <>
@@ -680,7 +690,10 @@ function ForecastCard({
   }
 
   const exceeded = forecast.threshold_exceeded
-  const [integer, decimal = '0'] = forecast.predicted_nox.toFixed(1).split('.')
+  // 화면 표시·delta 비교는 15% O2 보정값(predicted_nox_15pct). threshold_exceeded는
+  // backend가 raw 기준으로 판정해 송신하므로 그대로 사용.
+  const displayedForecast = forecast.predicted_nox_15pct
+  const [integer, decimal = '0'] = displayedForecast.toFixed(1).split('.')
 
   return (
     <section
@@ -706,7 +719,7 @@ function ForecastCard({
         </div>
       ) : (
         <div className="forecast-headroom mono">
-          {formatForecastDelta(forecast.predicted_nox, currentNox)}
+          {formatForecastDelta(displayedForecast, currentNox)}
         </div>
       )}
     </section>
@@ -925,7 +938,7 @@ function NoxChart({
   if (history.length < 2) {
     return <ChartPlaceholder width={width} height={height} />
   }
-  const values = history.map((point) => point.nox)
+  const values = history.map((point) => point.nox15pct)
   const focusedRange = createRange(values, 0.28, 1.2)
   const max = focusedRange.max
   const min = focusedRange.min
@@ -1144,8 +1157,9 @@ function buildOutputTableRows(args: {
   thresholds: Thresholds
 }): OutputTableRow[] {
   const { displayedNox, metrics, history, thresholds } = args
+  // displayedNox가 15% O2 보정값이므로 ranges도 동일 보정값 계열로 통일
   const noxRange = history.length > 0
-    ? getRange(history.map((p) => p.nox))
+    ? getRange(history.map((p) => p.nox15pct))
     : { min: displayedNox, max: displayedNox }
   const exhaustRange = history.length > 0
     ? getRange(history.map((p) => p.exhaust))

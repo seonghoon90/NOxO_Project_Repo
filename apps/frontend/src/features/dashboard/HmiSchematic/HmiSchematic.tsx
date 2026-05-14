@@ -5,7 +5,7 @@ import { SparkLines } from './SparkLines'
 import { SmokeCanvas } from './SmokeCanvas'
 import { LegendTexts } from './LegendTexts'
 import { LabelTexts } from './LabelTexts'
-import { computeKpiStates } from './kpiState'
+import { computeKpiStates, type KpiThresholds } from './kpiState'
 import { getFlowAnimationVars } from './flowVarsMap'
 import { useCascadeAnimation } from './useCascadeAnimation'
 import { cssVarsFromProps, type SchematicInputs } from './cssVarsFromProps'
@@ -17,18 +17,22 @@ import styles from './HmiSchematic.module.css'
 
 export interface HmiSchematicProps extends SchematicInputs {
   history?: ReadonlyArray<MetricPoint>
+  kpiThresholds: KpiThresholds
 }
 
 export function HmiSchematic(props: HmiSchematicProps) {
   const rootRef = useRef<HTMLDivElement>(null)
 
   const cssVars = cssVarsFromProps(props)
-  const kpi = computeKpiStates({
-    nox: props.nox,
-    ttxm: props.ttxm,
-    dwatt: props.power,
-    lambda: props.lambda,
-  })
+  const kpi = computeKpiStates(
+    {
+      nox: props.nox,
+      ttxm: props.ttxm,
+      dwatt: props.power,
+      lambda: props.lambda,
+    },
+    props.kpiThresholds,
+  )
 
   // 각 계통 파이프 속도는 해당 라인에 연결된 변수들의 단순 평균 ratio로 결정
   const fuelRatio = avgRatio([
