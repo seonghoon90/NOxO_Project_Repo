@@ -377,6 +377,186 @@ a {
   text-transform: uppercase;
 }
 
+/* 서버 초기화 카드 — sidebar-clock과 동일 높이/형태, 위험 액션이라 빨강 톤 */
+.sidebar-restart-wrap {
+  padding: 14px;
+}
+
+.sidebar-restart-card {
+  width: 100%;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: var(--radius);
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  background-color: rgba(248, 113, 113, 0.08);
+  color: #fca5a5;
+  font: 500 14px var(--font-mono);
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.sidebar-restart-card:hover:not(:disabled) {
+  background-color: rgba(248, 113, 113, 0.16);
+  border-color: rgba(248, 113, 113, 0.55);
+  color: #fecaca;
+}
+
+.sidebar-restart-card:disabled,
+.sidebar-restart-card.is-busy {
+  cursor: progress;
+  color: rgba(248, 113, 113, 0.7);
+  border-color: rgba(248, 113, 113, 0.25);
+  animation: sidebar-restart-pulse 1.4s ease-in-out infinite;
+}
+
+.sidebar-restart-icon {
+  display: inline-flex;
+  align-items: center;
+  width: 18px;
+  height: 18px;
+}
+
+.sidebar-restart-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.sidebar-restart-notice {
+  margin-top: 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.4;
+  letter-spacing: 0.01em;
+  text-align: center;
+  animation: sidebar-restart-fade 0.2s ease-out;
+}
+
+.sidebar-restart-notice.ok {
+  background-color: rgba(74, 222, 128, 0.12);
+  border: 1px solid rgba(74, 222, 128, 0.35);
+  color: #86efac;
+}
+
+.sidebar-restart-notice.warn {
+  background-color: rgba(250, 204, 21, 0.1);
+  border: 1px solid rgba(250, 204, 21, 0.35);
+  color: #fde68a;
+}
+
+@keyframes sidebar-restart-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(248, 113, 113, 0);
+  }
+  50% {
+    box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.18);
+  }
+}
+
+@keyframes sidebar-restart-fade {
+  from {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 서버 재시작 비밀번호 모달 — settings-modal보다 좁고 가벼운 confirm 형태 */
+.restart-modal {
+  width: min(360px, 100%);
+  padding: 20px;
+  border-radius: 12px;
+  border: 1px solid rgba(248, 113, 113, 0.32);
+  background: linear-gradient(180deg, rgba(28, 22, 24, 0.98), rgba(20, 16, 18, 0.98));
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.5);
+}
+
+.restart-modal-header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.restart-modal-title {
+  color: #fca5a5;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.restart-modal-hint {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.restart-modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.restart-modal-label {
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.restart-modal-input {
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background-color: var(--surface-2);
+  color: var(--text);
+  font-size: 14px;
+  letter-spacing: 0.08em;
+}
+
+.restart-modal-input:focus {
+  outline: none;
+  border-color: rgba(248, 113, 113, 0.55);
+  box-shadow: 0 0 0 2px rgba(248, 113, 113, 0.18);
+}
+
+.restart-modal-input:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.restart-modal-error {
+  margin-top: 2px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background-color: rgba(248, 113, 113, 0.1);
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  color: #fecaca;
+  font-size: 12px;
+}
+
+.restart-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.restart-modal-submit {
+  background: rgba(248, 113, 113, 0.18);
+  border-color: rgba(248, 113, 113, 0.55);
+  color: #fecaca;
+}
+
 .kpi-row {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

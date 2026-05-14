@@ -11,6 +11,8 @@ import {
   variableSeed,
 } from '../features/dashboard/mockConsole'
 import { useConsoleState, type StreamStatus } from '../features/dashboard/useConsoleState'
+
+type RestartNotice = { tone: 'ok' | 'warn'; text: string }
 import { useThresholds, type Thresholds } from '../features/dashboard/useThresholds'
 import type { AppOutletContext } from '../app/App'
 
@@ -34,10 +36,16 @@ export function ServicePage() {
     setMode: notifyBackendMode,
     updateActiveVariableConfig,
     restoreActiveVariableDefaults,
+    restartSession,
   } = useConsoleState(mode)
   const thresholds = useThresholds()
   const [draftConfig, setDraftConfig] = useState<VariableConfigUpdate | null>(null)
   const [savedToast, setSavedToast] = useState(false)
+  const [restartBusy, setRestartBusy] = useState(false)
+  const [restartNotice, setRestartNotice] = useState<RestartNotice | null>(null)
+  const [restartPromptOpen, setRestartPromptOpen] = useState(false)
+  const [restartPassword, setRestartPassword] = useState('')
+  const [restartPromptError, setRestartPromptError] = useState<string | null>(null)
   // realtime 모드는 Kafka 기반 5분 NOx 예측 표시 — 제어 조작은 잠근다.
   const isRealtimeMode = mode === 'realtime'
 
@@ -73,6 +81,68 @@ export function ServicePage() {
     setSavedToast(false)
     closeSettings()
   }, [closeSettings])
+
+  // 사이드바 버튼 → 비밀번호 모달 오픈
+  const handleOpenRestartPrompt = useCallback(() => {
+    if (restartBusy) return
+    setRestartPassword('')
+    setRestartPromptError(null)
+    setRestartNotice(null)
+    setRestartPromptOpen(true)
+  }, [restartBusy])
+
+  // 모달 닫기 — 입력값/에러 즉시 폐기 (메모리에도 비밀번호를 남기지 않는다)
+  const handleCloseRestartPrompt = useCallback(() => {
+    setRestartPromptOpen(false)
+    setRestartPassword('')
+    setRestartPromptError(null)
+  }, [])
+
+  // 모달 제출 — 비어 있으면 즉시 거절, 200/401/503 분기 처리
+  const handleSubmitRestart = useCallback(async () => {
+    if (restartBusy) return
+    const password = restartPassword
+    if (!password) {
+      setRestartPromptError('비밀번호를 입력하세요.')
+      return
+    }
+    setRestartBusy(true)
+    setRestartPromptError(null)
+    const outcome = await restartSession(password)
+    setRestartBusy(false)
+
+    if (outcome.kind === 'ok') {
+      handleCloseRestartPrompt()
+      setRestartNotice({ tone: 'ok', text: '서버 재시작 완료 — 새 세션이 연결되었습니다.' })
+      return
+    }
+    if (outcome.kind === 'invalid-password') {
+      // 모달 유지 + 입력란 비우기 + 에러 표시
+      setRestartPassword('')
+      setRestartPromptError(outcome.message)
+      return
+    }
+    // unavailable / error: 모달 닫고 사이드바 토스트로
+    handleCloseRestartPrompt()
+    setRestartNotice({ tone: 'warn', text: outcome.message })
+  }, [restartBusy, restartPassword, restartSession, handleCloseRestartPrompt])
+
+  // restart 결과 알림은 3초 후 자동 소거
+  useEffect(() => {
+    if (!restartNotice) return
+    const timer = window.setTimeout(() => setRestartNotice(null), 3000)
+    return () => window.clearTimeout(timer)
+  }, [restartNotice])
+
+  // 모달 ESC 닫기
+  useEffect(() => {
+    if (!restartPromptOpen) return
+    const handler = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !restartBusy) handleCloseRestartPrompt()
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [restartPromptOpen, restartBusy, handleCloseRestartPrompt])
 
   // 적용 클릭 시 1.5초간 "저장 완료" 토스트 노출
   useEffect(() => {
@@ -360,6 +430,31 @@ export function ServicePage() {
               />
             </div>
           </div>
+          <div className="sidebar-restart-wrap">
+            <button
+              type="button"
+              className={`sidebar-restart-card${restartBusy ? ' is-busy' : ''}`}
+              onClick={handleOpenRestartPrompt}
+              disabled={restartBusy}
+              aria-busy={restartBusy}
+            >
+              <span className="sidebar-restart-icon" aria-hidden="true">
+                <ServerRestartIcon />
+              </span>
+              <span className="sidebar-restart-text">
+                {restartBusy ? '서버 재시작 중…' : '서버 초기화'}
+              </span>
+            </button>
+            {restartNotice ? (
+              <div
+                className={`sidebar-restart-notice ${restartNotice.tone}`}
+                role="status"
+                aria-live="polite"
+              >
+                {restartNotice.text}
+              </div>
+            ) : null}
+          </div>
         </aside>
       </section>
 
@@ -480,6 +575,79 @@ export function ServicePage() {
                 적용
               </button>
             </div>
+          </section>
+        </div>
+      ) : null}
+
+      {restartPromptOpen ? (
+        <div
+          className="modal-backdrop"
+          onClick={() => {
+            if (!restartBusy) handleCloseRestartPrompt()
+          }}
+        >
+          <section
+            className="restart-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="restart-modal-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="restart-modal-header">
+              <div id="restart-modal-title" className="restart-modal-title">
+                서버 초기화 확인
+              </div>
+              <div className="restart-modal-hint">
+                계속하려면 관리자 비밀번호를 입력하세요.<br />
+                백엔드와 producer 컨테이너가 재시작됩니다.
+              </div>
+            </div>
+            <form
+              className="restart-modal-form"
+              onSubmit={(event) => {
+                event.preventDefault()
+                void handleSubmitRestart()
+              }}
+            >
+              <label className="restart-modal-label" htmlFor="restart-password">
+                비밀번호
+              </label>
+              <input
+                id="restart-password"
+                type="password"
+                className="restart-modal-input mono"
+                value={restartPassword}
+                autoComplete="off"
+                autoFocus
+                disabled={restartBusy}
+                onChange={(event) => {
+                  setRestartPassword(event.target.value)
+                  if (restartPromptError) setRestartPromptError(null)
+                }}
+              />
+              {restartPromptError ? (
+                <div className="restart-modal-error" role="alert">
+                  {restartPromptError}
+                </div>
+              ) : null}
+              <div className="restart-modal-actions">
+                <button
+                  type="button"
+                  className="button-secondary"
+                  onClick={handleCloseRestartPrompt}
+                  disabled={restartBusy}
+                >
+                  취소
+                </button>
+                <button
+                  type="submit"
+                  className="button-primary restart-modal-submit"
+                  disabled={restartBusy}
+                >
+                  {restartBusy ? '재시작 중…' : '재시작'}
+                </button>
+              </div>
+            </form>
           </section>
         </div>
       ) : null}
@@ -1121,6 +1289,8 @@ function streamStatusLabel(status: StreamStatus): { text: string; tone: string }
       return { text: 'CONNECTING', tone: 'caution' }
     case 'reconnecting':
       return { text: 'RECONNECTING', tone: 'caution' }
+    case 'restarting':
+      return { text: 'RESTARTING', tone: 'caution' }
     case 'disconnected':
       return { text: 'OFFLINE', tone: 'alert' }
     case 'mock':
@@ -1163,6 +1333,41 @@ function CloseIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" strokeWidth="1.6" />
+    </svg>
+  )
+}
+
+function ServerRestartIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect
+        x="4"
+        y="4"
+        width="16"
+        height="6"
+        rx="1.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.4"
+      />
+      <rect
+        x="4"
+        y="14"
+        width="16"
+        height="6"
+        rx="1.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.4"
+      />
+      <circle cx="8" cy="7" r="0.9" fill="currentColor" />
+      <circle cx="8" cy="17" r="0.9" fill="currentColor" />
+      <path
+        d="M14 7h3M14 17h3"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+      />
     </svg>
   )
 }
