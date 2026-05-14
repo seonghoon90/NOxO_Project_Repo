@@ -35,30 +35,45 @@ _FC = DEFAULT_CONFIG.features
 #   λ > 1 : 공기 과잉 (lean), NOx 증가 경향
 #   λ < 1 : 연료 과잉 (rich), CO 증가 경향
 #
-# 정확한 계산은 합성가스 조성(H2/CO/CH4 비율)이 필요하지만
-# 프로토타입에서는 IGV 개도(공기 유량 비례) / 합성가스 유량의
-# 비율로 근사한다. n2_offset은 미세 보정 항으로 처리.
+# 우선순위:
+#   1) 배기 O2 측정값(AIT_H1_902)이 있으면 표준 역산식
+#      λ = 20.9 / (20.9 - O2_dry_pct)
+#      산업 표준 (EPA 40 CFR Part 60). 가스터빈 정상 λ=2~4가 자연스럽게 산출.
+#   2) O2 측정이 없으면 IGV/syngas 비율 근사식으로 폴백
+#      (합성가스 조성/공기 유량 직접 측정이 없을 때의 차선).
 # ============================================================
+_O2_IN_AIR_PCT = 20.9  # 대기 중 O2 부피% (건조 기준)
+
+
 def compute_lambda(
     syngas_flow: float,
     n2_offset: float,
     igv_opening: float,
     *,
+    o2_dry_pct: float | None = None,
     op: OperatingPoint = _OP,
     fc: FeatureConfig = _FC,
 ) -> float:
-    """공기비 λ 근사 계산.
+    """공기비 λ 계산. O2 측정값이 있으면 역산식, 없으면 근사식 폴백.
 
     Args:
-        syngas_flow: 합성가스 유량.
-        n2_offset:   희석질소 오프셋.
-        igv_opening: IGV 개도(%) — 공기 유량 비례 변수로 사용.
-        op: 기준 운전점 설정.
-        fc: 피처 계산 상수.
+        syngas_flow: 합성가스 유량 (폴백 경로 입력).
+        n2_offset:   희석질소 오프셋 (폴백 경로 입력).
+        igv_opening: IGV 개도(%) — 폴백 경로의 공기 유량 비례 변수.
+        o2_dry_pct: 배기 건조 O2 농도 [%]. None/비현실값이면 폴백.
+        op: 기준 운전점 설정 (폴백 경로).
+        fc: 피처 계산 상수 (폴백 경로).
 
     Returns:
         λ (무차원). lambda_min 미만으로 떨어지지 않도록 클램프.
     """
+    if o2_dry_pct is not None and math.isfinite(o2_dry_pct):
+        # O2가 대기 농도(20.9%) 이상이면 측정 이상 — 폴백으로 전환
+        if 0.0 <= o2_dry_pct < _O2_IN_AIR_PCT:
+            denom = max(_O2_IN_AIR_PCT - o2_dry_pct, 0.5)
+            lambda_ = _O2_IN_AIR_PCT / denom
+            return max(DEFAULT_CONFIG.thresholds.lambda_min, lambda_)
+
     igv_ratio = max(igv_opening, 1.0) / op.igv_opening
     fuel_ratio = max(syngas_flow, 1.0) / op.syngas_flow
 
