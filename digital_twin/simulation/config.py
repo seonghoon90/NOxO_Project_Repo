@@ -115,19 +115,22 @@ class ThresholdConfig:
     # 운영 임계 — 프론트 화면 표시용. 시뮬 동작에는 영향 없음.
     nox_warning_ppm: float = 29.5     # NOx 경고 임계치 [ppm] — CSV 실측 mean+1.3σ≈p99
 
-    # 발전 효율 운영 임계 [가안] — 정격 0.89 기준. 정격 미만일 때만 주의/위험 색.
-    efficiency_caution: float = 0.3633  # backend 산출 분포 mean-2σ. 단위 정합 미해결 — 후속 작업 시 재산정
-    efficiency_danger: float = 0.3630   # backend 산출 분포 mean-3σ
+    # 발전 효율 운영 임계 — GE 7F 단순 사이클 스펙 ~38.5%(LHV) 기준.
+    # 종전 가안(0.3633/0.3630)은 0.03%p 간격으로 센서 노이즈에 채터링 발생 → 도메인 검토 후 상향.
+    efficiency_caution: float = 0.370
+    efficiency_danger: float = 0.360
 
-    # 배기온도 상한 운영 임계 [°C, 가안] — 정격 580 기준 상승만 경고
-    exhaust_caution_c: float = 633.0   # CSV 실측 mean+1σ≈p90
-    exhaust_danger_c: float = 638.0    # CSV 실측 mean+2σ
+    # 배기온도(TTXM) 상한 운영 임계 [°C] — GE 7FA 부분부하 시 IGV 제어로 ~650℃ 부근 유지.
+    # 종전 가안(633/638)은 정상 운전 최댓값(639.76℃)보다 낮아 오알람 위험 → 도메인 검토 후 상향.
+    exhaust_caution_c: float = 642.0
+    exhaust_danger_c: float = 650.0
 
-    # 공기비(λ) 운영 한계 [무차원, 가안] — lambda_min(0.5)과 별개의 운영 한계
-    lambda_caution_lo: float = 0.9
-    lambda_caution_hi: float = 1.3
-    lambda_danger_lo: float = 0.8
-    lambda_danger_hi: float = 1.4
+    # 공기비(λ) 운영 한계 [무차원] — 가스터빈 초희박 연소(2~4배 잉여 공기) 정상 대역.
+    # 종전 가안(0.8~1.4)은 연료과농 영역으로 가스터빈 운전 원리에 위배 → 도메인 검토 후 전면 재설정.
+    lambda_caution_lo: float = 2.0
+    lambda_caution_hi: float = 3.5
+    lambda_danger_lo: float = 1.5
+    lambda_danger_hi: float = 4.0
 
 
 # ============================================================

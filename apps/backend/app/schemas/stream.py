@@ -24,13 +24,16 @@ class StreamControls(BaseModel):
 
 
 class StreamOutputs(BaseModel):
-    """DT current 추론 결과 5개.
+    """DT current 추론 결과 5개 + 표시 보정값 1개.
 
-    단위: nox(ppm), exhaust_temp(°C), power(MW), lambda_(무차원), efficiency([0,1])
+    단위: nox(ppm), nox_15pct(15% O2 보정 ppm), exhaust_temp(°C), power(MW),
+    lambda_(무차원), efficiency([0,1])
+    nox_15pct는 대시보드 표시용 보정값으로 학습/예측 입력에는 사용되지 않는다.
     """
     model_config = ConfigDict(populate_by_name=True)
 
     nox: float
+    nox_15pct: float
     exhaust_temp: float
     power: float
     lambda_: float = Field(alias="lambda_")
@@ -48,7 +51,13 @@ class StreamKafkaLatest(BaseModel):
 
 
 class StreamForecast(BaseModel):
+    """5분 후 NOx 예측값. predicted_nox_15pct는 현재 시점 O2로 동일 보정한 표시값.
+
+    임계 비교(threshold_exceeded)는 raw 기준 — frontend ForecastCard는 표시만 보정값으로.
+    """
+
     predicted_nox: float
+    predicted_nox_15pct: float
     target_time: datetime
     threshold_value: float
     threshold_exceeded: bool

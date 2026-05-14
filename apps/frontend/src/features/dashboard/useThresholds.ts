@@ -20,16 +20,18 @@ export type Thresholds = {
   lambdaDangerHi: number
 }
 
+// SoT는 digital_twin/simulation/config.py::ThresholdConfig. backend 미응답 시 화면 채터링을
+// 막기 위해 동일 값을 fallback으로 둔다. SoT 변경 시 함께 동기화.
 const FALLBACK_THRESHOLDS: Thresholds = {
   noxLimit: DEFAULT_NOX_LIMIT,
-  efficiencyCaution: 0.85,
-  efficiencyDanger: 0.8,
-  exhaustCautionC: 600,
-  exhaustDangerC: 620,
-  lambdaCautionLo: 0.9,
-  lambdaCautionHi: 1.3,
-  lambdaDangerLo: 0.8,
-  lambdaDangerHi: 1.4,
+  efficiencyCaution: 0.370,
+  efficiencyDanger: 0.360,
+  exhaustCautionC: 642,
+  exhaustDangerC: 650,
+  lambdaCautionLo: 2.0,
+  lambdaCautionHi: 3.5,
+  lambdaDangerLo: 1.5,
+  lambdaDangerHi: 4.0,
 }
 
 type ThresholdResponse = {

@@ -21,7 +21,8 @@ def _make_controls() -> StreamControls:
 
 def _make_outputs() -> StreamOutputs:
     return StreamOutputs(
-        nox=28.5, exhaust_temp=580.0, power=165.2, lambda_=2.1, efficiency=0.42,
+        nox=28.5, nox_15pct=24.36, exhaust_temp=580.0, power=165.2,
+        lambda_=2.1, efficiency=0.42,
     )
 
 
@@ -54,6 +55,7 @@ def test_realtime_with_forecast():
         kafka_latest=None,
         forecast=StreamForecast(
             predicted_nox=31.2,
+            predicted_nox_15pct=26.68,
             target_time=datetime.now(timezone.utc),
             threshold_value=30.0,
             threshold_exceeded=True,

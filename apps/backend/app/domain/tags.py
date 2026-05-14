@@ -58,6 +58,8 @@ TAG_POWER: Final[str] = "IGCC.CC.G1.DWATT"  # 발전량 (MW)
 # ============================================================
 TAG_NOX_PPM: Final[str] = "IGCC.DeNOX.AT_H1_901_PV"   # TODO: 실제 NOx 측정 태그 확인 (가안)
 TAG_EXHAUST_TEMP: Final[str] = "IGCC.CC.G1.TTXM"
+# 배기가스 O2 농도 [%] — NOx 15% O2 표준 보정식의 입력. ML 학습 타깃 아님(준누수).
+TAG_O2_PCT: Final[str] = "IGCC.DeNOX.AIT_H1_902"
 # NPR primary (IGCC.CC.G1.VNPR_P) — DB 컬럼 npr_primary로는 stream ETL이
 # 적재하지만(docs/data-platform/stream-etl-storage-design.md §Mapping rule), 백엔드 도메인에서는
 # OutputVars/KPI 대상이 아니고 ML 외란 입력(`vnpr_p`)으로만 사용한다.
@@ -123,6 +125,8 @@ ALL_TAGS_TO_DOMAIN: Final[dict[str, str]] = {
     TAG_NOX_PPM: "nox",
     TAG_EXHAUST_TEMP: "exhaust_temp",
     TAG_POWER: "power",
+    # 표시값 보정 입력 — OutputVars 아님. realtime_engine에서 nox_15pct 계산용으로만 사용.
+    TAG_O2_PCT: "o2_pct",
     # 외란
     **DISTURBANCE_TAGS,
 }

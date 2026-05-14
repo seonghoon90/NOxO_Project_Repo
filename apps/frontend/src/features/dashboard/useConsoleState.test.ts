@@ -28,6 +28,7 @@ const samplePayload: RealtimeStreamPayload = {
     },
     outputs: {
       nox: 28.5,
+      nox_15pct: 24.36,
       exhaust_temp: 580.0,
       power: 165.2,
       lambda_: 2.1,
@@ -37,6 +38,7 @@ const samplePayload: RealtimeStreamPayload = {
   kafka_latest: null,
   forecast: {
     predicted_nox: 31.2,
+    predicted_nox_15pct: 26.68,
     target_time: '2026-05-12T07:35:15.123Z',
     threshold_value: 30.0,
     threshold_exceeded: true,
@@ -67,18 +69,20 @@ describe('createStateFromPayload', () => {
     const initial = createInitialConsoleState(false)
     const next = createStateFromPayload(samplePayload, initial)
     expect(next.metrics.nox).toBe(28.5)
-    expect(next.metrics.predictedNox).toBe(31.2)
+    expect(next.metrics.nox15pct).toBe(24.36)
+    expect(next.metrics.predictedNox).toBe(26.68)
     expect(next.forecast?.predicted_nox).toBe(31.2)
+    expect(next.forecast?.predicted_nox_15pct).toBe(26.68)
   })
 
-  it('falls back predictedNox to outputs.nox when forecast is null', () => {
+  it('falls back predictedNox to outputs.nox_15pct when forecast is null', () => {
     const sim: RealtimeStreamPayload = {
       ...samplePayload,
       mode: 'sim',
       forecast: null,
     }
     const next = createStateFromPayload(sim, createInitialConsoleState(false))
-    expect(next.metrics.predictedNox).toBe(28.5)
+    expect(next.metrics.predictedNox).toBe(24.36)
     expect(next.forecast).toBeNull()
   })
 

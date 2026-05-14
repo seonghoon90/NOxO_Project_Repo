@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import math
 from contextlib import suppress
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -30,6 +31,29 @@ from digital_twin.simulation.features import compute_lambda
 logger = logging.getLogger(__name__)
 
 FORECAST_HORIZON_MINUTES = 5  # spec §0.2
+
+# NOx 15% O2 표준 보정식의 기준 산소 농도 [%]
+# nox_15pct = nox * (20.9 - 15) / (20.9 - o2)
+# O2가 20.4% 이상이면 분모가 0.5% 미만이 되어 보정값이 발산 → raw nox fallback.
+_NOX_REF_O2_PCT: float = 15.0
+_NOX_AMB_O2_PCT: float = 20.9
+_NOX_O2_MIN_DENOM: float = 0.5
+
+
+def correct_nox_15pct(nox: float, o2_pct: float | None) -> float:
+    """NOx를 15% O2 기준으로 보정. 입력 O2가 비정상이면 raw nox 반환.
+
+    비정상 케이스 — 모두 raw nox로 fallback:
+    - None
+    - 음수 (센서 fault)
+    - 21% 이상 (분모 < 0.5%로 보정값 발산)
+    """
+    if o2_pct is None or o2_pct < 0.0:
+        return nox
+    denom = _NOX_AMB_O2_PCT - o2_pct
+    if denom < _NOX_O2_MIN_DENOM:
+        return nox
+    return nox * (_NOX_AMB_O2_PCT - _NOX_REF_O2_PCT) / denom
 
 
 class RealtimeEngine:
@@ -168,7 +192,17 @@ class RealtimeEngine:
         )
         current_outputs = self._postprocess_outputs(ml_outputs, input_controls)
 
-        # 4. realtime 모드면 forecast
+        # o2_pct는 nox_15pct 표시 보정(current + forecast)에 사용. 학습/예측 입력엔 미사용.
+        # bool은 isinstance(_, int) 통과하므로 명시적 제외, 비숫자/NaN은 None으로 폴백.
+        raw_o2 = kafka_row.get("o2_pct")
+        if isinstance(raw_o2, bool) or not isinstance(raw_o2, (int, float)):
+            o2_pct = None
+        else:
+            o2_pct = float(raw_o2)
+            if not math.isfinite(o2_pct):
+                o2_pct = None
+
+        # 4. realtime 모드면 forecast (o2_pct로 표시 보정값도 함께 채움)
         forecast_payload = None
         warning = None
         if session.mode == "realtime":
@@ -179,7 +213,7 @@ class RealtimeEngine:
                 try:
                     features = self._controls_to_features(input_controls)
                     predicted = self.forecaster.predict(ForecastInput(features=features))
-                    forecast_payload = self._build_forecast_payload(predicted)
+                    forecast_payload = self._build_forecast_payload(predicted, o2_pct)
                 except Exception as exc:
                     logger.warning("forecast_failed sid=%s err=%s", session.sid, exc)
                     warning = "forecast unavailable"
@@ -194,6 +228,7 @@ class RealtimeEngine:
             kafka_ts=kafka_row.get("measured_at"),
             forecast_payload=forecast_payload,
             warning=warning,
+            o2_pct=o2_pct,
         )
 
     def _postprocess_outputs(
@@ -279,11 +314,16 @@ class RealtimeEngine:
             "n2_flow": controls.n2_flow,
         }
 
-    def _build_forecast_payload(self, predicted_nox: float) -> dict[str, Any]:
+    def _build_forecast_payload(
+        self, predicted_nox: float, o2_pct: float | None
+    ) -> dict[str, Any]:
+        # threshold_exceeded는 raw 기준 — current 임계 비교와 단위 일관성 유지.
+        # frontend ForecastCard는 표시값(predicted_nox_15pct)으로 delta/색상 판정.
         threshold = self.dt_config.thresholds.nox_warning_ppm
         target = datetime.now(timezone.utc) + timedelta(minutes=FORECAST_HORIZON_MINUTES)
         return {
             "predicted_nox": round(predicted_nox, 3),
+            "predicted_nox_15pct": round(correct_nox_15pct(predicted_nox, o2_pct), 3),
             "target_time": target.isoformat(timespec="milliseconds").replace("+00:00", "Z"),
             "threshold_value": threshold,
             "threshold_exceeded": predicted_nox > threshold,
@@ -300,6 +340,7 @@ class RealtimeEngine:
         kafka_ts: Any,
         forecast_payload: dict[str, Any] | None,
         warning: str | None,
+        o2_pct: float | None = None,
     ) -> dict[str, Any]:
         now_iso = (
             datetime.now(timezone.utc)
@@ -309,6 +350,7 @@ class RealtimeEngine:
         controls_dict = self._controls_to_features(input_controls)
         outputs_dict = {
             "nox": current_outputs.nox,
+            "nox_15pct": correct_nox_15pct(current_outputs.nox, o2_pct),
             "exhaust_temp": current_outputs.exhaust_temp,
             "power": current_outputs.power,
             "lambda_": current_outputs.lambda_,

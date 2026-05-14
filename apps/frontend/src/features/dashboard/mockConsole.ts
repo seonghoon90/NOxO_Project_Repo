@@ -28,6 +28,7 @@ export type VariableConfig = {
 export type MetricPoint = {
   label: string
   nox: number
+  nox15pct: number
   exhaust: number
   lambda: number
   power: number
@@ -36,6 +37,7 @@ export type MetricPoint = {
 
 export type ConsoleMetrics = {
   nox: number
+  nox15pct: number
   exhaust: number
   lambda: number
   power: number
@@ -78,6 +80,7 @@ export type BackendConsoleSnapshot = {
   lambda_?: number
   exhaust_temp?: number
   nox?: number
+  nox_15pct?: number
   co?: number
   power?: number
   efficiency?: number
@@ -248,6 +251,7 @@ export function createInitialConsoleState(seedHistory = false): ConsoleState {
         return {
           label: `${HISTORY_LENGTH - index}s`,
           nox: point.nox,
+          nox15pct: point.nox15pct,
           exhaust: point.exhaust,
           lambda: point.lambda,
           power: point.power,
@@ -341,8 +345,11 @@ export function createStateFromSnapshot(
     variables.n2Flow.digits,
   )
 
+  const noxRaw = pickSnapshotValue(outputSource, ['nox'], previous?.metrics.nox ?? 25, 1)
   const metrics = {
-    nox: pickSnapshotValue(outputSource, ['nox'], previous?.metrics.nox ?? 25, 1),
+    nox: noxRaw,
+    // nox_15pct가 mock snapshot에 없을 수도 있으므로 raw nox로 폴백
+    nox15pct: pickSnapshotValue(outputSource, ['nox_15pct'], previous?.metrics.nox15pct ?? noxRaw, 1),
     exhaust: pickSnapshotValue(outputSource, ['exhaust_temp'], previous?.metrics.exhaust ?? 580, 1),
     lambda: pickSnapshotValue(outputSource, ['lambda', 'lambda_'], previous?.metrics.lambda ?? 1.1, 2),
     power: pickSnapshotValue(outputSource, ['power', POWER_RAW_NAME], previous?.metrics.power ?? 248.6, 1),
@@ -429,8 +436,10 @@ export function deriveMetrics(
   )
   const predictedNox = nox + 6 + (mode === 'realtime' ? 4 : 0)
 
+  // mock 시드에서는 O2 정보가 없으므로 nox15pct = raw nox로 폴백 (실제 backend는 별도 계산)
   return {
     nox: round(nox, 1),
+    nox15pct: round(nox, 1),
     exhaust: round(exhaust, 1),
     lambda: round(lambda, 2),
     power: round(power, 1),
@@ -473,6 +482,7 @@ export function appendHistory(
     {
       label: index === 0 ? 'now' : `${index}s`,
       nox: metrics.nox,
+      nox15pct: metrics.nox15pct,
       exhaust: metrics.exhaust,
       lambda: metrics.lambda,
       power: metrics.power,
@@ -528,6 +538,8 @@ export type RealtimeStreamPayload = {
     }
     outputs: {
       nox: number
+      // backend 구버전(nox_15pct 미전송)과의 호환을 위해 optional. 매핑 단계에서 raw nox로 폴백.
+      nox_15pct?: number
       exhaust_temp: number
       power: number
       lambda_: number
@@ -540,6 +552,8 @@ export type RealtimeStreamPayload = {
   } | null
   forecast: {
     predicted_nox: number
+    // 동일 사유로 optional. ForecastCard 등 표시단에서 predicted_nox로 폴백.
+    predicted_nox_15pct?: number
     target_time: string
     threshold_value: number
     threshold_exceeded: boolean
@@ -586,13 +600,20 @@ export function createStateFromPayload(
       value: roundForDigits(value, variables[key].digits),
     }
   }
+  // backend 구버전 호환: nox_15pct 미전송 시 raw nox로 폴백
+  const noxCorrected = outputs.nox_15pct ?? outputs.nox
   const metrics: ConsoleMetrics = {
     nox: outputs.nox,
+    nox15pct: noxCorrected,
     exhaust: outputs.exhaust_temp,
     lambda: outputs.lambda_,
     power: outputs.power,
     efficiency: outputs.efficiency,
-    predictedNox: payload.forecast?.predicted_nox ?? outputs.nox,
+    // predictedNox는 표시 일관성을 위해 15% O2 보정값 사용. 양쪽 모두 폴백 체인 적용.
+    predictedNox:
+      payload.forecast?.predicted_nox_15pct
+      ?? payload.forecast?.predicted_nox
+      ?? noxCorrected,
   }
   return {
     ...current,
