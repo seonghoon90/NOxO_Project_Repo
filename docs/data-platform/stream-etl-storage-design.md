@@ -192,7 +192,13 @@ It does four things:
 
 Important environment variables:
 
-- `DATABASE_URL`
+- `STREAM_ETL_DATABASE_URL`
+- `STREAM_ETL_POSTGRES_HOST`
+- `STREAM_ETL_POSTGRES_PORT`
+- `POSTGRES_USER`
+- `POSTGRES_PASSWORD`
+- `POSTGRES_DB`
+- `DATABASE_URL` (direct script fallback)
 - `KAFKA_BOOTSTRAP_SERVERS`
 - `KAFKA_SENSOR_TOPIC`
 - `KAFKA_ETL_CONSUMER_GROUP_ID`
@@ -205,13 +211,17 @@ Important environment variables:
 
 Recommended default:
 
+- `STREAM_ETL_POSTGRES_HOST=postgres` when the consumer runs in Docker on EC2
 - `KAFKA_ETL_AUTO_OFFSET_RESET=latest`
+- `KAFKA_ETL_CONSUMER_TIMEOUT_MS=0`
 
 Reason:
 
+- the stream ETL consumer runs inside the Docker network, so it should reach PostgreSQL through the compose service name instead of host-only names such as `host.docker.internal`
 - bootstrap already fills the initial replay window into `sensor_data_stream`
 - the live consumer should wait for new Kafka messages after startup
 - using `earliest` can replay old topic history and overwrite bootstrap rows with `ingest_mode='stream'`
+- using a positive consumer timeout makes the service repeatedly leave and rejoin its consumer group when no messages are available
 
 ## Compose service
 

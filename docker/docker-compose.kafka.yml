@@ -56,7 +56,12 @@ services:
       - redpanda
     command: ["python", "-m", "streaming.etl_consumer"]
     environment:
-      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://postgres:changeme@host.docker.internal:5432/igcc_db}
+      STREAM_ETL_DATABASE_URL: ${STREAM_ETL_DATABASE_URL:-}
+      STREAM_ETL_POSTGRES_HOST: ${STREAM_ETL_POSTGRES_HOST:-postgres}
+      STREAM_ETL_POSTGRES_PORT: ${STREAM_ETL_POSTGRES_PORT:-5432}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_DB: ${POSTGRES_DB:-igcc_db}
       KAFKA_BOOTSTRAP_SERVERS: redpanda:9092
       KAFKA_SENSOR_TOPIC: ${KAFKA_SENSOR_TOPIC:-noxo.sensor.raw}
       KAFKA_ETL_CONSUMER_GROUP_ID: ${KAFKA_ETL_CONSUMER_GROUP_ID:-noxo-stream-etl}
@@ -64,7 +69,7 @@ services:
       KAFKA_BOOTSTRAP_MINUTES: ${KAFKA_BOOTSTRAP_MINUTES:-15}
       KAFKA_ETL_AUTO_OFFSET_RESET: ${KAFKA_ETL_AUTO_OFFSET_RESET:-latest}
       STREAM_ETL_BOOTSTRAP_ENABLED: ${STREAM_ETL_BOOTSTRAP_ENABLED:-true}
-      KAFKA_ETL_CONSUMER_TIMEOUT_MS: ${KAFKA_ETL_CONSUMER_TIMEOUT_MS:-1000}
+      KAFKA_ETL_CONSUMER_TIMEOUT_MS: ${KAFKA_ETL_CONSUMER_TIMEOUT_MS:-0}
       STREAM_ETL_RETRY_DELAY_SECONDS: ${STREAM_ETL_RETRY_DELAY_SECONDS:-5}
     volumes:
       - ../data:/app/data:ro
