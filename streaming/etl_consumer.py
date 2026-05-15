@@ -5,6 +5,7 @@ import logging
 import os
 import time
 from pathlib import Path
+from urllib.parse import quote
 
 from dotenv import load_dotenv
 from kafka import KafkaConsumer
@@ -19,14 +20,13 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SQL_FILE = PROJECT_ROOT / "database" / "sensor_data_stream.sql"
 TABLE_NAME = "sensor_data_stream"
 
-DATABASE_URL = os.getenv("DATABASE_URL")
 BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:19092")
 TOPIC = os.getenv("KAFKA_SENSOR_TOPIC", "noxo.sensor.raw")
 GROUP_ID = os.getenv("KAFKA_ETL_CONSUMER_GROUP_ID", "noxo-stream-etl")
 BOOTSTRAP_FILE = os.getenv("KAFKA_BOOTSTRAP_FILE")
 BOOTSTRAP_MINUTES = int(os.getenv("KAFKA_BOOTSTRAP_MINUTES", "15"))
 BOOTSTRAP_ENABLED = os.getenv("STREAM_ETL_BOOTSTRAP_ENABLED", "true").lower() == "true"
-POLL_TIMEOUT_MS = int(os.getenv("KAFKA_ETL_CONSUMER_TIMEOUT_MS", "1000"))
+POLL_TIMEOUT_MS = int(os.getenv("KAFKA_ETL_CONSUMER_TIMEOUT_MS", "0"))
 RETRY_DELAY_SECONDS = int(os.getenv("STREAM_ETL_RETRY_DELAY_SECONDS", "5"))
 AUTO_OFFSET_RESET = os.getenv("KAFKA_ETL_AUTO_OFFSET_RESET", "latest")
 
@@ -50,18 +50,46 @@ RAW_TO_DB_MAPPING = {
 DB_COLUMNS = list(RAW_TO_DB_MAPPING.values())
 
 
+def _build_database_url_from_components() -> str | None:
+    user = os.getenv("POSTGRES_USER")
+    password = os.getenv("POSTGRES_PASSWORD")
+    database = os.getenv("POSTGRES_DB", "igcc_db")
+    host = os.getenv("STREAM_ETL_POSTGRES_HOST") or os.getenv("POSTGRES_HOST", "postgres")
+    port = os.getenv("STREAM_ETL_POSTGRES_PORT") or os.getenv("POSTGRES_PORT", "5432")
+
+    if not user or password is None:
+        return None
+
+    return (
+        "postgresql+psycopg://"
+        f"{quote(user, safe='')}:{quote(password, safe='')}"
+        f"@{host}:{port}/{quote(database, safe='')}"
+    )
+
+
+def _database_url_from_env() -> str | None:
+    return (
+        os.getenv("STREAM_ETL_DATABASE_URL")
+        or os.getenv("DATABASE_URL")
+        or _build_database_url_from_components()
+    )
+
+
 def get_database_url() -> str:
-    if DATABASE_URL:
-        return DATABASE_URL
+    database_url = _database_url_from_env()
+    if database_url:
+        return database_url
 
     try:
         load_dotenv()
     except PermissionError:
         pass
 
-    database_url = os.getenv("DATABASE_URL")
+    database_url = _database_url_from_env()
     if not database_url:
-        raise ValueError("DATABASE_URL is required for stream ETL consumer")
+        raise ValueError(
+            "STREAM_ETL_DATABASE_URL or DATABASE_URL is required for stream ETL consumer"
+        )
     return database_url
 
 
@@ -211,16 +239,18 @@ def bootstrap_stream_table(engine) -> int:
 
 
 def build_consumer() -> KafkaConsumer:
-    return KafkaConsumer(
-        TOPIC,
-        bootstrap_servers=BOOTSTRAP_SERVERS,
-        group_id=GROUP_ID,
-        auto_offset_reset=AUTO_OFFSET_RESET,
-        enable_auto_commit=True,
-        value_deserializer=lambda raw: json.loads(raw.decode("utf-8")),
-        key_deserializer=lambda raw: raw.decode("utf-8") if raw else None,
-        consumer_timeout_ms=POLL_TIMEOUT_MS,
-    )
+    options = {
+        "bootstrap_servers": BOOTSTRAP_SERVERS,
+        "group_id": GROUP_ID,
+        "auto_offset_reset": AUTO_OFFSET_RESET,
+        "enable_auto_commit": True,
+        "value_deserializer": lambda raw: json.loads(raw.decode("utf-8")),
+        "key_deserializer": lambda raw: raw.decode("utf-8") if raw else None,
+    }
+    if POLL_TIMEOUT_MS > 0:
+        options["consumer_timeout_ms"] = POLL_TIMEOUT_MS
+
+    return KafkaConsumer(TOPIC, **options)
 
 
 def run_consumer() -> None:

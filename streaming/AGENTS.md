@@ -23,7 +23,7 @@ IGCC 가스터빈 운전 데이터(`NOx_test_20250825.csv`)를 1초 간격으로
 
 기술 스택: kafka-python 2.0, SQLAlchemy 2.0, psycopg 3.2, Redpanda(Kafka 호환)
 
-주요 환경변수: `KAFKA_BOOTSTRAP_SERVERS`, `KAFKA_SENSOR_TOPIC`, `KAFKA_INPUT_FILE`, `KAFKA_PRODUCE_INTERVAL_SECONDS`, `KAFKA_MAX_MESSAGES`, `KAFKA_BOOTSTRAP_MINUTES`, `KAFKA_ETL_CONSUMER_GROUP_ID`, `DATABASE_URL`.
+주요 환경변수: `KAFKA_BOOTSTRAP_SERVERS`, `KAFKA_SENSOR_TOPIC`, `KAFKA_INPUT_FILE`, `KAFKA_PRODUCE_INTERVAL_SECONDS`, `KAFKA_MAX_MESSAGES`, `KAFKA_BOOTSTRAP_MINUTES`, `KAFKA_ETL_CONSUMER_GROUP_ID`, `STREAM_ETL_DATABASE_URL`, `STREAM_ETL_POSTGRES_HOST`, `STREAM_ETL_POSTGRES_PORT`, `DATABASE_URL`.
 
 ## 3. HOW — 일반적인 수정은 어떻게 하는가
 
@@ -72,7 +72,8 @@ IGCC 가스터빈 운전 데이터(`NOx_test_20250825.csv`)를 1초 간격으로
 **영역 고유 명령어 가드**:
 - producer를 `KAFKA_MAX_MESSAGES=0`(기본)로 production에 띄우면 CSV 종료까지 무한 발행 — 의도된 시연이 아니면 명시적 상한 설정
 - `rpk topic delete` 등 파괴적 명령을 production에서 실행 — consumer lag/offset 영구 손실
-- consumer를 production 환경에서 `DATABASE_URL` 없이 기동 — 적재 무한 실패 + lag 폭증
+- consumer를 production 환경에서 DB 접속 설정 없이 기동 — `STREAM_ETL_DATABASE_URL` 또는 `POSTGRES_*`/`STREAM_ETL_POSTGRES_*` 조합 누락 시 적재 무한 실패 + lag 폭증
+- EC2 Docker 내부 consumer에 host용 `DATABASE_URL`을 그대로 주입 — `host.docker.internal` 이름 해석 실패. 같은 compose network의 DB는 `STREAM_ETL_POSTGRES_HOST=postgres`를 사용
 
 ## 8. ⚠️ LEARNED CAUTIONS — 학습된 주의사항
 
