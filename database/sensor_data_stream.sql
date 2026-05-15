@@ -24,6 +24,8 @@ CREATE TABLE IF NOT EXISTS sensor_data_stream (
     exhaust_temp DOUBLE PRECISION NOT NULL,
     power_mw DOUBLE PRECISION NOT NULL,
     npr_primary DOUBLE PRECISION NOT NULL,
+    -- optional O2 value for NOx 15% O2 display correction
+    o2_pct DOUBLE PRECISION,
 
     -- stream lineage / audit columns
     source_file VARCHAR(255) NOT NULL,
@@ -38,6 +40,9 @@ CREATE TABLE IF NOT EXISTS sensor_data_stream (
     CONSTRAINT chk_sensor_data_stream_ingest_mode
         CHECK (ingest_mode IN ('bootstrap', 'stream'))
 );
+
+ALTER TABLE sensor_data_stream
+    ADD COLUMN IF NOT EXISTS o2_pct DOUBLE PRECISION;
 
 CREATE INDEX IF NOT EXISTS idx_sensor_data_stream_measured_at
     ON sensor_data_stream (measured_at DESC);
@@ -73,4 +78,5 @@ CREATE INDEX IF NOT EXISTS idx_sensor_data_stream_ingest_mode_measured_at
 --     kafka_partition = EXCLUDED.kafka_partition,
 --     kafka_offset = EXCLUDED.kafka_offset,
 --     ingest_mode = EXCLUDED.ingest_mode,
+--     o2_pct = EXCLUDED.o2_pct,
 --     ingested_at = CURRENT_TIMESTAMP;

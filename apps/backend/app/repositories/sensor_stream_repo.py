@@ -3,7 +3,7 @@
 KafkaSensorStream과 별개 경로 — kafka-etl-consumer가 적재한 row를
 backend가 (ingested_at, id) composite cursor 기반으로 단조 증가 순서로 pull.
 
-DDL은 `database/sensor_data_stream.sql` — 14 운영 컬럼 + 5 lineage + ingested_at.
+DDL은 `database/sensor_data_stream.sql` — 14 운영 컬럼 + o2_pct + 5 lineage + ingested_at.
 schema SoT 변경은 협의 필요(`AGENTS.md` root 가드).
 
 도메인 키 매핑 — `app/domain/tags.py::ALL_TAGS_TO_DOMAIN`이 SoT.
@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 # (DB 컬럼명, SensorBuffer 도메인 키) — DDL 순서 보존.
 # 11개는 동일명이지만 nox_ppm/power_mw/npr_primary 3개는 변환 필요.
 # tags.py::ALL_TAGS_TO_DOMAIN과 정합(`nox_ppm`→`nox`, `power_mw`→`power`,
-# `npr_primary`→`vnpr_p` 외란 도메인 키).
+# `npr_primary`→`vnpr_p` 외란 도메인 키). o2_pct는 NOx 15% O2 보정 표시용.
 _STREAM_COLUMN_MAP: tuple[tuple[str, str], ...] = (
     ("syngas_flow", "syngas_flow"),
     ("igv_opening", "igv_opening"),
@@ -47,6 +47,7 @@ _STREAM_COLUMN_MAP: tuple[tuple[str, str], ...] = (
     ("exhaust_temp", "exhaust_temp"),
     ("power_mw", "power"),
     ("npr_primary", "vnpr_p"),
+    ("o2_pct", "o2_pct"),
 )
 
 # composite cursor — (ingested_at, id) 단조성 보장.

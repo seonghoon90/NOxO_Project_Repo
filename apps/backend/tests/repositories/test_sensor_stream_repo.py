@@ -31,6 +31,7 @@ def _stream_row(
     ingested_at: datetime,
     measured_at: datetime,
     nox_ppm: float = 30.0,
+    o2_pct: float | None = 10.0,
 ) -> dict:
     """DB 컬럼명으로 row 모킹 — repo가 도메인 키로 변환해 반환한다."""
     return {
@@ -51,6 +52,7 @@ def _stream_row(
         "exhaust_temp": 580.0,
         "power_mw": 165.0,
         "npr_primary": 1.5,
+        "o2_pct": o2_pct,
     }
 
 
@@ -72,6 +74,7 @@ async def test_fetch_since_translates_db_columns_to_domain_keys(mock_session_fac
     assert row["nox"] == 33.0
     assert row["power"] == 165.0
     assert row["vnpr_p"] == 1.5
+    assert row["o2_pct"] == 10.0
     # DB 컬럼명은 더 이상 노출되지 않음
     assert "nox_ppm" not in row
     assert "power_mw" not in row

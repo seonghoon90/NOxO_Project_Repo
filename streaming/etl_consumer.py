@@ -46,9 +46,11 @@ RAW_TO_DB_MAPPING = {
     "IGCC.CC.G1.TTXM": "exhaust_temp",
     "IGCC.CC.G1.DWATT": "power_mw",
     "IGCC.CC.G1.VNPR_P": "npr_primary",
+    "IGCC.DeNOX.AIT_H1_902": "o2_pct",
 }
 
 DB_COLUMNS = list(RAW_TO_DB_MAPPING.values())
+OPTIONAL_DB_COLUMNS = {"o2_pct"}
 
 
 def _build_database_url_from_components() -> str | None:
@@ -139,6 +141,9 @@ def transform_message_to_row(
     for raw_tag, db_column in RAW_TO_DB_MAPPING.items():
         value = values.get(raw_tag)
         if value is None:
+            if db_column in OPTIONAL_DB_COLUMNS:
+                row[db_column] = None
+                continue
             missing_tags.append(raw_tag)
             continue
         row[db_column] = float(value)
@@ -176,7 +181,8 @@ def upsert_stream_row(engine, row: dict) -> None:
             stream_topic,
             kafka_partition,
             kafka_offset,
-            ingest_mode
+            ingest_mode,
+            o2_pct
         ) VALUES (
             :measured_at,
             :syngas_flow,
@@ -197,7 +203,8 @@ def upsert_stream_row(engine, row: dict) -> None:
             :stream_topic,
             :kafka_partition,
             :kafka_offset,
-            :ingest_mode
+            :ingest_mode,
+            :o2_pct
         )
         ON CONFLICT (measured_at) DO UPDATE
         SET
@@ -220,6 +227,7 @@ def upsert_stream_row(engine, row: dict) -> None:
             kafka_partition = EXCLUDED.kafka_partition,
             kafka_offset = EXCLUDED.kafka_offset,
             ingest_mode = EXCLUDED.ingest_mode,
+            o2_pct = EXCLUDED.o2_pct,
             ingested_at = CURRENT_TIMESTAMP
         """
     )
