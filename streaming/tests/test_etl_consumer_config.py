@@ -42,3 +42,20 @@ def test_bootstrap_reset_message_detection():
     assert not etl_consumer.is_bootstrap_reset_message(
         {"measured_at": "2025-08-25 00:15:00", "values": {}}
     )
+
+
+def test_o2_pct_is_optional_when_transforming_message():
+    import streaming.etl_consumer as etl_consumer
+
+    values = {
+        raw_tag: 1.0
+        for raw_tag in etl_consumer.RAW_TO_DB_MAPPING
+        if raw_tag != "IGCC.DeNOX.AIT_H1_902"
+    }
+    row = etl_consumer.transform_message_to_row(
+        {"measured_at": "2025-08-25 00:15:00", "values": values},
+        stream_topic="noxo.sensor.raw",
+        ingest_mode="stream",
+    )
+
+    assert row["o2_pct"] is None
