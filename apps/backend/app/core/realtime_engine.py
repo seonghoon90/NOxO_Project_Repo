@@ -32,6 +32,14 @@ logger = logging.getLogger(__name__)
 
 FORECAST_HORIZON_MINUTES = 5  # spec §0.2
 
+# Forecaster warmup 임계 — digital_twin/forecaster/predict.py::MIN_RECENT_ROWS=900의
+# 절반(450). 이 미만이면 predict 내부에서 "유효 행수 부족" 경고 + 마지막 유효 행
+# 폴백으로 OOD 외삽이 일어나 -19 같은 음수 예측이 나올 수 있다 → 사전 차단.
+_FORECAST_MIN_VALID_ROWS = 450
+# NOx 분산 stagnation 임계 — std < 1e-3 또는 unique<=1이면 lag/diff feature가 0이 되어
+# 학습 분포 밖 영역. 진짜 정상 운전에서도 NOx는 ±0.5ppm 수준 변동이 있어 안전 마진.
+_FORECAST_MIN_NOX_STD = 1e-3
+
 # NOx 15% O2 표준 보정식의 기준 산소 농도 [%]
 # nox_15pct = nox * (20.9 - 15) / (20.9 - o2)
 # O2가 20.4% 이상이면 분모가 0.5% 미만이 되어 보정값이 발산 → raw nox fallback.
@@ -233,13 +241,24 @@ class RealtimeEngine:
                 # spec §2.3 — Kafka stream 끊김 시 realtime 모드는 warning 채움
                 warning = "kafka stream stale"
             else:
-                try:
-                    inputs = self._build_forecast_input(session, input_controls)
-                    predicted = self.forecaster.predict(inputs)
-                    forecast_payload = self._build_forecast_payload(predicted, o2_pct)
-                except Exception as exc:
-                    logger.warning("forecast_failed sid=%s err=%s", session.sid, exc)
-                    warning = "forecast unavailable"
+                skip_reason = self._warmup_reason(session)
+                if skip_reason is not None:
+                    # Plan E — buffer warmup 부족 또는 NOx stagnation 시 forecast 차단.
+                    # predict 내부 ffill 폴백이 OOD 외삽으로 -19 같은 음수 출력하는 것
+                    # 보다 명시적 warning이 프론트/운영 모두에 안전.
+                    warning = "forecast warmup"
+                    logger.info(
+                        "forecast_skipped sid=%s reason=%s",
+                        session.sid, skip_reason,
+                    )
+                else:
+                    try:
+                        inputs = self._build_forecast_input(session, input_controls)
+                        predicted = self.forecaster.predict(inputs)
+                        forecast_payload = self._build_forecast_payload(predicted, o2_pct)
+                    except Exception as exc:
+                        logger.warning("forecast_failed sid=%s err=%s", session.sid, exc)
+                        warning = "forecast unavailable"
 
         # 6. payload 조립
         return self._build_payload(
@@ -362,6 +381,46 @@ class RealtimeEngine:
             "ibh_valve": controls.ibh_valve,
             "n2_flow": controls.n2_flow,
         }
+
+    def _warmup_reason(self, session: Session) -> str | None:
+        """forecast 차단 사유 판정 — None이면 정상 진행 가능.
+
+        ML 모델이 아닐 때(Stub)는 lag warmup 무관하므로 차단하지 않는다.
+        recent_df_buffer가 짧거나 NOx가 한 값으로 고정돼 lag/diff feature가
+        학습 분포 밖이 되는 경우만 차단.
+
+        REST 경로(POST /api/prediction)는 PredictionResponse 스키마에 warning
+        필드가 없어 동일 차단을 적용할 수 없다 — frontend 컨트랙트 협의 후 별도
+        PR에서 처리.
+        """
+        if self.forecaster.name != "ml":
+            return None
+        buf = session.context.recent_df_buffer
+        buf_len = len(buf)
+        if buf_len < _FORECAST_MIN_VALID_ROWS:
+            return f"buf_len={buf_len}<{_FORECAST_MIN_VALID_ROWS}"
+        # NOx stagnation — 지역 import는 sys.modules 캐시되어 비용 없음.
+        from digital_twin.forecaster.preprocess import NOX_TARGET_COL
+
+        # deque[dict] → 최근 300행만 스캔(stagnation은 단기 신호로 충분).
+        scan_n = min(300, buf_len)
+        nox_vals: list[float] = []
+        for row in list(buf)[-scan_n:]:
+            v = row.get(NOX_TARGET_COL)
+            if isinstance(v, bool) or not isinstance(v, (int, float)):
+                continue
+            f = float(v)
+            if math.isfinite(f):
+                nox_vals.append(f)
+        if len(nox_vals) < 2:
+            return f"nox_samples={len(nox_vals)}<2"
+        # 표본분산 — 평균 1회 + 차분 합산. numpy 없이 운영 의존성 최소화.
+        mean = sum(nox_vals) / len(nox_vals)
+        var = sum((x - mean) ** 2 for x in nox_vals) / (len(nox_vals) - 1)
+        nox_std = math.sqrt(var)
+        if nox_std < _FORECAST_MIN_NOX_STD:
+            return f"nox_std={nox_std:.5f}<{_FORECAST_MIN_NOX_STD}"
+        return None
 
     def _build_forecast_input(
         self, session: Session, controls: ControlVars
