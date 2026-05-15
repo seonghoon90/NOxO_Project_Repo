@@ -51,6 +51,21 @@ class Settings(BaseSettings):
         alias="KAFKA_BOOTSTRAP_FILE",
     )
 
+    # sensor_data_stream DB polling (KafkaSensorStream 대안 경로)
+    # KAFKA_STREAM_ENABLED와 상호배타 — lifespan에서 검증한다.
+    sensor_stream_poll_enabled: bool = Field(
+        default=False,
+        alias="SENSOR_STREAM_POLL_ENABLED",
+    )
+    sensor_stream_poll_interval_sec: float = Field(
+        default=1.0,
+        alias="SENSOR_STREAM_POLL_INTERVAL_SEC",
+    )
+    sensor_stream_poll_batch_size: int = Field(
+        default=200,
+        alias="SENSOR_STREAM_POLL_BATCH_SIZE",
+    )
+
     # CORS (개발 시 별도 호스트에서 접근 허용)
     cors_origins: list[str] = [
         "http://localhost:5173",

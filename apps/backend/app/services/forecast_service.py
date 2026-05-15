@@ -10,8 +10,10 @@
 
 from __future__ import annotations
 
+import logging
+import math
 from datetime import datetime, timedelta, timezone
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pandas as pd
 
@@ -20,6 +22,8 @@ from app.domain.tags import DOMAIN_TO_RAW_TAG
 from app.repositories.simulation_log_repo import SimulationLogRepository
 from app.schemas.prediction import PredictionResponse
 from digital_twin.simulation import DEFAULT_CONFIG, ControlVars, DTConfig
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from app.core.sensor_buffer import SensorBuffer
@@ -85,8 +89,10 @@ class ForecastService:
         }
         raw_df = domain_df.rename(columns=rename_map)
         required = set(RAW_FEATURES) | {TTXM_COL, NOX_TARGET_COL, DWATT_COL}
-        for col in required - set(raw_df.columns):
+        missing = required - set(raw_df.columns)
+        for col in missing:
             raw_df[col] = 0.0
+        _log_forecast_diag(raw_df, missing, source="rest")
         return raw_df
 
     def _resolve_controls(self, sid: str | None) -> ControlVars:
@@ -135,3 +141,89 @@ def _controls_to_features(controls: ControlVars) -> dict[str, float]:
         "ibh_valve": controls.ibh_valve,
         "n2_flow": controls.n2_flow,
     }
+
+
+def _safe_float(value: Any) -> float:
+    """NaN/None → 0.0, 그 외엔 float 변환. 진단 로그 포맷팅 가드용."""
+    if value is None:
+        return 0.0
+    try:
+        f = float(value)
+    except (TypeError, ValueError):
+        return 0.0
+    return 0.0 if math.isnan(f) else f
+
+
+def _is_zero(value: Any) -> bool:
+    """진단용 — int/float 0인지 판정. bool은 명시 제외."""
+    if isinstance(value, bool):
+        return False
+    if not isinstance(value, (int, float)):
+        return False
+    return value == 0.0
+
+
+def _log_forecast_diag(
+    raw_df: pd.DataFrame,
+    missing_cols: set[str],
+    *,
+    source: str,
+) -> None:
+    """REST 경로 forecast 입력 진단 — realtime_engine과 동일 포맷/필드.
+
+    목적: -19 → 15 변동 원인이 buffer stagnation(NOx std≈0, diff≈0)인지,
+    OOD 외삽(외란 29컬럼 대량 0.0 폴백)인지 즉시 구분.
+    외란/제어 분리 카운트 — 운전 정지로 제어가 0이어도 외란 신호 흐리지 않게.
+    """
+    try:
+        from app.domain.tags import CONTROL_TAGS, DISTURBANCE_TAGS
+        from digital_twin.forecaster.predict import DWATT_COL, TTXM_COL
+        from digital_twin.forecaster.preprocess import NOX_TARGET_COL, RAW_FEATURES
+
+        buf_len = len(raw_df)
+        nox_col = raw_df.get(NOX_TARGET_COL)
+        if nox_col is not None and buf_len > 0:
+            nox_std = _safe_float(nox_col.std(skipna=True))
+            nox_unique = int(nox_col.nunique(dropna=True))
+            # 학습 시 nox_roll_std_300s와 동일 윈도우.
+            tail = nox_col.tail(min(300, buf_len))
+            nox_roll_std_300s = _safe_float(tail.std(skipna=True))
+            nox_last = _safe_float(nox_col.iloc[-1])
+            nox_diff_5s = (
+                _safe_float(nox_col.diff(5).iloc[-1]) if buf_len >= 6 else 0.0
+            )
+            nox_diff_60s = (
+                _safe_float(nox_col.diff(60).iloc[-1]) if buf_len >= 61 else 0.0
+            )
+        else:
+            nox_std = nox_roll_std_300s = nox_last = 0.0
+            nox_diff_5s = nox_diff_60s = 0.0
+            nox_unique = 0
+        raw_set = set(RAW_FEATURES)
+        control_raw = set(CONTROL_TAGS)
+        dist_raw = set(DISTURBANCE_TAGS.keys()) & raw_set
+        dist_zero = 0
+        ctrl_zero = 0
+        if buf_len > 0:
+            last_row = raw_df.iloc[-1]
+            for col in dist_raw:
+                if col in last_row.index and _is_zero(last_row[col]):
+                    dist_zero += 1
+            for col in control_raw:
+                if col in last_row.index and _is_zero(last_row[col]):
+                    ctrl_zero += 1
+        logger.info(
+            "forecast_diag source=%s path=ml buf_len=%d "
+            "nox_std=%.4f nox_roll_std_300s=%.4f nox_unique=%d nox_last=%.3f "
+            "nox_diff_5s=%.3f nox_diff_60s=%.3f "
+            "missing_cols=%d dist_zero=%d/%d ctrl_zero=%d/%d "
+            "ttxm_present=%s dwatt_present=%s",
+            source, buf_len, nox_std, nox_roll_std_300s, nox_unique, nox_last,
+            nox_diff_5s, nox_diff_60s,
+            len(missing_cols), dist_zero, len(dist_raw),
+            ctrl_zero, len(control_raw),
+            TTXM_COL in raw_df.columns,
+            DWATT_COL in raw_df.columns,
+        )
+    except Exception as exc:
+        logger.debug("forecast_diag_log_failed source=%s err=%s", source, exc)

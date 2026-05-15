@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import asyncio
+import itertools
 import logging
 import math
 from contextlib import suppress
@@ -32,12 +33,45 @@ logger = logging.getLogger(__name__)
 
 FORECAST_HORIZON_MINUTES = 5  # spec §0.2
 
+# Forecaster warmup 임계 — digital_twin/forecaster/predict.py::MIN_RECENT_ROWS=900의
+# 절반(450). 이 미만이면 predict 내부에서 "유효 행수 부족" 경고 + 마지막 유효 행
+# 폴백으로 OOD 외삽이 일어나 -19 같은 음수 예측이 나올 수 있다 → 사전 차단.
+_FORECAST_MIN_VALID_ROWS = 450
+# NOx 분산 stagnation 임계 — std < 1e-3 또는 unique<=1이면 lag/diff feature가 0이 되어
+# 학습 분포 밖 영역. 진짜 정상 운전에서도 NOx는 ±0.5ppm 수준 변동이 있어 안전 마진.
+_FORECAST_MIN_NOX_STD = 1e-3
+# Stagnation 판정 시 스캔할 최근 행 수 — 학습 시 NOx rolling std 윈도우(300s)와 정합.
+# preprocess.NOX_LAG_FEATURES의 `nox_roll_std_300s`와 의미론적으로 동일하게 유지.
+_FORECAST_STAGNATION_SCAN_SEC = 300
+# 표본 표준편차 계산을 위한 최소 표본 수 — n-1 분모 정의상 2 필요.
+_FORECAST_MIN_NOX_SAMPLES = 2
+
 # NOx 15% O2 표준 보정식의 기준 산소 농도 [%]
 # nox_15pct = nox * (20.9 - 15) / (20.9 - o2)
 # O2가 20.4% 이상이면 분모가 0.5% 미만이 되어 보정값이 발산 → raw nox fallback.
 _NOX_REF_O2_PCT: float = 15.0
 _NOX_AMB_O2_PCT: float = 20.9
 _NOX_O2_MIN_DENOM: float = 0.5
+
+
+def _safe_float(value: Any) -> float:
+    """NaN/None → 0.0, 그 외엔 float 변환. 진단 로그 포맷팅 가드용."""
+    if value is None:
+        return 0.0
+    try:
+        f = float(value)
+    except (TypeError, ValueError):
+        return 0.0
+    return 0.0 if math.isnan(f) else f
+
+
+def _is_zero(value: Any) -> bool:
+    """진단용 — int/float 0인지 판정. bool은 명시 제외 (True is 1로 판정되지 않게)."""
+    if isinstance(value, bool):
+        return False
+    if not isinstance(value, (int, float)):
+        return False
+    return value == 0.0
 
 
 def correct_nox_15pct(nox: float, o2_pct: float | None) -> float:
@@ -213,13 +247,24 @@ class RealtimeEngine:
                 # spec §2.3 — Kafka stream 끊김 시 realtime 모드는 warning 채움
                 warning = "kafka stream stale"
             else:
-                try:
-                    inputs = self._build_forecast_input(session, input_controls)
-                    predicted = self.forecaster.predict(inputs)
-                    forecast_payload = self._build_forecast_payload(predicted, o2_pct)
-                except Exception as exc:
-                    logger.warning("forecast_failed sid=%s err=%s", session.sid, exc)
-                    warning = "forecast unavailable"
+                skip_reason = self._warmup_reason(session)
+                if skip_reason is not None:
+                    # Plan E — buffer warmup 부족 또는 NOx stagnation 시 forecast 차단.
+                    # predict 내부 ffill 폴백이 OOD 외삽으로 -19 같은 음수 출력하는 것
+                    # 보다 명시적 warning이 프론트/운영 모두에 안전.
+                    warning = "forecast warmup"
+                    logger.info(
+                        "forecast_skipped sid=%s reason=%s",
+                        session.sid, skip_reason,
+                    )
+                else:
+                    try:
+                        inputs = self._build_forecast_input(session, input_controls)
+                        predicted = self.forecaster.predict(inputs)
+                        forecast_payload = self._build_forecast_payload(predicted, o2_pct)
+                    except Exception as exc:
+                        logger.warning("forecast_failed sid=%s err=%s", session.sid, exc)
+                        warning = "forecast unavailable"
 
         # 6. payload 조립
         return self._build_payload(
@@ -343,6 +388,47 @@ class RealtimeEngine:
             "n2_flow": controls.n2_flow,
         }
 
+    def _warmup_reason(self, session: Session) -> str | None:
+        """forecast 차단 사유 판정 — None이면 정상 진행 가능.
+
+        ML 모델이 아닐 때(Stub)는 lag warmup 무관하므로 차단하지 않는다.
+        recent_df_buffer가 짧거나 NOx가 한 값으로 고정돼 lag/diff feature가
+        학습 분포 밖이 되는 경우만 차단.
+
+        REST 경로(POST /api/prediction)는 PredictionResponse 스키마에 warning
+        필드가 없어 동일 차단을 적용할 수 없다 — frontend 컨트랙트 협의 후 별도
+        PR에서 처리.
+        """
+        if self.forecaster.name != "ml":
+            return None
+        buf = session.context.recent_df_buffer
+        buf_len = len(buf)
+        if buf_len < _FORECAST_MIN_VALID_ROWS:
+            return f"buf_len={buf_len}<{_FORECAST_MIN_VALID_ROWS}"
+        # NOx stagnation — 지역 import는 sys.modules 캐시되어 비용 없음.
+        from digital_twin.forecaster.preprocess import NOX_TARGET_COL
+
+        # deque[dict] → 최근 scan_n 행만 스캔(stagnation은 단기 신호로 충분).
+        # itertools.islice로 list 전체 복사 없이 deque iteration O(n) 슬라이싱.
+        scan_n = min(_FORECAST_STAGNATION_SCAN_SEC, buf_len)
+        nox_vals: list[float] = []
+        for row in itertools.islice(buf, buf_len - scan_n, buf_len):
+            v = row.get(NOX_TARGET_COL)
+            if isinstance(v, bool) or not isinstance(v, (int, float)):
+                continue
+            f = float(v)
+            if math.isfinite(f):
+                nox_vals.append(f)
+        if len(nox_vals) < _FORECAST_MIN_NOX_SAMPLES:
+            return f"nox_samples={len(nox_vals)}<{_FORECAST_MIN_NOX_SAMPLES}"
+        # 표본분산 — 평균 1회 + 차분 합산. numpy 없이 운영 의존성 최소화.
+        mean = sum(nox_vals) / len(nox_vals)
+        var = sum((x - mean) ** 2 for x in nox_vals) / (len(nox_vals) - 1)
+        nox_std = math.sqrt(var)
+        if nox_std < _FORECAST_MIN_NOX_STD:
+            return f"nox_std={nox_std:.5f}<{_FORECAST_MIN_NOX_STD}"
+        return None
+
     def _build_forecast_input(
         self, session: Session, controls: ControlVars
     ) -> ForecastInput:
@@ -358,11 +444,88 @@ class RealtimeEngine:
         recent_df = session.context.buffer_to_df()
         if recent_df.empty:
             # cold start — buffer 비어 있으면 features dict로 graceful degrade.
+            logger.info(
+                "forecast_diag sid=%s source=ws path=cold_start buf_len=0",
+                session.sid,
+            )
             return ForecastInput(features=self._controls_to_features(controls))
         required = set(RAW_FEATURES) | {TTXM_COL, NOX_TARGET_COL, DWATT_COL}
-        for col in required - set(recent_df.columns):
+        missing = required - set(recent_df.columns)
+        for col in missing:
             recent_df[col] = 0.0
+        self._log_forecast_diag(session.sid, recent_df, missing)
         return ForecastInput(recent_df=recent_df)
+
+    def _log_forecast_diag(
+        self,
+        sid: str,
+        recent_df: Any,
+        missing_cols: set[str],
+    ) -> None:
+        """진단 로그 — buffer 길이, NOx 분산/단기 diff, 외란/제어 0.0 분리.
+
+        목적: -19 → 15 변동의 원인이 buffer stagnation(NOx std≈0, diff≈0)인지,
+        OOD 외삽(외란 29컬럼 대량 0.0 폴백)인지 즉시 구분.
+        외란과 제어는 RAW_FEATURES 안에서 분리 카운트 — 운전 정지로 제어가
+        0이어도 외란 0 카운트가 흐려지지 않도록.
+        prod 운영 중에도 안전한 단일 INFO 라인 — 1초 tick × 세션수만큼 발생.
+        """
+        try:
+            # 지역 import — 모듈 import 순환 방지 + lazy 의존성. import는 sys.modules
+            # 캐시되므로 호출당 lookup 비용만 발생.
+            from app.domain.tags import CONTROL_TAGS, DISTURBANCE_TAGS
+            from digital_twin.forecaster.predict import DWATT_COL, TTXM_COL
+            from digital_twin.forecaster.preprocess import NOX_TARGET_COL, RAW_FEATURES
+
+            buf_len = len(recent_df)
+            nox_col = recent_df.get(NOX_TARGET_COL)
+            if nox_col is not None and buf_len > 0:
+                nox_std = _safe_float(nox_col.std(skipna=True))
+                nox_unique = int(nox_col.nunique(dropna=True))
+                # 학습 시 nox_roll_std_300s와 동일 윈도우 (preprocess.NOX_LAG_FEATURES).
+                tail = nox_col.tail(min(300, buf_len))
+                nox_roll_std_300s = _safe_float(tail.std(skipna=True))
+                nox_last = _safe_float(nox_col.iloc[-1])
+                # 5/60s diff — forecaster lag feature와 동질. NaN/길이 부족 시 0.
+                nox_diff_5s = (
+                    _safe_float(nox_col.diff(5).iloc[-1]) if buf_len >= 6 else 0.0
+                )
+                nox_diff_60s = (
+                    _safe_float(nox_col.diff(60).iloc[-1]) if buf_len >= 61 else 0.0
+                )
+            else:
+                nox_std = nox_roll_std_300s = nox_last = 0.0
+                nox_diff_5s = nox_diff_60s = 0.0
+                nox_unique = 0
+            # 외란 29 / 제어 10 raw 태그 분리 — RAW_FEATURES = CONTROL + DISTURBANCE.
+            raw_set = set(RAW_FEATURES)
+            control_raw = set(CONTROL_TAGS)
+            dist_raw = set(DISTURBANCE_TAGS.keys()) & raw_set
+            dist_zero = 0
+            ctrl_zero = 0
+            if buf_len > 0:
+                last_row = recent_df.iloc[-1]
+                for col in dist_raw:
+                    if col in last_row.index and _is_zero(last_row[col]):
+                        dist_zero += 1
+                for col in control_raw:
+                    if col in last_row.index and _is_zero(last_row[col]):
+                        ctrl_zero += 1
+            logger.info(
+                "forecast_diag sid=%s source=ws path=ml buf_len=%d "
+                "nox_std=%.4f nox_roll_std_300s=%.4f nox_unique=%d nox_last=%.3f "
+                "nox_diff_5s=%.3f nox_diff_60s=%.3f "
+                "missing_cols=%d dist_zero=%d/%d ctrl_zero=%d/%d "
+                "ttxm_present=%s dwatt_present=%s",
+                sid, buf_len, nox_std, nox_roll_std_300s, nox_unique, nox_last,
+                nox_diff_5s, nox_diff_60s,
+                len(missing_cols), dist_zero, len(dist_raw),
+                ctrl_zero, len(control_raw),
+                TTXM_COL in recent_df.columns,
+                DWATT_COL in recent_df.columns,
+            )
+        except Exception as exc:
+            logger.debug("forecast_diag_log_failed sid=%s err=%s", sid, exc)
 
     def _build_forecast_payload(
         self, predicted_nox: float, o2_pct: float | None
