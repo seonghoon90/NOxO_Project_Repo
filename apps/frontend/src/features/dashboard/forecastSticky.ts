@@ -4,25 +4,23 @@ import { isForecastReady } from './mockConsole'
 type ForecastPayload = NonNullable<RealtimeStreamPayload['forecast']>
 
 /**
- * ForecastCard sticky 디바운스 상태.
+ * ForecastCard warmup gate + latch 상태.
  *
- * - `lastReady` : 마지막으로 ready였던 forecast (없으면 null)
- * - `notReadyStreak` : 연속 not-ready payload 수 (ready 들어오면 0)
+ * - `lastReady` : 마지막으로 ready였던 forecast (없으면 null = 아직 latch 전)
  */
 export interface ForecastStickyState {
   lastReady: ForecastPayload | null
-  notReadyStreak: number
 }
 
 export const initialForecastStickyState: ForecastStickyState = {
   lastReady: null,
-  notReadyStreak: 0,
 }
 
-// WS payload는 1Hz. not-ready가 이 횟수(약 4초) 연속될 때만 "준비 중"으로 폴백.
-// 백엔드 stale grace보다 짧게 잡아, 백엔드가 hold 못 하는 짧은 공백도
-// 프론트에서 한 번 더 흡수하는 이중 방어.
-export const FORECAST_STICKY_TICKS = 4
+// WS payload는 1Hz. 세션(재)연결 직후 이 tick 수만큼은 forecast가 와도
+// 무조건 "준비 중"으로 표시한다(warmup gate). 새로고침 직후 짧은 구간에
+// 세션 재생성/sticky 전이 등으로 "값 ↔ 준비 중"이 깜빡이는 것을 통째로
+// 흡수한다 — 이 게이트 안에서 일어나는 모든 전이는 화면에 노출되지 않는다.
+export const FORECAST_WARMUP_TICKS = 10
 
 export interface ForecastStickyStep {
   /** 이 payload 반영 후 다음 state (참조 동일하면 추가 리렌더 없음) */
@@ -32,38 +30,42 @@ export interface ForecastStickyStep {
 }
 
 /**
- * payload 1개를 sticky 상태에 반영하고, 그 즉시 표시할 forecast까지 함께
- * 반환하는 단일 순수 함수. state 갱신과 표시 판정을 한 곳에 모아
- * (reduce → resolve 2단계의) 한 렌더 지연 / grace 경계 불일치를 제거한다.
+ * payload 1개를 warmup gate + latch 상태에 반영하고, 그 즉시 표시할
+ * forecast까지 함께 반환하는 단일 순수 함수.
  *
- * - ready              : lastReady 갱신·streak 0, 그 forecast 즉시 표시
- * - not-ready & grace내 : streak 증가, 직전 ready forecast를 hold (깜빡임 차단)
- * - not-ready & grace초과: streak 증가, null → "준비 중" 폴백
- * - lastReady 없음(warmup 전): state 불변, null
+ * 정책 (사용자 요구: "처음엔 의도적으로 준비 중, 실제 값이 확인되면 값"):
+ *
+ * - warmup gate 내(elapsedTicks < FORECAST_WARMUP_TICKS)
+ *     : forecast가 ready여도 표시하지 않고 "준비 중"(null) 유지.
+ *       단, ready면 lastReady에는 적재해 둬 게이트 종료 즉시 값이 뜨게 한다.
+ * - gate 종료 후 ready : lastReady 갱신, 그 forecast 즉시 표시
+ * - gate 종료 후 not-ready & lastReady 있음 : 직전 ready forecast를 영구 hold
+ *       (한 번 latch되면 not-ready/warning이 와도 "준비 중"으로 되돌아가지
+ *        않는다 — "값 → 준비 중 → 값" 깜빡임 원천 차단)
+ * - lastReady 없음 : "준비 중"(null)
  *
  * state가 실제로 바뀌지 않으면 prev를 그대로 돌려줘 불필요한 리렌더를 막는다.
+ *
+ * @param elapsedTicks 세션(재)연결 후 누적된 WS payload 수 (1Hz ≈ 초)
  */
 export function stepForecastSticky(
   prev: ForecastStickyState,
   forecast: RealtimeStreamPayload['forecast'],
   warning: RealtimeStreamPayload['warning'],
+  elapsedTicks: number,
 ): ForecastStickyStep {
-  if (isForecastReady(forecast, warning)) {
-    const next =
-      prev.lastReady === forecast && prev.notReadyStreak === 0
-        ? prev
-        : { lastReady: forecast, notReadyStreak: 0 }
-    return { next, effective: forecast }
+  const ready = isForecastReady(forecast, warning)
+
+  // ready면 게이트 중이라도 lastReady에 적재 — 게이트 종료 즉시 표시되도록.
+  const next: ForecastStickyState =
+    ready && prev.lastReady !== forecast ? { lastReady: forecast } : prev
+
+  // warmup gate 내에서는 무조건 "준비 중".
+  if (elapsedTicks < FORECAST_WARMUP_TICKS) {
+    return { next, effective: null }
   }
 
-  // 한 번도 ready였던 적이 없으면 (새 세션 warmup 전) hold할 값이 없다.
-  if (prev.lastReady === null) {
-    return { next: prev, effective: null }
-  }
-
-  const notReadyStreak = prev.notReadyStreak + 1
-  const next: ForecastStickyState = { lastReady: prev.lastReady, notReadyStreak }
-  const effective =
-    notReadyStreak <= FORECAST_STICKY_TICKS ? prev.lastReady : null
-  return { next, effective }
+  // gate 종료 — ready면 방금 적재된 값, not-ready면 마지막 latch 값을
+  // 영구 hold. 둘 다 next.lastReady로 수렴(아직 한 번도 ready 전이면 null).
+  return { next, effective: next.lastReady }
 }

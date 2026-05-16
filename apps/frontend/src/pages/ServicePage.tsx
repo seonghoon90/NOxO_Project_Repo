@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ChangeEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { HmiSchematic } from '../features/dashboard/HmiSchematic/HmiSchematic'
 import {
@@ -682,28 +682,33 @@ export function ForecastCard({
   forecast: RealtimeStreamPayload['forecast']
   warning: RealtimeStreamPayload['warning']
   // 단조 증가 tick (WS payload 1개당 +1). payload 객체 동일성 대신 tick
-  // 변화로 "새 payload 도착"을 감지한다. forecast=null이 연속돼도 (지속
-  // stale) tick은 매번 증가하므로 streak가 정확히 누적된다.
+  // 변화로 "새 payload 도착"을 감지한다. 이 카드가 처음 본 tick을 기준으로
+  // 경과 tick 수(≈초)를 계산해 warmup gate 판정에 쓴다.
   tick: number
   noxLimit: number
   currentNox: number
 }) {
-  // sticky 디바운스 — 한 번 ready였으면, not-ready payload가 연속
-  // FORECAST_STICKY_TICKS회(1Hz 기준 약 4초) 지속될 때만 "준비 중"으로 폴백한다.
-  // 단발 stale/warning payload 1개로 ForecastCard가 "값 → 준비 중 → 값"
-  // 깜빡이는 것을 막는다. 백엔드 stale grace와 이중 방어.
+  // warmup gate + latch — 새로고침/세션 재연결 직후 FORECAST_WARMUP_TICKS회
+  // (1Hz 기준 약 10초)는 forecast가 와도 의도적으로 "준비 중"을 표시한다.
+  // 이 구간에 세션 재생성·sticky 전이로 "값 ↔ 준비 중"이 깜빡이는 것을
+  // 통째로 흡수한다. 게이트 종료 후 ready 값이 한 번 latch되면 not-ready/
+  // warning이 와도 그 값을 영구 hold해 다시 "준비 중"으로 돌아가지 않는다.
   //
   // tick이 바뀐 렌더에서만 step을 1회 적용하는 React 공식 derived-state
-  // 패턴. streak 누적과 표시값(effective)을 함께 state로 확정 보관해,
-  // setSticky 후 재렌더나 같은 tick의 부수 재렌더에서 streak가 재누적되지
-  // 않게 한다(멱등). stepForecastSticky가 한 번에 계산하므로 한 렌더 지연도 없다.
+  // 패턴. lastReady와 표시값(effective)을 함께 state로 확정 보관해, setSticky
+  // 후 재렌더나 같은 tick의 부수 재렌더에서 중복 적용되지 않게 한다(멱등).
   const [sticky, setSticky] = useState(initialForecastStickyState)
   const [seenTick, setSeenTick] = useState(-1)
   const [effectiveForecast, setEffectiveForecast] =
     useState<RealtimeStreamPayload['forecast']>(null)
+  // 이 카드 인스턴스가 처음 본 tick. tickRef는 세션 재생성 시에도 리셋되지
+  // 않으므로, 마운트 기준 상대 경과로 게이트를 건다.
+  const baseTickRef = useRef<number | null>(null)
+  if (baseTickRef.current === null) baseTickRef.current = tick
 
   if (tick !== seenTick) {
-    const step = stepForecastSticky(sticky, forecast, warning)
+    const elapsedTicks = tick - baseTickRef.current
+    const step = stepForecastSticky(sticky, forecast, warning, elapsedTicks)
     setSeenTick(tick)
     if (step.next !== sticky) setSticky(step.next)
     if (step.effective !== effectiveForecast) {

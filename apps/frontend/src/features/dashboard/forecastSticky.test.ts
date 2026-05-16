@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { RealtimeStreamPayload } from './mockConsole'
 import {
-  FORECAST_STICKY_TICKS,
+  FORECAST_WARMUP_TICKS,
   initialForecastStickyState,
   stepForecastSticky,
   type ForecastStickyState,
@@ -16,56 +16,105 @@ function fc(value: number): NonNullable<RealtimeStreamPayload['forecast']> {
   } as NonNullable<RealtimeStreamPayload['forecast']>
 }
 
-describe('stepForecastSticky', () => {
-  it('ready payload면 lastReady 갱신·streak 0, 그 forecast를 즉시 표시', () => {
+// gate 통과 기준 elapsedTicks (이 값 이상이면 게이트 종료)
+const PAST_GATE = FORECAST_WARMUP_TICKS
+
+describe('stepForecastSticky — warmup gate', () => {
+  it('gate 내에서는 ready여도 "준비 중"(null) 표시', () => {
+    const f = fc(12.1)
+    const { effective } = stepForecastSticky(
+      initialForecastStickyState,
+      f,
+      null,
+      0,
+    )
+    expect(effective).toBeNull()
+  })
+
+  it('gate 내 ready는 lastReady에 적재해 둔다 (게이트 종료 즉시 표시되도록)', () => {
+    const f = fc(12.1)
+    const { next } = stepForecastSticky(initialForecastStickyState, f, null, 3)
+    expect(next.lastReady).toBe(f)
+  })
+
+  it('gate 경계: elapsedTicks가 정확히 한도면 게이트 종료 (off-by-one 가드)', () => {
+    const f = fc(12.1)
+    const { effective } = stepForecastSticky(
+      initialForecastStickyState,
+      f,
+      null,
+      FORECAST_WARMUP_TICKS,
+    )
+    expect(effective).toBe(f)
+  })
+
+  it('gate 내내 not-ready여도 "준비 중" 유지', () => {
+    let state = initialForecastStickyState
+    for (let t = 0; t < FORECAST_WARMUP_TICKS; t += 1) {
+      const s = stepForecastSticky(state, null, 'forecast warmup', t)
+      expect(s.effective).toBeNull()
+      state = s.next
+    }
+  })
+
+  it('gate 동안 ready 적재 → 게이트 종료 tick에 즉시 그 값 표시', () => {
+    let state = initialForecastStickyState
+    const v = fc(12.1)
+    // gate 내 ready 수신 (아직 표시 안 됨)
+    let s = stepForecastSticky(state, v, null, 2)
+    expect(s.effective).toBeNull()
+    state = s.next
+    // 게이트 종료 직후 not-ready가 와도, 적재해 둔 값을 hold
+    s = stepForecastSticky(state, null, 'forecast warmup', PAST_GATE)
+    expect(s.effective).toBe(v)
+  })
+})
+
+describe('stepForecastSticky — latch (gate 종료 후)', () => {
+  it('ready payload면 lastReady 갱신, 그 forecast 즉시 표시', () => {
     const f = fc(12.1)
     const { next, effective } = stepForecastSticky(
       initialForecastStickyState,
       f,
       null,
+      PAST_GATE,
     )
     expect(next.lastReady).toBe(f)
-    expect(next.notReadyStreak).toBe(0)
     expect(effective).toBe(f)
   })
 
-  it('not-ready & grace 이내면 직전 ready forecast를 hold (깜빡임 차단)', () => {
+  it('latch 후 not-ready가 와도 마지막 ready 값을 영구 hold', () => {
     const last = fc(12.1)
-    const prev: ForecastStickyState = { lastReady: last, notReadyStreak: 0 }
-    const { next, effective } = stepForecastSticky(
+    const prev: ForecastStickyState = { lastReady: last }
+    const { effective } = stepForecastSticky(
       prev,
       null,
       'kafka stream stale',
+      PAST_GATE,
     )
-    expect(next.notReadyStreak).toBe(1)
-    expect(effective).toBe(last) // 한 렌더 지연 없이 이번 step에서 hold
-  })
-
-  it('streak가 grace 한도를 초과하는 step에서 null → 준비 중 폴백', () => {
-    const prev: ForecastStickyState = {
-      lastReady: fc(12.1),
-      notReadyStreak: FORECAST_STICKY_TICKS, // 이번 step에서 +1 → 초과
-    }
-    const { next, effective } = stepForecastSticky(prev, null, 'kafka stream stale')
-    expect(next.notReadyStreak).toBe(FORECAST_STICKY_TICKS + 1)
-    expect(effective).toBeNull()
-  })
-
-  it('grace 경계: streak가 정확히 한도면 아직 hold (off-by-one 가드)', () => {
-    const last = fc(12.1)
-    const prev: ForecastStickyState = {
-      lastReady: last,
-      notReadyStreak: FORECAST_STICKY_TICKS - 1, // 이번 step에서 +1 → 정확히 한도
-    }
-    const { effective } = stepForecastSticky(prev, null, 'kafka stream stale')
     expect(effective).toBe(last)
   })
 
-  it('한 번도 ready였던 적 없으면 state 불변 + null', () => {
+  it('latch 후 warning이 장시간 지속돼도 "준비 중"으로 되돌아가지 않는다', () => {
+    let state: ForecastStickyState = { lastReady: fc(12.1) }
+    for (let i = 0; i < 100; i += 1) {
+      const s = stepForecastSticky(
+        state,
+        null,
+        'forecast warmup',
+        PAST_GATE + i,
+      )
+      expect(s.effective).toBe(state.lastReady)
+      state = s.next
+    }
+  })
+
+  it('한 번도 ready였던 적 없으면 gate 종료 후에도 null', () => {
     const { next, effective } = stepForecastSticky(
       initialForecastStickyState,
       null,
       'forecast warmup',
+      PAST_GATE,
     )
     expect(next).toBe(initialForecastStickyState)
     expect(effective).toBeNull()
@@ -73,50 +122,47 @@ describe('stepForecastSticky', () => {
 
   it('동일 ready forecast 재수신 시 prev state를 그대로 반환 (불필요 리렌더 방지)', () => {
     const f = fc(12.1)
-    const prev: ForecastStickyState = { lastReady: f, notReadyStreak: 0 }
-    const { next } = stepForecastSticky(prev, f, null)
+    const prev: ForecastStickyState = { lastReady: f }
+    const { next } = stepForecastSticky(prev, f, null, PAST_GATE)
     expect(next).toBe(prev)
   })
 
-  it('단발 stale 시나리오: 값 → stale 1개 → 값 (깜빡임 없이 유지)', () => {
-    let state = initialForecastStickyState
+  it('새 ready 값이 오면 lastReady가 그 값으로 갱신된다', () => {
     const v1 = fc(12.1)
-    let s = stepForecastSticky(state, v1, null)
-    expect(s.effective).toBe(v1)
-    state = s.next
-
-    // 단발 stale payload — 깜빡이면 안 됨
-    s = stepForecastSticky(state, null, 'kafka stream stale')
-    expect(s.effective).toBe(v1)
-    state = s.next
-
-    // 다시 정상값
     const v2 = fc(13.4)
-    s = stepForecastSticky(state, v2, null)
+    let s = stepForecastSticky(initialForecastStickyState, v1, null, PAST_GATE)
+    expect(s.effective).toBe(v1)
+    s = stepForecastSticky(s.next, v2, null, PAST_GATE)
+    expect(s.next.lastReady).toBe(v2)
     expect(s.effective).toBe(v2)
   })
+})
 
-  it('새로고침 직후 stale 버스트: warmup 전 stale은 준비 중, latch 후엔 hold', () => {
+describe('stepForecastSticky — 전체 시나리오', () => {
+  it('새로고침 직후: gate 동안 준비 중 → 종료 후 정상값 → 단발 stale에도 깜빡임 없음', () => {
     let state = initialForecastStickyState
-    // warmup 전 — lastReady 없음 → 준비 중
-    let s = stepForecastSticky(state, null, 'forecast warmup')
-    expect(s.effective).toBeNull()
-    state = s.next
+    const v1 = fc(12.1)
 
-    // 첫 정상 예측 (latch)
-    const v = fc(12.1)
-    s = stepForecastSticky(state, v, null)
-    expect(s.effective).toBe(v)
-    state = s.next
-
-    // 이후 stale 버스트 — grace 한도까지 hold
-    for (let i = 0; i < FORECAST_STICKY_TICKS; i += 1) {
-      s = stepForecastSticky(state, null, 'kafka stream stale')
-      expect(s.effective).toBe(v)
+    // 1) gate 동안 — backend가 정상값을 보내도 의도적으로 "준비 중"
+    for (let t = 0; t < FORECAST_WARMUP_TICKS; t += 1) {
+      const s = stepForecastSticky(state, v1, null, t)
+      expect(s.effective).toBeNull()
       state = s.next
     }
-    // 한도 초과 — 준비 중 폴백
-    s = stepForecastSticky(state, null, 'kafka stream stale')
-    expect(s.effective).toBeNull()
+
+    // 2) gate 종료 — 정상값 표시 (latch)
+    let s = stepForecastSticky(state, v1, null, FORECAST_WARMUP_TICKS)
+    expect(s.effective).toBe(v1)
+    state = s.next
+
+    // 3) 단발 stale — 깜빡이면 안 됨 (영구 hold)
+    s = stepForecastSticky(state, null, 'kafka stream stale', FORECAST_WARMUP_TICKS + 1)
+    expect(s.effective).toBe(v1)
+    state = s.next
+
+    // 4) 다시 정상값으로 자연 갱신
+    const v2 = fc(13.4)
+    s = stepForecastSticky(state, v2, null, FORECAST_WARMUP_TICKS + 2)
+    expect(s.effective).toBe(v2)
   })
 })
