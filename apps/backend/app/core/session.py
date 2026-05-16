@@ -34,6 +34,9 @@ class Session:
     # stagnation 등으로 warmup이 번복돼 "12.1 → 준비 중" 깜빡임이 생기는 것을
     # 방지. mode 전환 시 재평가하도록 set_mode에서 리셋.
     forecast_warmup_passed: bool = False
+    # 연속 stale tick 수. stale grace 정책 상세는 realtime_engine의
+    # _FORECAST_STALE_GRACE_TICKS / _can_hold_forecast 참조. 정상 tick에 0 리셋.
+    consecutive_stale_ticks: int = 0
 
     def set_mode(self, mode: str) -> None:
         """모드 전환. realtime 진입 시 override + pending input flag 자동 해제."""
@@ -45,6 +48,7 @@ class Session:
             self.context.pending_input_flag = False
         # 모드가 바뀌면 버퍼 성격도 달라지므로 warmup 판정을 처음부터 다시.
         self.forecast_warmup_passed = False
+        self.consecutive_stale_ticks = 0
         self._touch()
 
     def set_override(self, controls: ControlVars) -> None:

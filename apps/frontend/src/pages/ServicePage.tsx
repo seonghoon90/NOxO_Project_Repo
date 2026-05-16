@@ -3,7 +3,6 @@ import { useOutletContext } from 'react-router-dom'
 import { HmiSchematic } from '../features/dashboard/HmiSchematic/HmiSchematic'
 import {
   CONTROL_VARIABLE_KEYS,
-  isForecastReady,
   type ConsoleMetrics,
   type MetricPoint,
   type RealtimeStreamPayload,
@@ -11,6 +10,10 @@ import {
   type VariableKey,
   variableSeed,
 } from '../features/dashboard/mockConsole'
+import {
+  initialForecastStickyState,
+  stepForecastSticky,
+} from '../features/dashboard/forecastSticky'
 import { useConsoleState, type StreamStatus } from '../features/dashboard/useConsoleState'
 
 type RestartNotice = { tone: 'ok' | 'warn'; text: string }
@@ -335,6 +338,7 @@ export function ServicePage() {
             <ForecastCard
               forecast={state.forecast}
               warning={state.warning}
+              tick={state.tick}
               noxLimit={thresholds.noxLimit}
               currentNox={state.metrics.nox15pct}
             />
@@ -667,18 +671,47 @@ export function ServicePage() {
   )
 }
 
-function ForecastCard({
+// 테스트에서 sticky 디바운스 동작을 컴포넌트 레벨로 검증하기 위해 export.
+export function ForecastCard({
   forecast,
   warning,
+  tick,
   noxLimit,
   currentNox,
 }: {
   forecast: RealtimeStreamPayload['forecast']
   warning: RealtimeStreamPayload['warning']
+  // 단조 증가 tick (WS payload 1개당 +1). payload 객체 동일성 대신 tick
+  // 변화로 "새 payload 도착"을 감지한다. forecast=null이 연속돼도 (지속
+  // stale) tick은 매번 증가하므로 streak가 정확히 누적된다.
+  tick: number
   noxLimit: number
   currentNox: number
 }) {
-  if (!isForecastReady(forecast, warning)) {
+  // sticky 디바운스 — 한 번 ready였으면, not-ready payload가 연속
+  // FORECAST_STICKY_TICKS회(1Hz 기준 약 4초) 지속될 때만 "준비 중"으로 폴백한다.
+  // 단발 stale/warning payload 1개로 ForecastCard가 "값 → 준비 중 → 값"
+  // 깜빡이는 것을 막는다. 백엔드 stale grace와 이중 방어.
+  //
+  // tick이 바뀐 렌더에서만 step을 1회 적용하는 React 공식 derived-state
+  // 패턴. streak 누적과 표시값(effective)을 함께 state로 확정 보관해,
+  // setSticky 후 재렌더나 같은 tick의 부수 재렌더에서 streak가 재누적되지
+  // 않게 한다(멱등). stepForecastSticky가 한 번에 계산하므로 한 렌더 지연도 없다.
+  const [sticky, setSticky] = useState(initialForecastStickyState)
+  const [seenTick, setSeenTick] = useState(-1)
+  const [effectiveForecast, setEffectiveForecast] =
+    useState<RealtimeStreamPayload['forecast']>(null)
+
+  if (tick !== seenTick) {
+    const step = stepForecastSticky(sticky, forecast, warning)
+    setSeenTick(tick)
+    if (step.next !== sticky) setSticky(step.next)
+    if (step.effective !== effectiveForecast) {
+      setEffectiveForecast(step.effective)
+    }
+  }
+
+  if (effectiveForecast === null) {
     return (
       <section className="kpi-card kpi-card-primary forecast-card">
         <div className="kpi-header">
@@ -693,10 +726,11 @@ function ForecastCard({
     )
   }
 
-  const exceeded = forecast.threshold_exceeded
+  const exceeded = effectiveForecast.threshold_exceeded
   // 화면 표시·delta 비교는 15% O2 보정값(predicted_nox_15pct). backend 구버전 호환을 위해
   // 미전송 시 raw predicted_nox로 폴백. threshold_exceeded는 backend raw 기준 유지.
-  const displayedForecast = forecast.predicted_nox_15pct ?? forecast.predicted_nox
+  const displayedForecast =
+    effectiveForecast.predicted_nox_15pct ?? effectiveForecast.predicted_nox
   const [integer, decimal = '0'] = displayedForecast.toFixed(1).split('.')
 
   return (

@@ -45,6 +45,27 @@ _FORECAST_MIN_NOX_STD = 1e-3
 _FORECAST_STAGNATION_SCAN_SEC = 300
 # 표본 표준편차 계산을 위한 최소 표본 수 — n-1 분모 정의상 2 필요.
 _FORECAST_MIN_NOX_SAMPLES = 2
+# stale grace window — warmup latch가 켜진 뒤 Kafka stream이 일시적으로 끊겨도
+# 이 tick 수 이내(약 30초)면 직전 forecast payload를 hold하고 warning을 억제한다.
+# Kafka 컨슈머 버퍼 일시 공백/네트워크 jitter는 보통 수 초 내 회복되므로,
+# 단발 stale 1개로 프론트가 "값 → 준비 중"으로 깜빡이는 것을 막는다.
+# 이 한도를 넘는 지속 stale은 실제 stream 장애 → warning을 정직하게 노출.
+_FORECAST_STALE_GRACE_TICKS = 30
+
+
+def _can_hold_forecast(
+    session: Session, prev_forecast: dict[str, Any] | None
+) -> bool:
+    """일시 stale 동안 직전 forecast를 재사용해도 되는지 판정.
+
+    warmup latch가 켜진 세션이 grace window 이내이고 hold할 직전 forecast가
+    있을 때만 True. 위 _FORECAST_STALE_GRACE_TICKS 주석이 정책 SoT.
+    """
+    return (
+        session.forecast_warmup_passed
+        and session.consecutive_stale_ticks <= _FORECAST_STALE_GRACE_TICKS
+        and prev_forecast is not None
+    )
 
 # NOx 15% O2 표준 보정식의 기준 산소 농도 [%]
 # nox_15pct = nox * (20.9 - 15) / (20.9 - o2)
@@ -184,7 +205,15 @@ class RealtimeEngine:
     ) -> None:
         try:
             session.tick += 1
-            payload = self._step_session(session, kafka_row, stream_stale=stream_stale)
+            prev_payload = self._last_payloads.get(sid)
+            prev_forecast = (
+                prev_payload.get("forecast") if prev_payload is not None else None
+            )
+            payload = self._step_session(
+                session, kafka_row,
+                stream_stale=stream_stale,
+                prev_forecast=prev_forecast,
+            )
             self._last_payloads[sid] = payload
             await self.ws_manager.broadcast(sid, payload)
         except Exception:
@@ -201,6 +230,7 @@ class RealtimeEngine:
     def _step_session(
         self, session: Session, kafka_row: dict[str, Any],
         *, stream_stale: bool = False,
+        prev_forecast: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         kafka_controls = self._kafka_row_to_controls(kafka_row)
 
@@ -244,9 +274,19 @@ class RealtimeEngine:
         warning = None
         if session.mode == "realtime":
             if stream_stale:
-                # spec §2.3 — Kafka stream 끊김 시 realtime 모드는 warning 채움
-                warning = "kafka stream stale"
+                session.consecutive_stale_ticks += 1
+                if _can_hold_forecast(session, prev_forecast):
+                    forecast_payload = prev_forecast
+                    logger.debug(
+                        "forecast_hold sid=%s stale_ticks=%d (grace)",
+                        session.sid, session.consecutive_stale_ticks,
+                    )
+                else:
+                    # spec §2.3 — Kafka stream 끊김 시 realtime 모드는 warning 채움
+                    warning = "kafka stream stale"
             else:
+                # 정상 tick — stale 카운터 리셋.
+                session.consecutive_stale_ticks = 0
                 # warmup latch — 한 번 정상 발행했으면 _warmup_reason 재평가를
                 # 건너뛴다. 신규 세션 첫 tick 정상 예측 직후 NOx stagnation 등으로
                 # 차단이 번복돼 "값 → 준비 중" 깜빡임이 생기는 것을 방지.

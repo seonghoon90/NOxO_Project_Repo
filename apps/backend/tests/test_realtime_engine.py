@@ -267,6 +267,162 @@ async def test_empty_buffer_realtime_mode_emits_stale_warning():
 
 
 @pytest.mark.asyncio
+async def test_stale_grace_holds_prev_forecast_after_latch():
+    """latch ON 후 단발 stale은 직전 forecast를 hold하고 warning을 억제.
+
+    "값 → 준비 중 → 값" 깜빡임의 주 트리거(단발 Kafka stale payload)의 회귀 방지.
+    """
+    buf = _make_buffer()
+    session = _make_session(mode="realtime")
+    sessions = {"s1": session}
+    fc = _make_forecaster(predicted=12.1)
+    ws = AsyncMock()
+    engine = RealtimeEngine(
+        settings=_make_settings(),
+        sensor_buffer=buf, simulator=_make_simulator(),
+        forecaster=fc, ws_manager=ws, sessions=sessions,
+    )
+
+    # tick 1 — 정상 발행 → latch
+    await engine._tick()
+    assert session.forecast_warmup_passed is True
+    assert ws.broadcast.call_args[0][1]["forecast"] is not None
+
+    # tick 2 — stream stale (buffer 고갈) 이지만 grace 이내 → 직전 forecast hold
+    engine.sensor_buffer = SensorBuffer(maxlen=10)  # 비어있음 → stream_stale
+    await engine._tick()
+
+    payload = ws.broadcast.call_args[0][1]
+    assert payload["warning"] is None  # 깜빡임 차단 — warning 미발신
+    assert payload["forecast"] is not None
+    assert payload["forecast"]["predicted_nox"] == 12.1  # 직전 값 그대로 hold
+    assert session.consecutive_stale_ticks == 1
+
+
+@pytest.mark.asyncio
+async def test_stale_grace_exhausted_emits_warning():
+    """grace 한도를 넘는 지속 stale은 warning을 정직하게 노출."""
+    from app.core import realtime_engine as re_mod
+
+    buf = _make_buffer()
+    session = _make_session(mode="realtime")
+    sessions = {"s1": session}
+    fc = _make_forecaster(predicted=12.1)
+    ws = AsyncMock()
+    engine = RealtimeEngine(
+        settings=_make_settings(),
+        sensor_buffer=buf, simulator=_make_simulator(),
+        forecaster=fc, ws_manager=ws, sessions=sessions,
+    )
+
+    await engine._tick()  # latch ON
+    assert session.forecast_warmup_passed is True
+
+    engine.sensor_buffer = SensorBuffer(maxlen=10)  # 이후 계속 stale
+    with patch.object(re_mod, "_FORECAST_STALE_GRACE_TICKS", 3):
+        # grace=3 → tick 1~3은 hold, tick 4부터 warning
+        for _ in range(3):
+            await engine._tick()
+            assert ws.broadcast.call_args[0][1]["warning"] is None
+        await engine._tick()  # 4번째 연속 stale → grace 초과
+
+    payload = ws.broadcast.call_args[0][1]
+    assert payload["warning"] == "kafka stream stale"
+    assert payload["forecast"] is None
+    assert session.consecutive_stale_ticks == 4
+
+
+@pytest.mark.asyncio
+async def test_stale_without_latch_emits_warning_immediately():
+    """latch 미통과 상태의 stale은 grace 없이 즉시 warning (기존 동작 유지)."""
+    buf = SensorBuffer(maxlen=10)  # 처음부터 비어있음 → 첫 tick부터 stale
+    session = _make_session(mode="realtime")
+    sessions = {"s1": session}
+    ws = AsyncMock()
+    engine = RealtimeEngine(
+        settings=_make_settings(),
+        sensor_buffer=buf, simulator=_make_simulator(),
+        forecaster=_make_forecaster(), ws_manager=ws, sessions=sessions,
+    )
+    await engine._tick()
+
+    payload = ws.broadcast.call_args[0][1]
+    assert session.forecast_warmup_passed is False
+    assert payload["warning"] == "kafka stream stale"
+    assert payload["forecast"] is None
+
+
+@pytest.mark.asyncio
+async def test_stale_grace_counter_resets_on_normal_tick():
+    """stale 후 정상 tick 1개가 들어오면 consecutive_stale_ticks가 0으로 리셋."""
+    buf = _make_buffer()
+    session = _make_session(mode="realtime")
+    sessions = {"s1": session}
+    fc = _make_forecaster(predicted=12.1)
+    ws = AsyncMock()
+    engine = RealtimeEngine(
+        settings=_make_settings(),
+        sensor_buffer=buf, simulator=_make_simulator(),
+        forecaster=fc, ws_manager=ws, sessions=sessions,
+    )
+
+    await engine._tick()  # latch ON
+    empty = SensorBuffer(maxlen=10)
+    engine.sensor_buffer = empty
+    await engine._tick()  # stale 1
+    await engine._tick()  # stale 2
+    assert session.consecutive_stale_ticks == 2
+
+    engine.sensor_buffer = buf  # stream 회복
+    await engine._tick()  # 정상 tick → 리셋
+    assert session.consecutive_stale_ticks == 0
+    assert ws.broadcast.call_args[0][1]["forecast"] is not None
+
+
+@pytest.mark.asyncio
+async def test_realtime_mode_rejects_override_so_stale_hold_is_override_free():
+    """realtime 모드는 override 설정을 거부 → stale-hold가 override 값과
+    모순될 수 없음을 보장하는 회귀 가드.
+
+    set_mode("realtime")가 control_override=None을 강제하고 set_override가
+    realtime에서 SessionModeConflictError를 던지므로, "realtime + override +
+    stale" 조합은 코드상 발생 불가. stale-hold 시 input_controls/current는
+    항상 kafka 추종값으로 계산된다.
+    """
+    from app.exceptions import SessionModeConflictError
+
+    session = _make_session(mode="realtime")
+    assert session.control_override is None  # realtime 진입 시 해제 확인
+
+    with pytest.raises(SessionModeConflictError):
+        session.set_override(ControlVars(
+            syngas_flow=999.0, igv_opening=80.0, n2_offset=5.0, n2_valve_1=42.0,
+            syngas_srv=60.0, syngas_gcv_1=55.0, syngas_gcv_1a=54.0,
+            syngas_gcv_2=53.0, ibh_valve=30.0, n2_flow=25.0,
+        ))
+    assert session.control_override is None  # 거부 후에도 여전히 None
+
+    # stale-hold가 실제로 override 없이 정상 동작하는지 확인
+    buf = _make_buffer()
+    sessions = {"s1": session}
+    fc = _make_forecaster(predicted=12.1)
+    ws = AsyncMock()
+    engine = RealtimeEngine(
+        settings=_make_settings(),
+        sensor_buffer=buf, simulator=_make_simulator(),
+        forecaster=fc, ws_manager=ws, sessions=sessions,
+    )
+    await engine._tick()  # latch ON
+    engine.sensor_buffer = SensorBuffer(maxlen=10)
+    await engine._tick()  # stale → hold
+
+    payload = ws.broadcast.call_args[0][1]
+    assert payload["override_active"] is False
+    assert payload["warning"] is None
+    assert payload["forecast"]["predicted_nox"] == 12.1
+
+
+@pytest.mark.asyncio
 async def test_tick_increments_session_tick():
     buf = _make_buffer()
     session = _make_session()

@@ -96,4 +96,28 @@ describe('createStateFromPayload', () => {
     const next = createStateFromPayload(payload, createInitialConsoleState(false))
     expect(next.overrideActive).toBe(true)
   })
+
+  // 회귀: ForecastCard sticky 디바운스는 state.tick으로 "새 payload"를
+  // 감지한다. tick은 반드시 백엔드 payload.tick(단조 증가)에서 와야 하며,
+  // history.length(60에서 포화)에 의존하면 60초 후 sticky가 동결된다.
+  it('state.tick은 payload.tick을 그대로 반영한다 (history.length 캡과 무관)', () => {
+    const next = createStateFromPayload(samplePayload, createInitialConsoleState(false))
+    expect(next.tick).toBe(5) // samplePayload.tick
+  })
+
+  it('연속 payload에서 tick이 단조 증가한다 (history 60 포화 이후에도)', () => {
+    let state = createInitialConsoleState(false)
+    expect(state.tick).toBe(0)
+    // history 캡(60)을 훨씬 넘는 200개 payload를 흘려도 tick은 계속 증가해야 함
+    let lastTick = -1
+    for (let t = 1; t <= 200; t += 1) {
+      state = createStateFromPayload({ ...samplePayload, tick: t }, state)
+      expect(state.tick).toBe(t)
+      expect(state.tick).toBeGreaterThan(lastTick)
+      lastTick = state.tick
+    }
+    // history는 60에서 포화됐지만 tick은 200까지 도달 — 결함 재현 방지
+    expect(state.history.length).toBeLessThanOrEqual(60)
+    expect(state.tick).toBe(200)
+  })
 })
