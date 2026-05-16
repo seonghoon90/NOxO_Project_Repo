@@ -181,14 +181,32 @@ export function useConsoleState(mode: Mode) {
       cancelReconnect()
       reconnectTimerRef.current = window.setTimeout(async () => {
         reconnectTimerRef.current = null
-        try {
-          // 재연결 직후 즉시 마지막 실상태로 화면 동기화 (FRONTEND §7).
-          const snapshot = await fetchSnapshot(sid)
-          if (snapshot) {
-            setState((current) => createStateFromSnapshot(snapshot, current))
+        // 재연결 직후 snapshot으로 세션 생존 여부 판정 (FRONTEND §7).
+        const result = await fetchSnapshot(sid)
+        if (result.kind === 'gone') {
+          // backend reload/재시작으로 세션 소실 → 같은 sid 재연결은 영원히
+          // 404. 새 세션을 만들어 그 sid로 연결한다 (죽은 세션 무한 루프 차단).
+          try {
+            const session = await startSession()
+            sessionIdRef.current = session.sid
+            setStoredSessionId(session.sid)
+            reconnectAttemptRef.current = 0
+            if (session.snapshot) {
+              setState((current) =>
+                createStateFromSnapshot(session.snapshot!, current),
+              )
+            }
+            connectStream(session.sid, true)
+          } catch (err) {
+            console.error('session recreate after loss failed', err)
+            setStatus('disconnected')
           }
-        } catch (err) {
-          console.warn('snapshot restore failed before reconnect', err)
+          return
+        }
+        if (result.kind === 'ok') {
+          setState((current) =>
+            createStateFromSnapshot(result.snapshot, current),
+          )
         }
         connectStream(sid, true)
       }, delay)
@@ -525,10 +543,25 @@ async function startSession() {
   }
 }
 
-async function fetchSnapshot(sid: string): Promise<BackendConsoleSnapshot | null> {
-  const response = await fetch(`${apiBaseUrl()}/api/session/${sid}/snapshot`)
-  if (!response.ok) return null
-  return (await response.json()) as BackendConsoleSnapshot
+// 'gone' = backend가 세션을 모름(404). reload/재시작으로 in-memory 세션이
+// 소실된 상태 → 같은 sid 재연결은 무의미하므로 새 세션을 만들어야 한다.
+type SnapshotResult =
+  | { kind: 'ok'; snapshot: BackendConsoleSnapshot }
+  | { kind: 'gone' }
+  | { kind: 'error' }
+
+async function fetchSnapshot(sid: string): Promise<SnapshotResult> {
+  try {
+    const response = await fetch(`${apiBaseUrl()}/api/session/${sid}/snapshot`)
+    if (response.status === 404) return { kind: 'gone' }
+    if (!response.ok) return { kind: 'error' }
+    return {
+      kind: 'ok',
+      snapshot: (await response.json()) as BackendConsoleSnapshot,
+    }
+  } catch {
+    return { kind: 'error' }
+  }
 }
 
 function resetVariableValues(variables: ConsoleState['variables']): ConsoleState['variables'] {
