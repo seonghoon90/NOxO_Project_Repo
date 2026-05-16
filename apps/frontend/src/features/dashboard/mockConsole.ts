@@ -52,6 +52,8 @@ export type ConsoleState = {
   metrics: ConsoleMetrics
   history: MetricPoint[]
   forecast: RealtimeStreamPayload['forecast']
+  // backend warmup/stale 알림. ForecastCard가 예측 보류 표시에 사용.
+  warning: RealtimeStreamPayload['warning']
   overrideActive: boolean
   kafkaLatest: RealtimeStreamPayload['kafka_latest']
 }
@@ -269,6 +271,7 @@ export function createInitialConsoleState(seedHistory = false): ConsoleState {
     metrics,
     history,
     forecast: null,
+    warning: null,
     overrideActive: false,
     kafkaLatest: null,
   }
@@ -376,6 +379,7 @@ export function createStateFromSnapshot(
     metrics,
     history: previous?.history ?? [],
     forecast: previous?.forecast ?? null,
+    warning: previous?.warning ?? null,
     overrideActive: previous?.overrideActive ?? false,
     kafkaLatest: previous?.kafkaLatest ?? null,
   }
@@ -563,6 +567,30 @@ export type RealtimeStreamPayload = {
   warning: string | null
 }
 
+// null이 아닌 forecast 페이로드 (isForecastReady 통과 시 narrowing 대상)
+type ForecastPayload = NonNullable<RealtimeStreamPayload['forecast']>
+
+/**
+ * 5분 후 NOx 예측을 화면에 표시할 수 있는 정상 상태인지 판정.
+ *
+ * 새로고침 직후 backend SensorBuffer가 부분 충전된 구간에서는 forecaster가
+ * OOD 외삽으로 -24 같은 음수를 낼 수 있다(`predict.py` ffill 폴백). 또한
+ * backend는 warmup/stale 시 forecast=null + warning을 보낸다. 이 중 하나라도
+ * 해당하면 false → 호출부는 "예측 모델 준비 중" 표시로 폴백한다.
+ *
+ * type predicate라 true 분기에서 forecast가 non-null로 narrowing된다.
+ */
+export function isForecastReady(
+  forecast: RealtimeStreamPayload['forecast'],
+  warning: RealtimeStreamPayload['warning'],
+): forecast is ForecastPayload {
+  if (forecast === null) return false
+  if (warning !== null) return false
+  const value = forecast.predicted_nox_15pct ?? forecast.predicted_nox
+  if (value === undefined || !Number.isFinite(value)) return false
+  return value >= 0
+}
+
 // VariableKey(camelCase) → backend payload.current.controls 키(snake_case) 매핑
 export const VARIABLE_KEY_TO_DOMAIN: Record<VariableKey, string> = {
   syngasFlow: 'syngas_flow',
@@ -622,6 +650,7 @@ export function createStateFromPayload(
     variables,
     metrics,
     forecast: payload.forecast,
+    warning: payload.warning,
     overrideActive: payload.override_active,
     kafkaLatest: payload.kafka_latest,
   }

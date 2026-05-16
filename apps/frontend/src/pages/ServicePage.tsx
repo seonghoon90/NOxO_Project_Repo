@@ -3,6 +3,7 @@ import { useOutletContext } from 'react-router-dom'
 import { HmiSchematic } from '../features/dashboard/HmiSchematic/HmiSchematic'
 import {
   CONTROL_VARIABLE_KEYS,
+  isForecastReady,
   type ConsoleMetrics,
   type MetricPoint,
   type RealtimeStreamPayload,
@@ -333,6 +334,7 @@ export function ServicePage() {
           {isRealtimeMode ? (
             <ForecastCard
               forecast={state.forecast}
+              warning={state.warning}
               noxLimit={thresholds.noxLimit}
               currentNox={state.metrics.nox15pct}
             />
@@ -667,14 +669,16 @@ export function ServicePage() {
 
 function ForecastCard({
   forecast,
+  warning,
   noxLimit,
   currentNox,
 }: {
   forecast: RealtimeStreamPayload['forecast']
+  warning: RealtimeStreamPayload['warning']
   noxLimit: number
   currentNox: number
 }) {
-  if (forecast === null) {
+  if (!isForecastReady(forecast, warning)) {
     return (
       <section className="kpi-card kpi-card-primary forecast-card">
         <div className="kpi-header">
