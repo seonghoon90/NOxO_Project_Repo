@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -166,6 +166,63 @@ async def test_forecaster_failure_yields_null_forecast():
     payload = ws.broadcast.call_args[0][1]
     assert payload["forecast"] is None
     assert payload["warning"] == "forecast unavailable"
+
+
+@pytest.mark.asyncio
+async def test_forecast_success_latches_warmup_passed():
+    """forecast 정상 발행 시 session.forecast_warmup_passed가 True로 고정."""
+    buf = _make_buffer()
+    session = _make_session(mode="realtime")
+    assert session.forecast_warmup_passed is False
+    sessions = {"s1": session}
+    fc = _make_forecaster(predicted=12.1)
+    ws = AsyncMock()
+
+    engine = RealtimeEngine(
+        settings=_make_settings(),
+        sensor_buffer=buf, simulator=_make_simulator(),
+        forecaster=fc, ws_manager=ws, sessions=sessions,
+    )
+    await engine._tick()
+
+    assert session.forecast_warmup_passed is True
+    assert ws.broadcast.call_args[0][1]["forecast"] is not None
+
+
+@pytest.mark.asyncio
+async def test_warmup_latch_prevents_reversion_to_warmup():
+    """latch 후에는 _warmup_reason이 차단 사유를 줘도 forecast 계속 진행.
+
+    신규 세션 첫 tick 정상 예측(12.1) 직후 NOx stagnation 등으로 warmup이
+    번복돼 "값 → 준비 중" 깜빡임이 생기던 버그의 회귀 방지.
+    """
+    buf = _make_buffer()
+    session = _make_session(mode="realtime")
+    sessions = {"s1": session}
+    fc = _make_forecaster(predicted=12.1)
+    ws = AsyncMock()
+    engine = RealtimeEngine(
+        settings=_make_settings(),
+        sensor_buffer=buf, simulator=_make_simulator(),
+        forecaster=fc, ws_manager=ws, sessions=sessions,
+    )
+
+    # tick 1 — 정상 발행 → latch
+    await engine._tick()
+    assert session.forecast_warmup_passed is True
+    assert ws.broadcast.call_args[0][1]["forecast"] is not None
+
+    # tick 2 — _warmup_reason이 차단 사유를 줘도 latch 때문에 무시되어야 함
+    with patch.object(
+        engine, "_warmup_reason", return_value="nox_stagnation"
+    ) as mock_reason:
+        await engine._tick()
+
+    payload = ws.broadcast.call_args[0][1]
+    assert mock_reason.called is False  # latch면 _warmup_reason 호출 자체 skip
+    assert payload["forecast"] is not None
+    assert payload["forecast"]["predicted_nox"] == 12.1
+    assert payload["warning"] is None
 
 
 @pytest.mark.asyncio

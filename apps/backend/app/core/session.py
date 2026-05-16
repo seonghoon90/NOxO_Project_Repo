@@ -28,6 +28,12 @@ class Session:
     mode: Mode = "sim"
     control_override: ControlVars | None = None
     tick: int = 0
+    # forecast warmup latch — 한 세션에서 forecast가 한 번 정상 발행되면 True.
+    # 이후 _warmup_reason이 일시적으로 차단 사유를 반환해도 forecast를 계속
+    # 진행한다. 신규 세션 첫 tick에 정상 예측(예: 12.1)을 보낸 직후 NOx
+    # stagnation 등으로 warmup이 번복돼 "12.1 → 준비 중" 깜빡임이 생기는 것을
+    # 방지. mode 전환 시 재평가하도록 set_mode에서 리셋.
+    forecast_warmup_passed: bool = False
 
     def set_mode(self, mode: str) -> None:
         """모드 전환. realtime 진입 시 override + pending input flag 자동 해제."""
@@ -37,6 +43,8 @@ class Session:
         if mode == "realtime":
             self.control_override = None
             self.context.pending_input_flag = False
+        # 모드가 바뀌면 버퍼 성격도 달라지므로 warmup 판정을 처음부터 다시.
+        self.forecast_warmup_passed = False
         self._touch()
 
     def set_override(self, controls: ControlVars) -> None:
