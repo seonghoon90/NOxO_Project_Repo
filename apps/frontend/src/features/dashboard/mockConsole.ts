@@ -382,11 +382,13 @@ export function createStateFromSnapshot(
     variables,
     metrics,
     history: previous?.history ?? [],
-    // snapshot.t(시뮬 경과 초, 단조 증가)를 tick 소스로 사용한다.
-    // ForecastCard는 tick !== seenTick으로 "새 payload 도착"만 감지하므로
-    // 정수 카운터일 필요는 없고 단조 변화값이면 된다. 직전 tick fallback은
-    // 세션 0 시작값이 이전 세션 잔존 seenTick과 우연히 충돌해 첫 step이
-    // 누락되는 것을 피한다.
+    // snapshot.t를 tick 소스로 사용한다. backend session 엔드포인트가
+    // `"t": payload["tick"]`(app/api/endpoints/session.py)로 채우므로
+    // snapshot.t는 WS payload.tick과 동일한 session.tick 정수 카운터다
+    // (스키마 타입만 float). ForecastCard는 tick !== seenTick으로 "새
+    // payload 도착"만 감지하므로 단조 변화값이면 충분하다. 직전 tick
+    // fallback은 세션 0 시작값이 이전 세션 잔존 seenTick과 우연히 충돌해
+    // 첫 step이 누락되는 것을 피한다.
     tick: snapshot.t ?? previous?.tick ?? 0,
     forecast: previous?.forecast ?? null,
     warning: previous?.warning ?? null,
