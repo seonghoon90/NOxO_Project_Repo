@@ -247,7 +247,13 @@ class RealtimeEngine:
                 # spec §2.3 — Kafka stream 끊김 시 realtime 모드는 warning 채움
                 warning = "kafka stream stale"
             else:
-                skip_reason = self._warmup_reason(session)
+                # warmup latch — 한 번 정상 발행했으면 _warmup_reason 재평가를
+                # 건너뛴다. 신규 세션 첫 tick 정상 예측 직후 NOx stagnation 등으로
+                # 차단이 번복돼 "값 → 준비 중" 깜빡임이 생기는 것을 방지.
+                if session.forecast_warmup_passed:
+                    skip_reason = None
+                else:
+                    skip_reason = self._warmup_reason(session)
                 if skip_reason is not None:
                     # Plan E — buffer warmup 부족 또는 NOx stagnation 시 forecast 차단.
                     # predict 내부 ffill 폴백이 OOD 외삽으로 -19 같은 음수 출력하는 것
@@ -262,6 +268,8 @@ class RealtimeEngine:
                         inputs = self._build_forecast_input(session, input_controls)
                         predicted = self.forecaster.predict(inputs)
                         forecast_payload = self._build_forecast_payload(predicted, o2_pct)
+                        # 정상 발행 성공 → 이후 tick은 warmup 재평가 없이 진행.
+                        session.forecast_warmup_passed = True
                     except Exception as exc:
                         logger.warning("forecast_failed sid=%s err=%s", session.sid, exc)
                         warning = "forecast unavailable"
