@@ -33,6 +33,7 @@ function makeFeed() {
           tick={tick}
           noxLimit={50}
           currentNox={15.5}
+          forecastTargetKst={null}
         />
       )
     },
