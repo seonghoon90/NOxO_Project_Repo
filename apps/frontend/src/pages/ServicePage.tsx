@@ -324,14 +324,6 @@ export function ServicePage() {
           <div className="sidebar-clock-wrap">
             <div className="sidebar-clock-stack">
               <div className="sidebar-clock mono">{clock}</div>
-              {forecastTargetKst ? (
-                <div className="sidebar-clock sidebar-clock-forecast mono">
-                  <span className="sidebar-clock-icon" aria-label="5분 후 예측 시각" title="5분 후 예측 시각">
-                    <ForecastClockIcon />
-                  </span>
-                  <span>{forecastTargetKst}</span>
-                </div>
-              ) : null}
             </div>
           </div>
           {isRealtimeMode ? (
@@ -341,6 +333,7 @@ export function ServicePage() {
               tick={state.tick}
               noxLimit={thresholds.noxLimit}
               currentNox={state.metrics.nox15pct}
+              forecastTargetKst={forecastTargetKst}
             />
           ) : (
             <>
@@ -678,6 +671,7 @@ export function ForecastCard({
   tick,
   noxLimit,
   currentNox,
+  forecastTargetKst,
 }: {
   forecast: RealtimeStreamPayload['forecast']
   warning: RealtimeStreamPayload['warning']
@@ -687,6 +681,8 @@ export function ForecastCard({
   tick: number
   noxLimit: number
   currentNox: number
+  // 5분 후 예측 대상 시각(KST 포맷). forecast 미수신 시 null.
+  forecastTargetKst: string | null
 }) {
   // warmup gate + latch — 새로고침/세션 재연결 직후 FORECAST_WARMUP_TICKS회
   // (1Hz 기준 약 10초)는 forecast가 와도 의도적으로 "준비 중"을 표시한다.
@@ -721,12 +717,11 @@ export function ForecastCard({
       <section className="kpi-card kpi-card-primary forecast-card">
         <div className="kpi-header">
           <div className="kpi-name">5분 후 NOx 예측</div>
-          <span className="status-pill status-normal">대기</span>
         </div>
         <div className="kpi-value-row">
           <div className="kpi-value">--</div>
-          <div className="kpi-subtitle">예측 모델 준비 중...</div>
         </div>
+        <div className="kpi-subtitle forecast-warmup-text">예측 모델 준비 중...</div>
       </section>
     )
   }
@@ -749,6 +744,14 @@ export function ForecastCard({
       <div className="kpi-header">
         <div className="kpi-name">5분 후 NOx 예측</div>
       </div>
+      {forecastTargetKst ? (
+        <div className="forecast-target-time mono">
+          <span className="sidebar-clock-icon" aria-label="5분 후 예측 시각" title="5분 후 예측 시각">
+            <ForecastClockIcon />
+          </span>
+          <span>{forecastTargetKst}</span>
+        </div>
+      ) : null}
       <div className="kpi-value-row">
         <div className={exceeded ? 'kpi-value kpi-value-large caution-text' : 'kpi-value kpi-value-large'}>
           {integer}
