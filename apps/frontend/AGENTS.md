@@ -82,6 +82,4 @@ React + Vite 기반 운영자 대시보드. 공장 도면(HMI), 제어 패널, T
 
 ## 8. ⚠️ LEARNED CAUTIONS — 학습된 주의사항
 
-<!-- `learn` 스킬(`/learn` 또는 Codex의 `$learn`)로 누적되는 영역. -->
-
-_(아직 없음)_
+- **제어 변수 운영 한계(min/max) 동기화**: `src/features/dashboard/mockConsole.ts::variableSeed`에 정의된 한계값은 백엔드의 `apps/backend/app/domain/tags.py::ControlBounds`와 항상 일치해야 한다. 이 값들은 학습 데이터의 실측 분포(median 등)를 반영하고 있으므로, 임의 변경 시 백엔드 검증 로직과의 불일치로 인해 제어 입력이 거부될 수 있다.
