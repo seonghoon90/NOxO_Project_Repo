@@ -217,19 +217,21 @@ def control_vars_to_tag_dict(vars: ControlVars) -> dict[str, float]:
 # ============================================================
 @dataclass(frozen=True)
 class ControlBounds:
+    # 모든 min/max는 frontend mockConsole.ts (median 기반 실측 분포)와 동기화.
     syngas_flow_min: float = 0.0
-    syngas_flow_max: float = 100.0
+    syngas_flow_max: float = 80.0
     igv_opening_min: float = 30.0
     igv_opening_max: float = 100.0
-    n2_offset_min: float = -100.0
-    n2_offset_max: float = 500.0
-    # 신규 7개 — 개도 변수는 [0, 100], n2_flow는 [0, 500] 가안
+    n2_offset_min: float = -50.0
+    n2_offset_max: float = 50.0
+
+    # 신규 7개
     n2_valve_1_min: float = 0.0
     n2_valve_1_max: float = 100.0
     syngas_srv_min: float = 0.0
     syngas_srv_max: float = 100.0
     syngas_gcv_1_min: float = 0.0
-    syngas_gcv_1_max: float = 300.0
+    syngas_gcv_1_max: float = 100.0
     syngas_gcv_1a_min: float = 0.0
     syngas_gcv_1a_max: float = 100.0
     syngas_gcv_2_min: float = 0.0
@@ -237,7 +239,7 @@ class ControlBounds:
     ibh_valve_min: float = 0.0
     ibh_valve_max: float = 100.0
     n2_flow_min: float = 0.0
-    n2_flow_max: float = 500.0
+    n2_flow_max: float = 60.0
 
 
 DEFAULT_CONTROL_BOUNDS: Final[ControlBounds] = ControlBounds()

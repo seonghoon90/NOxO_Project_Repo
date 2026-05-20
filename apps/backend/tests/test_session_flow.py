@@ -21,14 +21,14 @@ def _initial_payload():
     return {
         CONTROL_TAGS["syngas"]: 50.0,
         CONTROL_TAGS["igv"]: 75.0,
-        CONTROL_TAGS["n2"]: 200.0,
+        CONTROL_TAGS["n2"]: 20.0,
         CONTROL_TAGS["n2_valve_1"]: 50.0,
         CONTROL_TAGS["syngas_srv"]: 60.0,
         CONTROL_TAGS["syngas_gcv_1"]: 55.0,
         CONTROL_TAGS["syngas_gcv_1a"]: 55.0,
         CONTROL_TAGS["syngas_gcv_2"]: 55.0,
         CONTROL_TAGS["ibh_valve"]: 30.0,
-        CONTROL_TAGS["n2_flow"]: 100.0,
+        CONTROL_TAGS["n2_flow"]: 30.0,
     }
 
 
@@ -72,14 +72,14 @@ def test_get_session_snapshot_returns_last_stream_payload(client):
             "controls": {
                 "syngas_flow": 50.0,
                 "igv_opening": 75.0,
-                "n2_offset": 200.0,
+                "n2_offset": 20.0,
                 "n2_valve_1": 50.0,
                 "syngas_srv": 60.0,
                 "syngas_gcv_1": 55.0,
                 "syngas_gcv_1a": 55.0,
                 "syngas_gcv_2": 55.0,
                 "ibh_valve": 30.0,
-                "n2_flow": 100.0,
+                "n2_flow": 30.0,
             },
             "outputs": {
                 "nox": 28.5,

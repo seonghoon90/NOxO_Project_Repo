@@ -14,9 +14,9 @@ from digital_twin.simulation import ControlVars
 
 def _make_controls() -> ControlVars:
     return ControlVars(
-        syngas_flow=50.0, igv_opening=75.0, n2_offset=200.0, n2_valve_1=50.0,
+        syngas_flow=50.0, igv_opening=75.0, n2_offset=20.0, n2_valve_1=50.0,
         syngas_srv=60.0, syngas_gcv_1=55.0, syngas_gcv_1a=55.0, syngas_gcv_2=55.0,
-        ibh_valve=30.0, n2_flow=100.0,
+        ibh_valve=30.0, n2_flow=30.0,
     )
 
 
@@ -25,10 +25,10 @@ def _make_buffer() -> SensorBuffer:
     buf.load_bootstrap([
         {
             "syngas_flow": 50.0, "igv_opening": 75.0,
-            "n2_offset": 200.0, "n2_valve_1": 50.0,
+            "n2_offset": 20.0, "n2_valve_1": 50.0,
             "syngas_srv": 60.0, "syngas_gcv_1": 55.0,
             "syngas_gcv_1a": 55.0, "syngas_gcv_2": 55.0,
-            "ibh_valve": 30.0, "n2_flow": 100.0,
+            "ibh_valve": 30.0, "n2_flow": 30.0,
         }
     ])
     return buf

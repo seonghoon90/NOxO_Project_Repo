@@ -114,6 +114,4 @@ FastAPI 기반 API 서버. 시뮬 세션 관리, 제어 입력 주입, WebSocket
 
 ## 8. ⚠️ LEARNED CAUTIONS — 학습된 주의사항
 
-<!-- `learn` 스킬(`/learn` 또는 Codex의 `$learn`)로 누적되는 영역. -->
-
-_(아직 없음)_
+- **제어 변수 운영 한계(min/max) 동기화**: `app/domain/tags.py::ControlBounds`의 한계값은 프론트엔드의 `apps/frontend/src/features/dashboard/mockConsole.ts::variableSeed`와 항상 일치해야 한다. 이 값들은 15일치 학습 데이터의 median 및 실제 운전 분포를 기반으로 산정되었으므로, 임의 변경 시 시뮬레이션의 물리적 개연성이 깨질 수 있다.
