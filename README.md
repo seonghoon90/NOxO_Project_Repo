@@ -177,7 +177,7 @@ cd apps/frontend && npm install && npm run dev      # → http://localhost:5173
 cd apps/backend && uvicorn app.main:app --reload    # → http://localhost:8000
 
 # 전체 통합 기동 (PostgreSQL · Redpanda · backend · frontend)
-docker compose -f docker/docker-compose.yml -f docker/docker-compose.dev.yml --profile local-db up
+docker compose -f docker/docker-compose.yml -f docker/docker-compose.dev.yml -f docker/docker-compose.kafka.yml --profile local-db --profile streaming up
 ```
 
 테스트:
