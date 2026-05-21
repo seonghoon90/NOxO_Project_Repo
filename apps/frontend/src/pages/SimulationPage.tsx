@@ -142,9 +142,7 @@ export function SimulationPage() {
           <h2 className="section-title">한 step에서 일어나는 8단계</h2>
           <p className="body-copy">
             한 step 안에서 물리 기반 모델과 데이터 기반 모델이 동시에 풀립니다. 운영자의 목표값(target)은 1차 lag을
-            거쳐 실제 운전점(current)으로 천천히 수렴하고, 그 사이 ML 모델이 정상상태 출력을
-            <br />
-            회귀합니다.
+            거쳐 실제 운전점(current)으로 천천히 수렴하고, 그 사이 ML 모델이 정상상태 출력을 회귀합니다.
           </p>
           <div className="sim-lag-card">
             <div className="section-label">1차 지연 응답</div>
@@ -253,20 +251,6 @@ A = 1.8×10⁸,  Eₐ = 318 kJ/mol`}</pre>
           </div>
         </section>
       </div>
-      <PageFooter />
     </main>
-  )
-}
-
-function PageFooter() {
-  return (
-    <footer className="page-footer">
-      <span>NOxO · 합성가스 발전 NOx 시뮬레이션 · 2026-04-29</span>
-      <div className="footer-links">
-        <span>PRD</span>
-        <span>Architecture</span>
-        <span>Repo</span>
-      </div>
-    </footer>
   )
 }

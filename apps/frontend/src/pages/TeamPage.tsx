@@ -123,20 +123,6 @@ export function TeamPage() {
           </table>
         </section>
       </div>
-      <PageFooter />
     </main>
-  )
-}
-
-function PageFooter() {
-  return (
-    <footer className="page-footer">
-      <span>NOxO · 합성가스 발전 NOx 시뮬레이션 · 2026-04-29</span>
-      <div className="footer-links">
-        <span>PRD</span>
-        <span>Architecture</span>
-        <span>Repo</span>
-      </div>
-    </footer>
   )
 }

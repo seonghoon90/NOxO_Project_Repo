@@ -226,7 +226,6 @@ export function DatabasePage() {
           </div>
         </section>
       </div>
-      <PageFooter />
     </main>
   )
 }
@@ -256,15 +255,3 @@ function TableNode({
   )
 }
 
-function PageFooter() {
-  return (
-    <footer className="page-footer">
-      <span>NOxO · 합성가스 발전 NOx 디지털 트윈 · 2026-05-21</span>
-      <div className="footer-links">
-        <span>PRD</span>
-        <span>Architecture</span>
-        <span>Repo</span>
-      </div>
-    </footer>
-  )
-}
