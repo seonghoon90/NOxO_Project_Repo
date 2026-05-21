@@ -7,7 +7,7 @@
 운영자가 조작 결과를 미리 보고, 5분 뒤 NOx 상승 위험을 사전에 감지하게 합니다.
 
 [![Live Demo](https://img.shields.io/badge/Live_Demo-15.165.247.216-3b82f6?style=for-the-badge)](http://15.165.247.216/)
-&nbsp;
+
 ![React](https://img.shields.io/badge/React-19-61dafb?logo=react&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791?logo=postgresql&logoColor=white)
@@ -182,8 +182,6 @@ pytest digital_twin/tests/
 ---
 
 <div align="center">
-
-**[Live Demo →](http://15.165.247.216/)**
 
 SeSAC × Fininsight · 2026
 
