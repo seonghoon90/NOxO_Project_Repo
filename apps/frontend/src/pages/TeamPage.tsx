@@ -1,32 +1,101 @@
-const members = [
-  ['안태현', 'FRONTEND', 'React 기반 운영자 콘솔과 실시간 스트리밍 UI를 담당합니다.', 'AT'],
-  ['팀원 B', 'BACKEND', 'FastAPI, WebSocket, 세션과 스냅샷 영속 계층을 담당합니다.', 'B'],
-  ['팀원 C', 'DIGITAL TWIN', '물리 기반 시뮬 루프와 시간 상수 τ 모델링을 담당합니다.', 'C'],
-  ['팀원 D', 'DATA / ML', '운전 시퀀스 학습과 미래 NOx 예측 모델을 담당합니다.', 'D'],
+type Member = {
+  name: string
+  role: string
+  lead?: boolean
+  email: string
+  github: string
+  initials: string
+}
+
+function githubAvatar(url: string, size = 200) {
+  const handle = url.replace(/^https?:\/\/github\.com\//, '').replace(/\/$/, '')
+  return `https://github.com/${handle}.png?size=${size}`
+}
+
+const members: Member[] = [
+  {
+    name: '김희태',
+    role: 'AI/ML Engineering',
+    lead: true,
+    email: 'heetae104@gmail.com',
+    github: 'https://github.com/kimheetae0104',
+    initials: 'KH',
+  },
+  {
+    name: '신성훈',
+    role: 'Data · DB Engineering',
+    email: 'dotofi@naver.com',
+    github: 'https://github.com/seonghoon90',
+    initials: 'SH',
+  },
+  {
+    name: '안태현',
+    role: 'Full-stack · Agentic Engineering',
+    email: 'rapael817@naver.com',
+    github: 'https://github.com/taehyunan-99',
+    initials: 'AT',
+  },
+  {
+    name: '지태현',
+    role: 'Data Analytics',
+    email: 'sys9807@naver.com',
+    github: 'https://github.com/Tay-hyyyyn',
+    initials: 'JT',
+  },
 ]
 
-const roles = [
-  ['프론트엔드', '안태현', '메인 대시보드, 시계열 차트, 도면 오버레이'],
-  ['백엔드', '팀원 B', 'API, WebSocket 게이트웨이, 세션 영속'],
-  ['디지털 트윈', '팀원 C', '시뮬 루프, τ 기반 응답 함수'],
-  ['데이터·ML', '팀원 D', '학습 파이프라인, 예측 서비스'],
+const roles: Array<[string, string, string]> = [
+  ['AI/ML Engineering', '김희태 (팀장)', 'Ridge·LGB 앙상블, Zeldovich ODE, 5분 NOx 예측 모델'],
+  ['Data · DB Engineering', '신성훈', 'sensor_data 스키마, Kafka 스트림, 학습 데이터 파이프라인'],
+  ['Full-stack · Agentic Engineering', '안태현', 'React 콘솔, FastAPI 세션, WebSocket, 에이전트 환경 구축'],
+  ['Data Analytics', '지태현', '운전 분포 분석, 임계 산정, 모델 성능 검증'],
 ]
+
+function githubHandle(url: string) {
+  return url.replace(/^https?:\/\/github\.com\//, '@')
+}
 
 export function TeamPage() {
   return (
-    <main className="content-page">
+    <main className="content-page team-page">
       <div className="content-inner">
         <section className="content-section">
           <div className="section-label">TEAM</div>
           <h1 className="section-title">이 콘솔을 만든 사람들</h1>
-          <p className="body-copy">프론트엔드, 백엔드, 디지털 트윈, 데이터 분석 네 영역을 나눠 맡았습니다.</p>
+          <p className="body-copy">
+            AI/ML, 데이터 엔지니어링, 풀스택, 데이터 분석 네 영역을 나눠 맡아 NOxO를 만들었습니다.
+          </p>
           <div className="team-grid">
-            {members.map(([name, role, body, initials]) => (
-              <article key={name} className="team-card">
-                <div className="avatar">{initials}</div>
-                <div className="member-name">{name}</div>
-                <div className="role-badge">{role}</div>
-                <p className="goal-body">{body}</p>
+            {members.map((m) => (
+              <article key={m.name} className="team-card">
+                <div className="team-card-head">
+                  <div className="avatar avatar-photo">
+                    <img
+                      src={githubAvatar(m.github)}
+                      alt={`${m.name} GitHub avatar`}
+                      loading="lazy"
+                      referrerPolicy="no-referrer"
+                    />
+                  </div>
+                  {m.lead ? <div className="team-lead-badge">팀장</div> : null}
+                </div>
+                <div className="member-name">{m.name}</div>
+                <div className="role-badge">{m.role}</div>
+                <div className="team-contact">
+                  <a className="team-contact-row" href={`mailto:${m.email}`}>
+                    <span className="team-contact-key">EMAIL</span>
+                    <span className="team-contact-value">{m.email}</span>
+                  </a>
+                  <a
+                    className="team-contact-row"
+                    href={m.github}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <span className="team-contact-key">GITHUB</span>
+                    <span className="team-contact-value mono">{githubHandle(m.github)}</span>
+                  </a>
+                </div>
               </article>
             ))}
           </div>
@@ -62,7 +131,7 @@ export function TeamPage() {
 function PageFooter() {
   return (
     <footer className="page-footer">
-      <span>NOxO · 합성가스 발전 NOx 디지털 트윈 · 2026-04-29</span>
+      <span>NOxO · 합성가스 발전 NOx 시뮬레이션 · 2026-04-29</span>
       <div className="footer-links">
         <span>PRD</span>
         <span>Architecture</span>

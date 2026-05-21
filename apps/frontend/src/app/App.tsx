@@ -17,7 +17,7 @@ const navItems = [
   { to: '/', label: '대시보드' },
   { to: '/about', label: '프로젝트 소개' },
   { to: '/database', label: 'DB 구조' },
-  { to: '/digital-twin', label: 'Digital Twin' },
+  { to: '/simulation', label: '시뮬레이션' },
   { to: '/team', label: '팀원 소개' },
 ]
 

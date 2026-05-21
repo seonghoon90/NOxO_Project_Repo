@@ -1,82 +1,84 @@
-const goals = [
-  {
-    title: 'Stateful 시뮬레이션',
-    body: '운영자의 매 조작이 이전 상태에 누적되어 시간 상수 τ에 따라 응답하는 시뮬레이션을 제공합니다.',
-  },
-  {
-    title: '미래 NOx 예측',
-    body: '현재까지의 운전 시퀀스를 학습한 모델로 5분 후 NOx와 허용치 초과 여부를 함께 보여줍니다.',
-  },
-  {
-    title: '산업용 운영자 톤',
-    body: 'Grafana와 SCADA 사이의 밀도 높은 다크 콘솔 톤으로 장시간 모니터링에 맞췄습니다.',
-  },
-]
-
-const flows = [
-  '운영자 조작',
-  'Digital Twin 시뮬 루프',
-  'WebSocket 스트림',
-  '프론트 대시보드',
-  '미래 예측 모델',
-]
+import hmiLive from '../assets/hmi-live.png'
 
 export function AboutPage() {
   return (
-    <main className="content-page">
+    <main className="content-page about-page">
       <div className="content-inner">
         <section className="hero-grid">
           <div>
             <div className="section-label">NOxO PROJECT</div>
-            <h1 className="hero-title">합성가스 발전 NOx, 실시간으로 관측하고 예측한다.</h1>
+            <h1 className="hero-title">
+              조작이 만든 변화를,
+              <br />
+              먼저 시뮬레이션으로 본다.
+            </h1>
             <p className="hero-copy">
-              운영자가 변수 하나를 바꾸면, 시간 상수 τ 만큼 늦게 다른 공정 변수가 응답합니다. NOxO는 그 응답을
-              디지털 트윈으로 재현하고, 미래 NOx를 예측합니다.
+              합성가스 발전소의 NOx는 한 번의 조작에 즉시 반응하지 않습니다.
+              <br />
+              운영자는 지금 누르면 잠시 후 어떻게 될지를 미리 가늠해야 했고,
+              <br />
+              그 판단의 무게가 곧 NOx 초과 사고로 이어졌습니다.
+              <br />
+              NOxO는 그 빈자리를 공정 시뮬레이션으로 채워, 운영자가 결정을 내리기 전에 결과를 먼저 보게 합니다.
             </p>
           </div>
-          <div className="mini-plant-card">
-            <MiniPlant />
+          <div className="about-logomark" aria-label="NOxO">
+            <div className="about-logomark-inner">
+              NOx<span>O</span>
+            </div>
           </div>
         </section>
 
         <section className="content-section">
           <div className="section-label">PROBLEM</div>
-          <h2 className="section-title">왜 NOx인가</h2>
+          <h2 className="section-title">보이지 않는 응답</h2>
           <p className="body-copy">
-            합성가스 발전은 환경 규제의 정점인 NOx 배출량 통제가 핵심입니다. 허용 기준을 초과하면 운전 중단과 법적
-            제재가 뒤따르기 때문에 운영자는 매 순간 NOx 수치를 주시해야 합니다.
+            IGCC 가스터빈은 합성가스를 태워 전기를 만들고, 그 과정에서 NOx가 나옵니다. 법적 허용치를 넘으면 운전이
+            멈추고, 보고서가 쌓이고, 다음 분기 운영 계획이 흔들립니다. 그래서 관제실의 운영자는
+            <br />
+            합성가스 유량·IGV 개도·희석질소까지 10개의 제어 변수를 동시에 들여다보며 NOx를 누르고 있습니다.
           </p>
           <p className="body-copy">
-            운전 변수는 즉각 반응하지 않습니다. 시간 상수 τ 때문에 운영자는 지금 조작이 몇 초 뒤에 어떻게 반영될지
-            머릿속으로 계산해야 하고, 이 인지 부담이 오조작으로 이어집니다.
+            문제는 NOx가 조작 직후에 보이지 않는다는 점입니다. 변수를 바꾼 결과는 한참 뒤에야 화면에 나타나고,
+            그때는 이미 손쓰기 늦은 경우가 많았습니다. 운영자에게 필요한 것은 기다림이 아니라 미리
+            <br />
+            보기였습니다.
           </p>
-        </section>
-
-        <section className="content-section">
-          <div className="section-label">GOALS</div>
-          <h2 className="section-title">이 프로젝트가 해결하려는 것</h2>
-          <div className="goal-grid">
-            {goals.map((goal) => (
-              <article key={goal.title} className="goal-card">
-                <div className="goal-title">{goal.title}</div>
-                <p className="goal-body">{goal.body}</p>
-              </article>
-            ))}
+          <div className="about-timeline">
+            <TimelineDiagram />
           </div>
         </section>
 
         <section className="content-section">
-          <div className="section-label">SYSTEM</div>
-          <h2 className="section-title">데이터 흐름</h2>
-          <p className="body-copy">운영자 조작 → 디지털 트윈 시뮬 루프 → WebSocket 스트림 → 프론트 대시보드 → 예측 모델.</p>
-          <div className="flow-strip">
-            {flows.map((flow, index) => (
-              <div key={flow} className="flow-node">
-                <span>{flow}</span>
-                {index < flows.length - 1 ? <span className="flow-arrow">→</span> : null}
-              </div>
-            ))}
-          </div>
+          <div className="section-label">CORE</div>
+          <h2 className="section-title">프로젝트의 중심: Stateful 시뮬레이션</h2>
+          <p className="body-copy">
+            NOxO의 핵심은 합성가스 발전소 연소계를 그대로 재현하는 Stateful 시뮬레이션 엔진입니다. 운영자가 10개의
+            제어 변수 중 하나를 조작하면, NOx·배기온도·발전량이 함께 움직이며 새 정상상태로
+            <br />
+            수렴해 갑니다. 한 번의 조작이 만들어내는 전체 응답 곡선을 운영자가 그대로 관찰할 수 있습니다.
+          </p>
+          <p className="body-copy">
+            엔진은 물리 기반 화학 반응 모델과 데이터 기반 ML 모델을 함께 사용해, 실측 공정에 가까운 거동을
+            재현합니다.
+          </p>
+          <figure className="about-hmi-mockup">
+            <img src={hmiLive} alt="NOxO HMI 콘솔" />
+            <figcaption className="about-hmi-caption">
+              HMI CONSOLE · 합성가스 발전소 공정 시뮬레이션 대시보드
+            </figcaption>
+          </figure>
+        </section>
+
+        <section className="content-section">
+          <div className="section-label">FORECAST</div>
+          <h2 className="section-title">5분 후 NOx도 함께 본다</h2>
+          <p className="body-copy">
+            시뮬레이션이 조작의 결과를 보여준다면, 5분 후 예측은 조작이 없을 때의 자연 추이를 보여줍니다. 현재
+            센서 시계열을 바탕으로 5분 뒤 NOx를 미리 추정해, 운영자가 상승 위험을 사전에 감지할 수 있게
+            <br />
+            합니다.
+          </p>
         </section>
       </div>
       <PageFooter />
@@ -84,34 +86,34 @@ export function AboutPage() {
   )
 }
 
-function MiniPlant() {
+function TimelineDiagram() {
   return (
-    <svg viewBox="0 0 440 160" className="mini-plant-svg">
-      <line x1="78" y1="80" x2="112" y2="80" className="plant-link" />
-      <line x1="192" y1="80" x2="226" y2="80" className="plant-link" />
-      <line x1="276" y1="80" x2="310" y2="80" className="plant-link" />
-      <line x1="154" y1="118" x2="154" y2="105" className="plant-link-secondary" />
-      <rect x="18" y="68" width="60" height="24" rx="5" className="plant-node" />
-      <text x="48" y="83" textAnchor="middle" className="plant-text secondary">
-        연료 공급
+    <svg viewBox="0 0 720 140" className="about-timeline-svg" role="img" aria-label="조작과 예측의 시간 흐름">
+      <defs>
+        <marker id="tl-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M0,0 L10,5 L0,10 z" fill="rgba(59, 130, 246, 0.85)" />
+        </marker>
+      </defs>
+
+      <line x1="40" y1="78" x2="680" y2="78" stroke="rgba(255,255,255,0.18)" strokeWidth="1.5" markerEnd="url(#tl-arrow)" />
+
+      <line x1="120" y1="62" x2="120" y2="94" stroke="rgba(255,255,255,0.12)" strokeWidth="1" strokeDasharray="2 3" />
+      <line x1="320" y1="62" x2="320" y2="94" stroke="rgba(255,255,255,0.12)" strokeWidth="1" strokeDasharray="2 3" />
+      <line x1="560" y1="62" x2="560" y2="94" stroke="rgba(255,255,255,0.12)" strokeWidth="1" strokeDasharray="2 3" />
+
+      <circle cx="120" cy="78" r="5" fill="rgba(255,255,255,0.35)" />
+      <circle cx="320" cy="78" r="7" fill="rgba(59, 130, 246, 0.9)" />
+      <circle cx="560" cy="78" r="5" fill="rgba(139, 92, 246, 0.85)" />
+
+      <text x="120" y="118" textAnchor="middle" fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace" fontSize="11" fill="rgba(255,255,255,0.45)">PAST</text>
+      <text x="320" y="118" textAnchor="middle" fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace" fontSize="11" fill="rgba(255,255,255,0.85)">NOW</text>
+      <text x="560" y="118" textAnchor="middle" fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace" fontSize="11" fill="rgba(139, 92, 246, 0.85)">+5 MIN</text>
+
+      <text x="320" y="44" textAnchor="middle" fontFamily="system-ui, sans-serif" fontSize="12" fill="rgba(59, 130, 246, 0.95)" fontWeight="600">
+        조작 → 시뮬레이션으로 응답 곡선 재현
       </text>
-      <rect x="114" y="60" width="78" height="40" rx="5" className="plant-node active" />
-      <text x="153" y="78" textAnchor="middle" className="plant-text active">
-        합성가스
-      </text>
-      <text x="153" y="90" textAnchor="middle" className="plant-text active">
-        반응기
-      </text>
-      <circle cx="251" cy="80" r="25" className="plant-node" />
-      <text x="251" y="77" textAnchor="middle" className="plant-text secondary">
-        가스
-      </text>
-      <text x="251" y="88" textAnchor="middle" className="plant-text secondary">
-        터빈
-      </text>
-      <rect x="312" y="68" width="60" height="24" rx="5" className="plant-node" />
-      <text x="342" y="83" textAnchor="middle" className="plant-text secondary">
-        배기 라인
+      <text x="560" y="44" textAnchor="middle" fontFamily="system-ui, sans-serif" fontSize="12" fill="rgba(139, 92, 246, 0.95)" fontWeight="600">
+        예측된 NOx
       </text>
     </svg>
   )
@@ -120,7 +122,7 @@ function MiniPlant() {
 function PageFooter() {
   return (
     <footer className="page-footer">
-      <span>NOxO · 합성가스 발전 NOx 디지털 트윈 · 2026-04-29</span>
+      <span>NOxO · 합성가스 발전 NOx 시뮬레이션 · 2026-04-29</span>
       <div className="footer-links">
         <span>PRD</span>
         <span>Architecture</span>
