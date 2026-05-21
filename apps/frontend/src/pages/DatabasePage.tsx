@@ -1,9 +1,8 @@
 /**
  * DB 스키마 페이지.
  *
- * 본 페이지는 database/db_definition.md v1.2 기준 운영 스키마를 요약한다.
- * 현재 실제 적재가 확정된 테이블은 sensor_data이며, 세션/입력/예측 로그 테이블은
- * 백엔드 영속화 도입 시점에 확정한다.
+ * 본 페이지는 batch ETL, streaming ETL, simulation log 저장 흐름에서
+ * 프론트 팀이 알아야 하는 DB 구조를 요약한다.
  */
 
 /**
@@ -12,10 +11,18 @@
  * - test CSV(`NOx_test_20250825.csv`)는 Kafka 스트리밍 시뮬레이션 입력으로 분리한다.
  * - `co`는 학습 타겟에서 제외되어 운영 테이블/로그에 추가하지 않는다.
  */
-const erdTables = [
+type ColumnSpec = readonly [name: string, type: string, constraint: string, description: string]
+
+type ErdTable = {
+  name: string
+  note: string
+  columns: readonly ColumnSpec[]
+}
+
+const erdTables: readonly ErdTable[] = [
   {
     name: 'sensor_data',
-    note: '운영 확정 — v1.2',
+    note: 'Batch ETL — train/historical',
     columns: [
       ['measured_at', 'timestamp', 'PK, NOT NULL', '측정 시간'],
       ['syngas_flow', 'double precision', 'NOT NULL', '합성가스 유량'],
@@ -35,8 +42,25 @@ const erdTables = [
     ],
   },
   {
+    name: 'sensor_data_stream',
+    note: 'Stream ETL — test/bootstrap/live',
+    columns: [
+      ['id', 'bigserial', 'PK', '스트림 적재 행 ID'],
+      ['measured_at', 'timestamp', 'NOT NULL, UNIQUE', '원천 센서 측정 시간'],
+      ['운영 컬럼 14개 그룹', 'double precision', 'NOT NULL', 'sensor_data와 동일한 핵심 운전 컬럼 묶음'],
+      ['o2_pct', 'double precision', 'nullable', 'NOx 15% O2 보정용 선택 컬럼'],
+      ['ML 보조 피처 28개 그룹', 'double precision', 'nullable', '예측 보조용 disturbance/raw 피처 컬럼 묶음'],
+      ['source_file', 'varchar(255)', 'NOT NULL', '입력 원천 파일명'],
+      ['stream_topic', 'varchar(128)', 'NOT NULL', 'Kafka-compatible topic 이름'],
+      ['kafka_partition', 'integer', 'UNIQUE 조합', 'Kafka partition'],
+      ['kafka_offset', 'bigint', 'UNIQUE 조합', 'Kafka offset'],
+      ['ingest_mode', 'varchar(16)', "CHECK ('bootstrap', 'stream')", '초기 적재/실시간 적재 구분'],
+      ['ingested_at', 'timestamp', 'NOT NULL, default now()', 'DB 적재 시각'],
+    ],
+  },
+  {
     name: 'simulation_session_log',
-    note: '예정 — 백엔드 영속화 시점',
+    note: 'Backend persistence',
     columns: [
       ['id', 'bigint', 'PK', '세션 로그 ID'],
       ['sid', 'varchar(64)', 'UNIQUE', '세션 식별자'],
@@ -47,7 +71,7 @@ const erdTables = [
   },
   {
     name: 'simulation_input_log',
-    note: '예정 — 백엔드 영속화 시점',
+    note: 'Backend persistence',
     columns: [
       ['id', 'bigint', 'PK', '입력 이력 ID'],
       ['sid', 'varchar(64)', 'FK', 'simulation_session_log.sid 참조'],
@@ -66,15 +90,14 @@ const erdTables = [
   },
   {
     name: 'forecast_log',
-    note: '예정 — 백엔드 영속화 시점',
+    note: 'Backend persistence',
     columns: [
       ['id', 'bigint', 'PK', '예측 이력 ID'],
       ['sid', 'varchar(64)', 'FK', 'simulation_session_log.sid 참조'],
       ['created_at', 'timestamp', 'NOT NULL', '예측 생성 시간'],
       ['target_time', 'timestamp', 'NOT NULL', '예측 대상 미래 시점'],
       ['predicted_nox', 'double precision', 'NOT NULL', '예측된 NOx 농도'],
-      ['predicted_exhaust_temp', 'double precision', 'nullable', '예측된 배기가스 온도'],
-      ['predicted_power_mw', 'double precision', 'nullable', '예측된 발전기 출력'],
+      ['threshold_value', 'double precision', 'NOT NULL', '예측 시점의 NOx 임계값 스냅샷'],
       ['threshold_exceeded', 'boolean', 'NOT NULL', '임계값 초과 여부'],
     ],
   },
@@ -85,11 +108,15 @@ export function DatabasePage() {
     <main className="content-page">
       <div className="content-inner db-inner">
         <div className="section-label">DATABASE</div>
-        <h1 className="section-title">데이터 모델 v1.2</h1>
-        <p className="body-copy">
-          IGCC 센서 train 데이터를 적재하는 운영 테이블과, 후속 백엔드 영속화 단계에서
-          사용할 로그 테이블의 기준 스키마다.
-        </p>
+        <h1 className="section-title">데이터 모델 구조</h1>
+        <div className="db-summary">
+          <p>
+            IGCC train 데이터는 batch 테이블에, test-day replay 데이터는 streaming 전용 테이블에 분리 저장한다.
+          </p>
+          <p>
+            시뮬레이션 세션·제어 입력·예측 결과는 sid 기준 로그 테이블로 연결한다.
+          </p>
+        </div>
 
         <section
           className="panel"
@@ -100,54 +127,67 @@ export function DatabasePage() {
             background: 'rgba(245, 158, 11, 0.08)',
           }}
         >
-          <strong>구현 상태</strong> — `sensor_data`는 PostgreSQL에 적재 완료된 운영 테이블이다.
-          세션·입력·예측 로그는 아직 백엔드 in-memory 상태를 대체하지 않으며,
-          영속화 요구가 확정된 뒤 ORM/Alembic과 함께 도입한다.
+          <strong>구현 상태</strong> — `sensor_data`는 Airflow batch ETL의 train 적재 테이블이고,
+          `sensor_data_stream`은 Redpanda 기반 streaming simulation 데이터를 lineage와 함께 저장한다.
+          `simulation_session_log`, `simulation_input_log`, `forecast_log`는 백엔드 세션/예측 로그 영속화에 사용한다.
         </section>
 
         <section className="erd-container">
           <div className="erd-wrap">
-            <svg className="erd-svg" viewBox="0 0 900 456">
-              <line x1="260" y1="310" x2="390" y2="260" className="erd-link" />
-              <line x1="260" y1="330" x2="390" y2="390" className="erd-link" />
+            <svg className="erd-svg" viewBox="0 0 1120 620">
+              <line x1="700" y1="320" x2="790" y2="250" className="erd-link" />
+              <line x1="700" y1="365" x2="790" y2="490" className="erd-link" />
+              <text x="710" y="295" className="erd-link-label">sid 1:N</text>
+              <text x="710" y="435" className="erd-link-label">sid 1:N</text>
             </svg>
             <TableNode
-              left={10}
-              top={20}
-              width={280}
+              left={24}
+              top={24}
+              width={300}
               title="sensor_data"
               rows={[
-                'measured_at',
-                'syngas_flow, igv_opening, n2_offset',
-                'n2_valve_1, syngas_srv',
-                'syngas_gcv_1, syngas_gcv_1a, syngas_gcv_2',
-                'ibh_valve, n2_flow',
+                '[PK] measured_at',
+                'train/historical batch rows',
+                'ControlVars 10 columns',
                 'nox_ppm, exhaust_temp, power_mw',
                 'npr_primary',
               ]}
             />
-            <TableNode left={10} top={285} width={250} title="simulation_session_log" rows={['id', 'sid', 'started_at', 'ended_at', 'notes']} />
             <TableNode
-              left={390}
-              top={190}
-              width={290}
-              title="simulation_input_log"
+              left={24}
+              top={310}
+              width={330}
+              title="sensor_data_stream"
               rows={[
-                'id',
-                'sid',
-                'created_at',
-                'syngas_flow, igv_opening, n2_offset',
-                'n2_valve_1, syngas_srv',
-                'syngas_gcv_1, syngas_gcv_1a, syngas_gcv_2',
-                'ibh_valve, n2_flow',
+                '[PK] id',
+                '[UQ] measured_at',
+                'test/bootstrap/live rows',
+                'ControlVars + OutputVars',
+                'optional ML feature columns',
+                'topic, partition, offset',
+                'ingest_mode, ingested_at',
               ]}
             />
             <TableNode
-              left={390}
-              top={45}
-              width={280}
+              left={430}
+              top={245}
+              width={270}
+              title="simulation_session_log"
+              rows={['[PK] id', '[UQ] sid', 'started_at', 'ended_at', 'notes']}
+            />
+            <TableNode
+              left={790}
+              top={145}
+              width={300}
+              title="simulation_input_log"
+              rows={['[PK] id', '[FK] sid', 'created_at', 'ControlVars 10 columns']}
+            />
+            <TableNode
+              left={790}
+              top={430}
+              width={300}
               title="forecast_log"
-              rows={['id', 'sid', 'created_at', 'target_time', 'predicted_nox', 'predicted_exhaust_temp', 'predicted_power_mw']}
+              rows={['[PK] id', '[FK] sid', 'created_at', 'target_time', 'predicted_nox', 'threshold_value', 'threshold_exceeded']}
             />
           </div>
         </section>
@@ -219,7 +259,7 @@ function TableNode({
 function PageFooter() {
   return (
     <footer className="page-footer">
-      <span>NOxO · 합성가스 발전 NOx 디지털 트윈 · 2026-04-29</span>
+      <span>NOxO · 합성가스 발전 NOx 디지털 트윈 · 2026-05-21</span>
       <div className="footer-links">
         <span>PRD</span>
         <span>Architecture</span>

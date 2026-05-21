@@ -1472,6 +1472,19 @@ a {
   width: min(1280px, 100%);
 }
 
+.db-summary {
+  display: grid;
+  gap: 6px;
+  max-width: 900px;
+  color: var(--text-2);
+  font-size: 14px;
+  line-height: 1.75;
+}
+
+.db-summary p {
+  margin: 0;
+}
+
 .hero-grid,
 .split-hero {
   display: grid;
@@ -1574,7 +1587,7 @@ a {
 .erd-container {
   margin-top: 32px;
   padding: 32px;
-  height: 520px;
+  height: 700px;
   background: var(--surface-2);
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -1583,8 +1596,8 @@ a {
 
 .erd-wrap {
   position: relative;
-  width: 900px;
-  height: 456px;
+  width: 1120px;
+  height: 620px;
 }
 
 .erd-svg {
@@ -1597,6 +1610,12 @@ a {
 .erd-link {
   stroke: rgba(59, 130, 246, 0.3);
   stroke-width: 1.2;
+}
+
+.erd-link-label {
+  fill: var(--text-3);
+  font-size: 11px;
+  font-family: var(--font-mono);
 }
 
 .table-node {
