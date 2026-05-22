@@ -991,8 +991,13 @@ function NoxChart({
   const thresholdInRange = noxLimit <= max
   const line = buildLinePath(values, min, max, width, height)
   const area = `${line} L ${width} ${height} L 0 ${height} Z`
-  const thresholdY = thresholdInRange ? scaleY(noxLimit, min, max, height) : thresholdPinnedY
-  const currentY = scaleY(current, min, max, height)
+  const thresholdY = clamp(
+    thresholdInRange ? scaleY(noxLimit, min, max, height) : thresholdPinnedY,
+    14,
+    height - 6,
+  )
+  const currentY = clamp(scaleY(current, min, max, height), 14, height - 6)
+  const currentLabelY = clamp(currentY - 10, 12, height - 4)
 
   return (
     <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
@@ -1018,7 +1023,7 @@ function NoxChart({
       <path d={area} fill="url(#noxArea)" />
       <path d={line} fill="none" stroke="#3B82F6" strokeWidth="2" strokeLinecap="round" />
       <circle cx={width} cy={currentY} r="3.2" fill="#3B82F6" />
-      <text x={width - 8} y={currentY - 10} textAnchor="end" className="svg-label svg-accent">
+      <text x={width - 8} y={currentLabelY} textAnchor="end" className="svg-label svg-accent">
         {current.toFixed(1)}
       </text>
       <text x="8" y={bottomLabelY} className="svg-label">
@@ -1119,7 +1124,7 @@ function buildLinePath(values: number[], min: number, max: number, width: number
   return values
     .map((value, index) => {
       const x = (index / (values.length - 1)) * width
-      const y = scaleY(value, min, max, height)
+      const y = clamp(scaleY(value, min, max, height), 0, height)
       return `${index === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`
     })
     .join(' ')
@@ -1137,7 +1142,7 @@ function buildSeriesPath(
   return values
     .map((value, index) => {
       const x = left + (index / (values.length - 1)) * width
-      const y = top + scaleY(value, min, max, height)
+      const y = clamp(top + scaleY(value, min, max, height), top, top + height)
       return `${index === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`
     })
     .join(' ')
@@ -1158,6 +1163,10 @@ function createRange(values: number[], paddingRatio: number, minimumPadding: num
 function scaleY(value: number, min: number, max: number, height: number) {
   const range = max - min || 1
   return height - ((value - min) / range) * (height * 0.78) - height * 0.08
+}
+
+function clamp(value: number, lower: number, upper: number) {
+  return Math.min(Math.max(value, lower), upper)
 }
 
 function formatValue(value: number, digits: number) {
